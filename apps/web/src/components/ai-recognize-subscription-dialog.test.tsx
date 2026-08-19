@@ -3,12 +3,13 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VirtualItem } from "@tanstack/react-virtual";
-import type { AiRecognitionStreamEvent, AiRecognizeResponse } from "@/lib/api/schemas/ai-recognition";
+import type { AiRecognizeResponse } from "@/lib/api/schemas/ai-recognition";
 import type { PreparedImport } from "@/modules/import-export/domain/import-export-model";
 import {
   clipboardDataWithFiles,
   clipboardDataWithItems,
   configuredSettings,
+  expectRecognizeStreamCalledWith,
   makeDraft,
   makePreview,
   makeResponse,
@@ -109,21 +110,6 @@ vi.mock("@/components/ui/virtualized-list", () => ({
     </div>
   ),
 }));
-
-function expectRecognizeStreamCalledWith(input: {
-  text: string;
-  images: File[];
-  thinkingControl: unknown;
-}) {
-  const streamHandlerMatcher = expect.any(Function) as unknown as (event: AiRecognitionStreamEvent) => void;
-  const abortSignalMatcher = expect.any(Object) as unknown as AbortSignal;
-
-  expect(mocks.recognizeSubscriptionsStream).toHaveBeenCalledWith(
-    input,
-    { onEvent: streamHandlerMatcher },
-    { signal: abortSignalMatcher },
-  );
-}
 
 describe("AIRecognizeSubscriptionDialog", () => {
   beforeEach(() => {
@@ -554,7 +540,7 @@ describe("AIRecognizeSubscriptionDialog", () => {
     await user.click(screen.getByRole("button", { name: "生成订阅草稿" }));
 
     await waitFor(() => expect(mocks.recognizeSubscriptionsStream).toHaveBeenCalledTimes(1));
-    expectRecognizeStreamCalledWith({
+    expectRecognizeStreamCalledWith(mocks.recognizeSubscriptionsStream.mock.calls, {
       text: "apple 50刀 1年",
       images: [],
       thinkingControl: null,
@@ -579,7 +565,7 @@ describe("AIRecognizeSubscriptionDialog", () => {
     await user.click(screen.getByRole("button", { name: "生成订阅草稿" }));
 
     await waitFor(() => expect(mocks.recognizeSubscriptionsStream).toHaveBeenCalledTimes(1));
-    expectRecognizeStreamCalledWith({
+    expectRecognizeStreamCalledWith(mocks.recognizeSubscriptionsStream.mock.calls, {
       text: "",
       images: [image],
       thinkingControl: null,
@@ -611,7 +597,7 @@ describe("AIRecognizeSubscriptionDialog", () => {
     await user.click(screen.getByRole("button", { name: "生成订阅草稿" }));
 
     await waitFor(() => expect(mocks.recognizeSubscriptionsStream).toHaveBeenCalledTimes(1));
-    expectRecognizeStreamCalledWith({
+    expectRecognizeStreamCalledWith(mocks.recognizeSubscriptionsStream.mock.calls, {
       text: "",
       images: [optimized],
       thinkingControl: null,
@@ -674,7 +660,7 @@ describe("AIRecognizeSubscriptionDialog", () => {
     await user.click(screen.getByRole("button", { name: "生成订阅草稿" }));
 
     await waitFor(() => expect(mocks.recognizeSubscriptionsStream).toHaveBeenCalledTimes(1));
-    expectRecognizeStreamCalledWith({
+    expectRecognizeStreamCalledWith(mocks.recognizeSubscriptionsStream.mock.calls, {
       text: "apple 50刀 1年",
       images: [],
       thinkingControl: { provider: "openai", effort: "high" },
@@ -794,7 +780,9 @@ describe("AIRecognizeSubscriptionDialog", () => {
     await user.click(screen.getByRole("button", { name: "生成导入预览" }));
 
     expect(await screen.findByTestId("import-preview-panel")).toBeInTheDocument();
-    expect(mocks.previewPrepared).toHaveBeenCalledWith(expect.anything(), "skip");
+    const previewCall = mocks.previewPrepared.mock.calls[0];
+    expect(previewCall?.[1]).toBe("skip");
+    expect(previewCall?.[2]).toBeInstanceOf(AbortSignal);
     expect(mocks.importPreviewPanel).toHaveBeenLastCalledWith(expect.objectContaining({ showImportOptions: false }));
   });
 });

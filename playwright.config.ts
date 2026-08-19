@@ -75,7 +75,8 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: `pnpm --dir apps/web exec vite --host 127.0.0.1 --port ${e2eClientPort} --strictPort`,
+      // 每轮强制重建 optimizer，确保 Worker 首次加载不依赖开发机残留的暖缓存。
+      command: `pnpm --dir apps/web exec vite --force --host 127.0.0.1 --port ${e2eClientPort} --strictPort`,
       env: {
         ...proxyEnv,
         VITE_DEV_PROXY_TARGET: e2eServerURL,

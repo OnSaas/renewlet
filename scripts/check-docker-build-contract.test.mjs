@@ -20,6 +20,7 @@ FROM client-deps AS client-builder
 COPY apps/web apps/web
 COPY packages/shared packages/shared
 RUN pnpm --filter @renewlet/client build
+RUN pnpm --filter @renewlet/client build:docker-sidecars
 FROM golang:1.26.6-alpine AS server-builder
 COPY --from=client-builder /app/apps/web/dist ./internal/static/public
 FROM alpine:3.24 AS runner
@@ -45,12 +46,22 @@ function writeFixtureFile(root, relativePath, content) {
 function createFixture() {
   const root = mkdtempSync(join(tmpdir(), "renewlet-docker-contract-"));
   writeFixtureFile(root, "Dockerfile", dockerfile);
-  writeFixtureFile(root, "apps/web/package.json", JSON.stringify({ scripts: { build: clientBuild } }));
+  writeFixtureFile(
+    root,
+    "apps/web/package.json",
+    JSON.stringify({
+      scripts: {
+        build: clientBuild,
+        "build:docker-sidecars": "node scripts/generate-static-sidecars.mjs",
+      },
+    }),
+  );
   writeFixtureFile(root, "apps/web/scripts/check-client-csp.mjs", "export {};\n");
+  writeFixtureFile(root, "apps/web/scripts/generate-static-sidecars.mjs", "export {};\n");
   writeFixtureFile(
     root,
     "apps/web/scripts/check-client-bundle-budget.mjs",
-    "556075 468559 73240 60088 112455 93798\n",
+    "400000 344000\n",
   );
   writeFixtureFile(root, "apps/web/vite.config.ts", "export default { build: { manifest: true } };\n");
   writeFixtureFile(
@@ -101,6 +112,28 @@ test("rejects missing client build scripts", () => {
   withFixture((root) => {
     rmSync(join(root, "apps/web/scripts/check-client-csp.mjs"));
     assert.throws(() => checkDockerBuildContract(root), /does not exist/);
+  });
+});
+
+test("rejects a missing Docker sidecar package command", () => {
+  withFixture((root) => {
+    const packagePath = join(root, "apps/web/package.json");
+    const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
+    delete packageJson.scripts["build:docker-sidecars"];
+    writeFileSync(packagePath, JSON.stringify(packageJson));
+    assert.throws(() => checkDockerBuildContract(root), /must own the Docker static sidecar build command/);
+  });
+});
+
+test("rejects a client-builder that skips Docker sidecar generation", () => {
+  withFixture((root) => {
+    const dockerfilePath = join(root, "Dockerfile");
+    const content = readFileSync(dockerfilePath, "utf8").replace(
+      "RUN pnpm --filter @renewlet/client build:docker-sidecars\n",
+      "",
+    );
+    writeFileSync(dockerfilePath, content);
+    assert.throws(() => checkDockerBuildContract(root), /build:docker-sidecars/);
   });
 });
 

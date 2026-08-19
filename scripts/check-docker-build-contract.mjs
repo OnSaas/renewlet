@@ -7,7 +7,8 @@ const CLIENT_CHECK_SCRIPTS = [
   "scripts/check-client-csp.mjs",
   "scripts/check-client-bundle-budget.mjs",
 ];
-const BUNDLE_BUDGET_VALUES = ["556075", "468559", "73240", "60088", "112455", "93798"];
+const DOCKER_SIDECAR_SCRIPT = "node scripts/generate-static-sidecars.mjs";
+const BUNDLE_BUDGET_VALUES = ["400000", "344000"];
 const IMAGE_WORKFLOWS = [
   ".github/workflows/build-smoke.yml",
   ".github/workflows/security-scan.yml",
@@ -138,6 +139,12 @@ export function checkDockerBuildContract(repoRoot) {
   if (typeof clientBuild !== "string") {
     throw new Error("apps/web package must define a build script.");
   }
+  if (clientPackage.scripts?.["build:docker-sidecars"] !== DOCKER_SIDECAR_SCRIPT) {
+    throw new Error("apps/web must own the Docker static sidecar build command.");
+  }
+  if (!existsSync(join(repoRoot, "apps/web/scripts/generate-static-sidecars.mjs"))) {
+    throw new Error("Docker static sidecar generator must exist inside apps/web.");
+  }
 
   if (!dockerfile.startsWith("# syntax=docker/dockerfile:1.8\n# check=error=true\n")) {
     throw new Error("Dockerfile must pin syntax 1.8 and fail all stable build checks.");
@@ -151,6 +158,7 @@ export function checkDockerBuildContract(repoRoot) {
       "COPY apps/web apps/web",
       "COPY packages/shared packages/shared",
       "RUN pnpm --filter @renewlet/client build",
+      "RUN pnpm --filter @renewlet/client build:docker-sidecars",
     ],
     "Docker client-builder",
   );

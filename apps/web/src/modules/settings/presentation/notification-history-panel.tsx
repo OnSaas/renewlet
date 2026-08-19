@@ -195,6 +195,14 @@ function UpcomingBatchList({
 }) {
   const { t } = useI18n();
   const getScrollElement = useCallback(() => scrollElementRef.current, [scrollElementRef]);
+  const getItemKey = useCallback((index: number) => {
+    const batch = batches[index];
+    return batch ? getUpcomingBatchKey(batch) : index;
+  }, [batches]);
+  const renderItem = useCallback((index: number) => {
+    const batch = batches[index];
+    return batch ? <UpcomingBatchCard batch={batch} /> : null;
+  }, [batches]);
 
   if (batches.length === 0) {
     return <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground sm:p-6">{t("notification.upcoming.empty")}</div>;
@@ -204,19 +212,13 @@ function UpcomingBatchList({
     return (
       <VirtualizedList
         count={batches.length}
-        estimateSize={() => UPCOMING_BATCH_ESTIMATE}
+        estimatedItemSize={UPCOMING_BATCH_ESTIMATE}
         gap={UPCOMING_BATCH_GAP}
-        getItemKey={(index) => {
-          const batch = batches[index];
-          return batch ? getUpcomingBatchKey(batch) : index;
-        }}
+        getItemKey={getItemKey}
         getScrollElement={getScrollElement}
         overscan={5}
         testId="virtualized-upcoming-notification-list"
-        renderItem={(index) => {
-          const batch = batches[index];
-          return batch ? <UpcomingBatchCard batch={batch} /> : null;
-        }}
+        renderItem={renderItem}
       />
     );
   }
@@ -329,7 +331,7 @@ function HistoryDetailDrawer({
           closeLabel={t("common.close")}
           icon={<History className="h-5 w-5 shrink-0 text-primary" />}
           className="h5-notification-history-detail-drawer"
-          zIndexClassName="z-[70]"
+          zIndexClassName="z-70"
           data-testid="notification-history-detail-drawer"
         >
           <HistoryDetail job={job} />

@@ -167,6 +167,40 @@ describe("Cloudflare D1 subscription migrations", () => {
       db.close();
     }
   });
+
+  it("moves legacy custom units into a one-time migration instead of runtime fallbacks", () => {
+    const db = openSubscriptionMigrationDatabase();
+    try {
+      insertCostSharingSubscription(db, {
+        costSharingJson: JSON.stringify(costSharingJson({})),
+        billingCycle: "custom",
+        customDays: 45,
+        customCycleUnit: null,
+      });
+
+      applyMigration(db, "0037_subscription_cycle_fields.sql");
+
+      expect(db.prepare("SELECT custom_days, custom_cycle_unit FROM subscriptions LIMIT 1").get()).toEqual({
+        custom_days: 45,
+        custom_cycle_unit: "day",
+      });
+
+      db.prepare(`UPDATE subscriptions
+        SET billing_cycle = 'monthly', custom_days = 30, custom_cycle_unit = 'week',
+            one_time_term_count = 6, one_time_term_unit = 'month'`).run();
+      applyMigration(db, "0037_subscription_cycle_fields.sql");
+
+      expect(db.prepare(`SELECT custom_days, custom_cycle_unit,
+        one_time_term_count, one_time_term_unit FROM subscriptions LIMIT 1`).get()).toEqual({
+        custom_days: null,
+        custom_cycle_unit: null,
+        one_time_term_count: null,
+        one_time_term_unit: null,
+      });
+    } finally {
+      db.close();
+    }
+  });
 });
 
 function openSubscriptionMigrationDatabase(): DatabaseSync {
@@ -303,7 +337,14 @@ function applyOldCostSharingCollectionReminder0034(db: DatabaseSync): void {
 
 function insertCostSharingSubscription(
   db: DatabaseSync,
-  options: { costSharingJson: string; billingCycle: string; oneTimeTermCount?: number | null; oneTimeTermUnit?: string | null },
+  options: {
+    costSharingJson: string;
+    billingCycle: string;
+    customDays?: number | null;
+    customCycleUnit?: string | null;
+    oneTimeTermCount?: number | null;
+    oneTimeTermUnit?: string | null;
+  },
 ): void {
   db.prepare(`
     INSERT INTO subscriptions (
@@ -320,8 +361,8 @@ function insertCostSharingSubscription(
     "30",
     "USD",
     options.billingCycle,
-    null,
-    null,
+    options.customDays ?? null,
+    options.customCycleUnit ?? null,
     options.oneTimeTermCount ?? null,
     options.oneTimeTermUnit ?? null,
     "streaming",

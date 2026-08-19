@@ -13,13 +13,15 @@ import {
   INHERIT_REMINDER_DAYS,
 } from "@/types/subscription";
 import { AddToCalendarDialog } from "@/components/add-to-calendar-dialog";
+import { preloadRenewSubscriptionDialog } from "@/components/renew-subscription-dialog-loader";
 import { SubscriptionLogo } from "@/components/subscription-logo";
 import { SubscriptionStatusBadge } from "@/components/subscription-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileBottomDrawerContent, MobileDrawerRoot } from "@/components/ui/mobile-drawer";
-import { useCustomConfig } from "@/contexts/CustomConfigContext";
+import { SubscriptionDetailDialogLoading } from "@/components/subscription-dialog-loading";
+import { useCustomConfigState } from "@/contexts/CustomConfigContext";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSettings } from "@/hooks/use-settings";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -46,6 +48,7 @@ interface SubscriptionDetailDialogProps {
   currencyConvert: SubscriptionCurrencyConverter;
   currencyRatesReady: boolean;
   priceReferenceCurrency: string | null;
+  loading?: boolean | undefined;
 }
 
 interface SubscriptionDetailContentProps {
@@ -88,7 +91,7 @@ function SubscriptionDetailContent({
   currencyRatesReady,
   priceReferenceCurrency,
 }: SubscriptionDetailContentProps) {
-  const { config } = useCustomConfig();
+  const { config } = useCustomConfigState();
   const { data: settings } = useSettings();
   const { t, locale, label, formatDateOnly, formatCurrency } = useI18n();
   const category = config.categories.find((item) => item.value === subscription.category);
@@ -280,7 +283,14 @@ function SubscriptionDetailContent({
           </Button>
         ) : null}
         {canManualRenew ? (
-          <Button variant="outline" className="w-full justify-center border-border sm:w-auto" onClick={() => onRenewSubscription?.(subscription.id)}>
+          <Button
+            variant="outline"
+            className="w-full justify-center border-border sm:w-auto"
+            onPointerEnter={preloadRenewSubscriptionDialog}
+            onFocus={preloadRenewSubscriptionDialog}
+            onTouchStart={preloadRenewSubscriptionDialog}
+            onClick={() => onRenewSubscription?.(subscription.id)}
+          >
             <RotateCw className="h-4 w-4" />
             {t("subscription.renew")}
           </Button>
@@ -306,6 +316,7 @@ export function SubscriptionDetailDialog({
   currencyConvert,
   currencyRatesReady,
   priceReferenceCurrency,
+  loading,
 }: SubscriptionDetailDialogProps) {
   const isMobile = useMediaQuery("(max-width: 639px)");
   const { t } = useI18n();
@@ -341,7 +352,9 @@ export function SubscriptionDetailDialog({
               closeLabel={t("common.close")}
               className="max-h-[calc(var(--app-viewport-height)-1rem)]"
             >
-              {subscription ? (
+              {loading ? (
+                <SubscriptionDetailDialogLoading />
+              ) : subscription ? (
                 <SubscriptionDetailContent
                   subscription={subscription}
                   today={today}
@@ -367,7 +380,9 @@ export function SubscriptionDetailDialog({
                 </DialogTitle>
                 <DialogDescription className="sr-only">{description}</DialogDescription>
               </DialogHeader>
-              {subscription ? (
+              {loading ? (
+                <SubscriptionDetailDialogLoading />
+              ) : subscription ? (
                 <SubscriptionDetailContent
                   subscription={subscription}
                   today={today}

@@ -20,6 +20,8 @@ FROM client-deps AS client-builder
 COPY apps/web apps/web
 COPY packages/shared packages/shared
 RUN pnpm --filter @renewlet/client build
+# 预压缩只属于 Go 嵌入式运行面；Cloudflare 构建继续交给平台自动协商，避免上传无用 sidecar。
+RUN pnpm --filter @renewlet/client build:docker-sidecars
 
 FROM --platform=$BUILDPLATFORM golang:1.26.6-alpine3.24 AS server-builder
 

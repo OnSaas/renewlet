@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import {
   useCreatePublicStatusPage,
   useDeletePublicStatusPage,
@@ -9,7 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/i18n/I18nProvider";
 import { getDisplayErrorMessage } from "@/lib/display-error";
 import { copyTextToClipboard, type ClipboardCopyTarget } from "@/shared/browser/clipboard";
-import type { Subscription } from "@/types/subscription";
 
 export interface SettingsPublicStatusPageController {
   enabled: boolean;
@@ -30,7 +29,7 @@ export interface SettingsPublicStatusPageController {
 }
 
 export function usePublicStatusPageSettingsController(
-  subscriptions: Subscription[] | undefined,
+  counts: { visibleCount: number; hiddenCount: number } | undefined,
 ): SettingsPublicStatusPageController {
   const { toast } = useToast();
   const { t } = useI18n();
@@ -38,16 +37,6 @@ export function usePublicStatusPageSettingsController(
   const createPublicStatusPage = useCreatePublicStatusPage();
   const updatePublicStatusPage = useUpdatePublicStatusPage();
   const deletePublicStatusPage = useDeletePublicStatusPage();
-  const publicStatusCounts = useMemo(() => {
-    const rows = subscriptions ?? [];
-    return rows.reduce(
-      (counts, subscription) => ({
-        visible: counts.visible + (subscription.publicHidden ? 0 : 1),
-        hidden: counts.hidden + (subscription.publicHidden ? 1 : 0),
-      }),
-      { visible: 0, hidden: 0 },
-    );
-  }, [subscriptions]);
 
   const handleCreatePublicStatusPage = useCallback(async () => {
     try {
@@ -146,8 +135,8 @@ export function usePublicStatusPageSettingsController(
     enabled: publicStatusPageStatus.data?.enabled ?? false,
     pageUrl: publicStatusPageStatus.data?.pageUrl ?? null,
     showPrices: publicStatusPageStatus.data?.showPrices ?? false,
-    visibleCount: publicStatusCounts.visible,
-    hiddenCount: publicStatusCounts.hidden,
+    visibleCount: counts?.visibleCount ?? 0,
+    hiddenCount: counts?.hiddenCount ?? 0,
     isLoading: publicStatusPageStatus.isLoading,
     isCreating: createPublicStatusPage.isPending,
     isDeleting: deletePublicStatusPage.isPending,

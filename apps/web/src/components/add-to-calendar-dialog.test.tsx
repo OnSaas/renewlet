@@ -16,9 +16,10 @@ const mocks = vi.hoisted(() => ({
 }));
 const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 const originalExecCommandDescriptor = Object.getOwnPropertyDescriptor(document, "execCommand");
+const originalWindowOpen = window.open;
 
 vi.mock("@/contexts/CustomConfigContext", () => ({
-  useCustomConfig: () => ({
+  useCustomConfigState: () => ({
     config: {
       categories: [{
         id: "productivity",
@@ -97,18 +98,28 @@ const subscription: Subscription = {
   repeatReminderEnabled: false,
   repeatReminderInterval: "1h",
   repeatReminderWindow: "72h",
+  extra: {},
   pinned: false,
   publicHidden: false,
 };
 
-function renderDialog() {
+function renderDialog(value: Subscription = subscription) {
   return render(
     <AddToCalendarDialog
       open
       onOpenChange={vi.fn()}
-      subscription={subscription}
+      subscription={value}
     />,
   );
+}
+
+function mockUserAgent(userAgent: string) {
+  const descriptor = Object.getOwnPropertyDescriptor(window.navigator, "userAgent");
+  Object.defineProperty(window.navigator, "userAgent", { configurable: true, value: userAgent });
+  return () => {
+    if (descriptor) Object.defineProperty(window.navigator, "userAgent", descriptor);
+    else Reflect.deleteProperty(window.navigator, "userAgent");
+  };
 }
 
 function withoutRandomUUID(callback: () => void) {
@@ -135,7 +146,16 @@ describe("AddToCalendarDialog", () => {
     mocks.subscriptionCalendarFeedStatus = { data: { enabled: false, feedUrl: undefined }, isLoading: false };
     mocks.toastError.mockReset();
     mocks.toastSuccess.mockReset();
+    mocks.createSubscriptionCalendarFeed.mockResolvedValue({
+      enabled: true,
+      createdAt: "2026-05-18T00:00:00.000Z",
+      updatedAt: "2026-05-18T00:00:00.000Z",
+      feedUrl: "https://example.com/calendar/renewals.ics?token=secret",
+    });
     mocks.downloadSubscriptionIcs.mockResolvedValue(new Blob(["BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n"], { type: "text/calendar;charset=utf-8" }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", {
+      headers: { "content-type": "text/calendar; charset=utf-8" },
+    })));
   });
 
   afterEach(() => {
@@ -149,6 +169,8 @@ describe("AddToCalendarDialog", () => {
     } else {
       Reflect.deleteProperty(document, "execCommand");
     }
+    Object.defineProperty(window, "open", { configurable: true, value: originalWindowOpen });
+    vi.unstubAllGlobals();
   });
 
   it("renders without crypto.randomUUID", () => {
@@ -158,6 +180,139 @@ describe("AddToCalendarDialog", () => {
 
     expect(screen.getByRole("dialog", { name: "添加到日历" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "下载 ICS 文件" })).toBeInTheDocument();
+  });
+
+  it("keeps one dialog shell while detail data replaces the loading state", () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <AddToCalendarDialog
+        open
+        onOpenChange={onOpenChange}
+        subscription={null}
+        loading
+      />,
+    );
+    const loadingDialog = screen.getByRole("dialog", { name: "添加到日历" });
+
+    rerender(
+      <AddToCalendarDialog
+        open
+        onOpenChange={onOpenChange}
+        subscription={subscription}
+        loading={false}
+      />,
+    );
+
+    expect(screen.getByRole("dialog", { name: "添加到日历" })).toBe(loadingDialog);
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "下载 ICS 文件" })).toBeInTheDocument();
+  });
+
+  it("renders the full calendar workflow and activates a newly generated feed", async () => {
+    const open = vi.fn();
+    Object.defineProperty(window, "open", { configurable: true, value: open });
+
+    renderDialog();
+
+    expect(screen.getByText("为「Fastmail」创建单独日历订阅，只同步这一条续费。")).toBeInTheDocument();
+    expect(screen.getByText("2026年6月15日")).toBeInTheDocument();
+    expect(screen.getByText("持续同步此订阅")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "用 Google Calendar 打开" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("calendar.google.com"),
+    );
+    expect(screen.getByRole("link", { name: "用 Outlook.com 打开" })).not.toHaveClass("bg-primary");
+    expect(screen.getByRole("link", { name: "用 Office 365 打开" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "用 Yahoo Calendar 打开" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "生成订阅链接" }));
+
+    await waitFor(() => expect(mocks.createSubscriptionCalendarFeed).toHaveBeenCalledWith("sub-1"));
+    expect(open).toHaveBeenCalledWith("webcal://example.com/calendar/renewals.ics?token=secret", "_self");
+    expect(screen.getByLabelText("本次订阅 URL")).toHaveValue("https://example.com/calendar/renewals.ics?token=secret");
+    expect(screen.getByRole("button", { name: "重新生成订阅链接" })).toBeInTheDocument();
+  });
+
+  it("uses an existing feed without generating another token", async () => {
+    const open = vi.fn();
+    Object.defineProperty(window, "open", { configurable: true, value: open });
+    mocks.subscriptionCalendarFeedStatus = {
+      data: { enabled: true, feedUrl: "https://example.com/calendar/renewals.ics?token=existing" },
+      isLoading: false,
+    };
+
+    renderDialog();
+    fireEvent.click(screen.getByRole("button", { name: "在系统日历中订阅" }));
+
+    await waitFor(() => expect(open).toHaveBeenCalledWith(
+      "webcal://example.com/calendar/renewals.ics?token=existing",
+      "_self",
+    ));
+    expect(screen.getByLabelText("本次订阅 URL")).toHaveValue("https://example.com/calendar/renewals.ics?token=existing");
+    expect(screen.queryByRole("button", { name: "生成订阅链接" })).not.toBeInTheDocument();
+    expect(mocks.createSubscriptionCalendarFeed).not.toHaveBeenCalled();
+  });
+
+  it("does not open the system calendar when feed preflight returns HTML", async () => {
+    const open = vi.fn();
+    Object.defineProperty(window, "open", { configurable: true, value: open });
+    const fetchMock = vi.fn().mockResolvedValue(new Response("<html></html>", {
+      headers: { "content-type": "text/html" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    mocks.subscriptionCalendarFeedStatus = {
+      data: { enabled: true, feedUrl: "http://localhost:5173/calendar/renewals.ics?token=existing" },
+      isLoading: false,
+    };
+
+    renderDialog();
+    fireEvent.click(screen.getByRole("button", { name: "在系统日历中订阅" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:5173/calendar/renewals.ics?token=existing",
+      {
+        cache: "no-store",
+        credentials: "omit",
+        headers: { Accept: "text/calendar,*/*;q=0.1" },
+      },
+    ));
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it("uses an Android insert intent for the one-off calendar event", () => {
+    const restoreUserAgent = mockUserAgent(
+      "Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 Chrome/126.0.0.0 Mobile Safari/537.36",
+    );
+    try {
+      renderDialog();
+
+      const link = screen.getByRole("link", { name: "添加单次事件到 Android 日历" });
+      expect(link).toHaveAttribute("href", expect.stringContaining("intent://renewlet/calendar-event#Intent;"));
+      expect(link).toHaveAttribute("href", expect.stringContaining("action=android.intent.action.INSERT"));
+      expect(link).toHaveAttribute("href", expect.stringContaining("type=vnd.android.cursor.dir/event"));
+      expect(link).toHaveAttribute("href", expect.stringContaining("S.title=Fastmail"));
+    } finally {
+      restoreUserAgent();
+    }
+  });
+
+  it("renders fixed-term one-time subscriptions as expiry events", () => {
+    const fixedTerm: Subscription = {
+      ...subscription,
+      billingCycle: "one-time",
+      customDays: undefined,
+      customCycleUnit: undefined,
+      oneTimeTermCount: 6,
+      oneTimeTermUnit: "month",
+      autoRenew: false,
+      autoCalculateNextBillingDate: false,
+    };
+
+    renderDialog(fixedTerm);
+
+    expect(screen.getByRole("dialog", { name: "添加到期日历" })).toBeInTheDocument();
+    expect(screen.getByText("为「Fastmail」创建单独日历订阅，只同步这次服务到期。")).toBeInTheDocument();
+    expect(screen.getByText("2026年6月15日")).toBeInTheDocument();
   });
 
   it("downloads one-off ICS through the authenticated calendar service", async () => {

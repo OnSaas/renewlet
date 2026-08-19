@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, Archive, Download, RefreshCw, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { preloadImportDataDialog } from "@/components/import-data-dialog-loader";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileBottomDrawerContent, MobileDrawerRoot } from "@/components/ui/mobile-drawer";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -264,7 +265,7 @@ function CloudBackupSnapshotListOverlay({
             className="max-h-[calc(var(--app-viewport-height)-1rem)]"
             headerClassName="border-b border-border"
             bodyClassName={null}
-            zIndexClassName="z-[70]"
+            zIndexClassName="z-70"
           >
             {content}
           </MobileBottomDrawerContent>
@@ -389,7 +390,7 @@ function SnapshotRow({
       <div className="whitespace-nowrap text-xs font-medium text-muted-foreground md:text-right">{formatBytes(snapshot.sizeBytes)}</div>
       <div className="grid grid-cols-2 gap-2 md:flex md:flex-nowrap md:items-center md:justify-end">
         {/* 云备份远端操作是全局单操作；只有 provider:id 命中的当前行显示 loading，其它行只禁用。 */}
-        <Button type="button" variant="outline" size="sm" onClick={() => void onRestore(snapshot)} disabled={busy} aria-busy={isRestoring ? true : undefined} className="inline-flex h-8 min-w-[5.25rem] shrink-0 justify-center gap-1.5 whitespace-nowrap border-border px-2.5">
+        <Button type="button" variant="outline" size="sm" onClick={() => void onRestore(snapshot)} onFocus={preloadImportDataDialog} onPointerEnter={preloadImportDataDialog} onTouchStart={preloadImportDataDialog} disabled={busy} aria-busy={isRestoring ? true : undefined} className="inline-flex h-8 min-w-[5.25rem] shrink-0 justify-center gap-1.5 whitespace-nowrap border-border px-2.5">
           <LoadingButtonContent loading={isRestoring} loadingLabel={restoringLabel}>
             <Download className="h-4 w-4 shrink-0" />
             {restoreLabel}

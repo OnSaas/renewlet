@@ -70,7 +70,7 @@ describe("SettingsScreen section navigation", () => {
     const desktopNav = screen.getByTestId("settings-section-nav-desktop");
     expect(desktopNav).toHaveClass(
       "sticky",
-      "top-[var(--settings-desktop-sticky-top)]",
+      "top-(--settings-desktop-sticky-top)",
       "max-h-[calc(var(--app-viewport-height)-var(--settings-desktop-sticky-top)-1rem)]",
       "bg-card/70",
       "backdrop-blur",
@@ -150,10 +150,10 @@ describe("SettingsScreen section navigation", () => {
     expect(drawer).toHaveClass(
       "fixed",
       "left-0",
-      "top-[var(--app-visual-viewport-offset-top)]",
-      "h-[var(--app-viewport-height)]",
-      "max-h-[var(--app-viewport-height)]",
-      "z-[80]",
+      "top-(--app-visual-viewport-offset-top)",
+      "h-(--app-viewport-height)",
+      "max-h-(--app-viewport-height)",
+      "z-80",
       "rounded-r-xl",
       "bg-card/95",
     );

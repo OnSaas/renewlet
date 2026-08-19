@@ -356,6 +356,13 @@ func registerRoutes(app core.App, router *router.Router[*core.RequestEvent]) []a
 	auth.PUT("/exchange-rate-snapshots/{month}", func(e *core.RequestEvent) error { return handleExchangeRateSnapshotPut(app, e) })
 	auth.GET("/subscriptions", func(e *core.RequestEvent) error { return handleSubscriptionsList(app, e) })
 	auth.POST("/subscriptions", func(e *core.RequestEvent) error { return handleSubscriptionCreate(app, e) })
+	// 静态集合路由必须先于 {id} 详情路由注册，防止 index/analytics/facets/export 被解释成订阅 ID。
+	auth.GET("/subscriptions/index", func(e *core.RequestEvent) error { return handleSubscriptionsIndex(app, e) })
+	auth.GET("/subscriptions/analytics", func(e *core.RequestEvent) error { return handleSubscriptionsAnalytics(app, e) })
+	auth.GET("/subscriptions/calendar", func(e *core.RequestEvent) error { return handleSubscriptionsCalendar(app, e) })
+	auth.GET("/subscriptions/facets", func(e *core.RequestEvent) error { return handleSubscriptionsFacets(app, e) })
+	auth.GET("/subscriptions/export", func(e *core.RequestEvent) error { return handleSubscriptionsExport(app, e) })
+	auth.GET("/subscriptions/{id}", func(e *core.RequestEvent) error { return handleSubscriptionRead(app, e) })
 	auth.PATCH("/subscriptions/{id}", func(e *core.RequestEvent) error { return handleSubscriptionUpdate(app, e) })
 	auth.DELETE("/subscriptions/{id}", func(e *core.RequestEvent) error { return handleSubscriptionDelete(app, e) })
 	auth.GET("/assets", func(e *core.RequestEvent) error { return handleAssetsList(app, e) })

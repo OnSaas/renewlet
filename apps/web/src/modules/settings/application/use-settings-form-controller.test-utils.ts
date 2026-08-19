@@ -56,7 +56,8 @@ const mocks = vi.hoisted(() => ({
   setTheme: vi.fn(),
   clearThemeModeOverride: vi.fn(),
   theme: "dark",
-  setLocale: vi.fn(),
+  commitLocale: vi.fn(),
+  syncRemoteLocale: vi.fn(),
   testConnection: vi.fn(),
   refetchNotificationHistory: vi.fn(),
   calendarFeedStatus: { data: { enabled: false, feedUrl: undefined as string | undefined }, isLoading: false },
@@ -153,8 +154,8 @@ vi.mock("@/hooks/use-report-exchange-rates", () => ({
 }));
 
 vi.mock("@/hooks/use-subscriptions", () => ({
-  useSubscriptions: () => ({
-    data: [],
+  useSubscriptionFacets: () => ({
+    data: { total: 0, categoryCounts: {}, tags: [], visibleCount: 0, hiddenCount: 0 },
     isPending: false,
     status: "success",
   }),
@@ -226,10 +227,8 @@ vi.mock("@/lib/theme-provider", () => ({
 }));
 
 vi.mock("@/contexts/CustomConfigContext", () => ({
-  useCustomConfig: () => ({
-    config: mocks.customConfig,
-    saveConfig: mocks.saveConfig,
-  }),
+  useCustomConfigState: () => ({ config: mocks.customConfig }),
+  useCustomConfigActions: () => ({ saveConfig: mocks.saveConfig }),
 }));
 
 vi.mock("@/services/runtime", () => ({
@@ -326,7 +325,8 @@ vi.mock("@/i18n/I18nProvider", () => {
         const message = messages[key];
         return typeof message === "function" ? message(params) : message ?? key;
       },
-      setLocale: mocks.setLocale,
+      commitLocale: mocks.commitLocale,
+      syncRemoteLocale: mocks.syncRemoteLocale,
     }),
   };
 });
@@ -398,7 +398,8 @@ export function setupSettingsFormControllerTestEnvironment() {
     mocks.setTheme.mockReset();
     mocks.clearThemeModeOverride.mockReset();
     mocks.theme = "dark";
-    mocks.setLocale.mockReset();
+    mocks.commitLocale.mockReset();
+    mocks.syncRemoteLocale.mockReset();
     mocks.refetchNotificationHistory.mockReset();
     mocks.createCalendarFeedMutateAsync.mockReset();
     mocks.deleteCalendarFeedMutateAsync.mockReset();

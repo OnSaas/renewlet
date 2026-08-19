@@ -15,6 +15,7 @@ import type {
 } from "@/lib/api/schemas/exchange-rates";
 import type { ReportExchangeRateBasisStatus } from "@/hooks/use-report-exchange-rates";
 import type { BuiltInIconIndexStatus } from "@/lib/api/schemas/media";
+import { EMPTY_SETTINGS_SECRET_STATUS } from "@/services/settings-service";
 import { DEFAULT_SETTINGS, type AppSettings, type NotificationChannel } from "@/types/subscription";
 import type { ThemeMode } from "@/types/theme";
 import { BUILT_IN_ICON_PROVIDERS, type BuiltInIconProvider } from "@renewlet/shared/built-in-icons";
@@ -23,6 +24,7 @@ import { NotificationChannelConfigPanel } from "./notification-channel-config-pa
 import type { UploadedAssetsManagerController } from "../application/use-uploaded-assets-manager";
 import type { SettingsAuthSecurityController } from "../application/use-auth-security-settings-controller";
 import type { SettingsTelegramBotCommandsController } from "../application/use-telegram-bot-commands-controller";
+import type { SettingsFormController } from "../application/settings-form-controller-types";
 
 const mocks = vi.hoisted(() => ({
   useSettingsFormController: vi.fn(),
@@ -210,6 +212,14 @@ export function setSectionAnchorGeometry(
 vi.mock("@/components/header", () => ({
   Header: () => <header data-testid="header" />,
 }));
+
+vi.mock("./settings-advanced-sections-loader", async () => {
+  const module = await import("./settings-advanced-sections");
+  return {
+    DeferredSettingsAdvancedSections: module.SettingsAdvancedSections,
+    preloadSettingsAdvancedSections: vi.fn(),
+  };
+});
 
 vi.mock("@/modules/custom-config/presentation/config-manager-dialog", () => ({
   ConfigManagerDialog: ({
@@ -458,12 +468,14 @@ export function createControllerState(overrides: {
       recipientEmail: "alice@example.com",
       ...overrides.settings,
     },
+    secretStatus: EMPTY_SETTINGS_SECRET_STATUS,
+    clearSecret: fn,
     effectiveThemeMode: overrides.effectiveThemeMode ?? overrides.settings?.themeMode ?? DEFAULT_SETTINGS.themeMode,
     accountEmail: "alice@example.com",
     canManageUsers: overrides.canManageUsers ?? true,
     canAccessPocketBaseAdmin: overrides.canAccessPocketBaseAdmin ?? true,
     customConfig: overrides.customConfig ?? DEFAULT_CUSTOM_CONFIG,
-    subscriptionsQuery: { data: [] },
+    subscriptionFacetsQuery: { data: undefined, isPending: false, status: "success" },
     categoryUsageCount: new Map(),
     rates: overrides.rates ?? {},
     activeRateProvider: overrides.activeRateProvider ?? "frankfurter",
@@ -482,6 +494,7 @@ export function createControllerState(overrides: {
     updateCategories: fn,
     updateStatuses: fn,
     updatePaymentMethods: fn,
+    updateCurrencies: fn,
     updateSetting: fn,
     monthlyBudgetInput: String(overrides.settings?.monthlyBudget ?? DEFAULT_SETTINGS.monthlyBudget),
     monthlyBudgetError: null,
@@ -499,6 +512,9 @@ export function createControllerState(overrides: {
     handleThemeCustomColorChange: fn,
     testingChannel: overrides.testingChannel ?? null,
     handleTestConnection: fn,
+    notificationTestErrorDetails: null,
+    notificationTestErrorDetailsOpen: false,
+    setNotificationTestErrorDetailsOpen: fn,
     isSavingSettings: overrides.isSavingSettings ?? false,
     notificationHistory: {
       data: undefined,
@@ -636,7 +652,7 @@ export function createControllerState(overrides: {
     externalIntegrationsDisabled: overrides.externalIntegrationsDisabled ?? false,
     sensitiveAccountActionsDisabled: overrides.sensitiveAccountActionsDisabled ?? false,
     sensitiveAccountActionsDemoDisabled: overrides.sensitiveAccountActionsDemoDisabled ?? false,
-  };
+  } satisfies SettingsFormController;
 }
 
 function RouteProbe() {

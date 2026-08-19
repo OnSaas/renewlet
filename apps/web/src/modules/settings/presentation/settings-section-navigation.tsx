@@ -52,6 +52,7 @@ type SettingsSectionNavigationProps = {
   sections: SettingsSectionList;
   activeSectionId: SettingsSectionId;
   onSectionClick: (id: SettingsSectionId) => void;
+  onSectionIntent?: ((id: SettingsSectionId) => void) | undefined;
 };
 
 function getSectionFromHash(hash: string, sections: SettingsSectionList): SettingsSectionId | null {
@@ -305,11 +306,13 @@ function SettingsSectionNavLink({
   section,
   active,
   onSectionClick,
+  onSectionIntent,
   variant,
 }: {
   section: SettingsSectionDefinition;
   active: boolean;
   onSectionClick: (id: SettingsSectionId) => void;
+  onSectionIntent?: ((id: SettingsSectionId) => void) | undefined;
   variant: "desktop" | "mobileDrawer";
 }) {
   const { t } = useI18n();
@@ -323,6 +326,8 @@ function SettingsSectionNavLink({
       href={`#${section.id}`}
       aria-current={active ? "location" : undefined}
       onClick={handleClick}
+      onPointerEnter={() => onSectionIntent?.(section.id)}
+      onFocus={() => onSectionIntent?.(section.id)}
       className={cn(
         "group relative transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         variant === "desktop"
@@ -349,6 +354,7 @@ export function DesktopSettingsSectionNav({
   sections,
   activeSectionId,
   onSectionClick,
+  onSectionIntent,
 }: SettingsSectionNavigationProps) {
   const { t } = useI18n();
 
@@ -369,6 +375,7 @@ export function DesktopSettingsSectionNav({
               section={section}
               active={activeSectionId === section.id}
               onSectionClick={onSectionClick}
+              onSectionIntent={onSectionIntent}
               variant="desktop"
             />
           ))}
@@ -382,6 +389,7 @@ export function MobileSettingsSectionDrawer({
   sections,
   activeSectionId,
   onSectionClick,
+  onSectionIntent,
   open,
   onOpenChange,
 }: SettingsSectionNavigationProps & {
@@ -398,9 +406,9 @@ export function MobileSettingsSectionDrawer({
     <Drawer.Root open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} direction="left">
       {open ? (
         <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 z-[70] bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+          <Drawer.Overlay className="fixed inset-0 z-70 bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
           <Drawer.Content
-            className="fixed left-0 top-[var(--app-visual-viewport-offset-top)] z-[80] flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-[min(18rem,calc(100vw-3.5rem))] flex-col overflow-hidden rounded-r-xl border-r border-border bg-card/95 text-card-foreground shadow-lg backdrop-blur-xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-left-4"
+            className="fixed left-0 top-(--app-visual-viewport-offset-top) z-80 flex h-(--app-viewport-height) max-h-(--app-viewport-height) w-[min(18rem,calc(100vw-3.5rem))] flex-col overflow-hidden rounded-r-xl border-r border-border bg-card/95 text-card-foreground shadow-lg backdrop-blur-xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-left-4"
             data-testid="settings-section-nav-drawer"
           >
             <div className="flex items-start justify-between gap-4 border-b border-border px-4 pb-3 pt-[calc(1rem+env(safe-area-inset-top))]">
@@ -428,6 +436,7 @@ export function MobileSettingsSectionDrawer({
                       section={section}
                       active={activeSectionId === section.id}
                       onSectionClick={handleSectionClick}
+                      onSectionIntent={onSectionIntent}
                       variant="mobileDrawer"
                     />
                   </li>

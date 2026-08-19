@@ -5,7 +5,8 @@ import type { SettingsSecretKey, SettingsSecretStatus } from "@/lib/api/schemas/
 import type { RawErrorResponseDetails } from "@/lib/raw-error-response";
 import type { ClipboardCopyTarget } from "@/shared/browser/clipboard";
 import type { ConfigItem, CustomConfig } from "@/types/config";
-import type { AppSettings, NotificationChannel, Subscription } from "@/types/subscription";
+import type { AppSettings, NotificationChannel } from "@/types/subscription";
+import type { SubscriptionFacets } from "@/services/subscription-service";
 import type { CustomThemeColor, ThemeMode, ThemeVariant } from "@/types/theme";
 import type { SettingsAuthSecurityController } from "./use-auth-security-settings-controller";
 import type { SettingsBuiltInIconIndexController } from "./use-built-in-icon-index-controller";
@@ -17,8 +18,8 @@ import type { SettingsTelegramBotCommandsController } from "./use-telegram-bot-c
 
 type UpdateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
 
-interface SettingsSubscriptionsQuery {
-  data: Subscription[] | undefined;
+interface SettingsSubscriptionFacetsQuery {
+  data: SubscriptionFacets | undefined;
   isPending: boolean;
   status: "pending" | "error" | "success";
 }
@@ -56,7 +57,7 @@ export interface SettingsFormController {
   canManageUsers: boolean;
   canAccessPocketBaseAdmin: boolean;
   customConfig: CustomConfig;
-  subscriptionsQuery: SettingsSubscriptionsQuery;
+  subscriptionFacetsQuery: SettingsSubscriptionFacetsQuery;
   categoryUsageCount: Map<string, number>;
   rates: ExchangeRates;
   activeRateProvider: ExchangeRateProvider | "builtin";

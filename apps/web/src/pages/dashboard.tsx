@@ -14,41 +14,44 @@
 
 import { useCallback, useMemo } from "react";
 import Link from '@/components/router-link';
-import type { Subscription } from "@/types/subscription";
+import type { Subscription, SubscriptionCollectionItem } from "@/types/subscription";
 import { Header } from "@/components/header";
 import { dashboardStatLayout } from "@/components/dashboard-stat-layout";
 import { StatCard } from "@/components/ui/stat-card";
 import { SubscriptionCard } from "@/components/subscription-card";
 import { SubscriptionDetailDialog } from "@/components/subscription-detail-dialog";
-import { SpendingChart } from "@/components/spending-chart";
+import { AddToCalendarDialog } from "@/components/add-to-calendar-dialog";
+import { DeferredSpendingChart } from "@/components/spending-chart-loader";
 import { UpcomingRenewals } from "@/components/upcoming-renewals";
 import { DashboardPageSkeleton } from "@/components/loading-skeleton";
+import { QueryErrorState } from "@/components/query-error-state";
 import { EditSubscriptionDialog } from "@/components/edit-subscription-dialog";
 import { CreditCard, TrendingUp, Clock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useReportExchangeRates } from "@/hooks/use-report-exchange-rates";
-import { useSubscriptions } from "@/hooks/use-subscriptions";
+import { useSubscriptionAnalytics, useSubscriptionFacets } from "@/hooks/use-subscriptions";
 import { useSettings } from "@/hooks/use-settings";
-import { useCustomConfig } from "@/contexts/CustomConfigContext";
+import { useCustomConfigState } from "@/contexts/CustomConfigContext";
 import { useDashboardStats } from "@/modules/subscriptions/application/use-dashboard-stats";
 import { useSubscriptionCrud } from "@/modules/subscriptions/application/use-subscription-crud";
-import { collectSubscriptionTags } from "@/modules/subscriptions/domain/subscription-filters";
 import { resolveSubscriptionPriceReferenceCurrency } from "@/modules/subscriptions/domain/subscription-price-reference";
 import { useI18n } from "@/i18n/I18nProvider";
 import { DEFAULT_NOTIFICATION_REMINDER_DAYS } from "@/types/subscription";
 import { useSubscriptionDetailDialog } from "@/hooks/use-subscription-detail-dialog";
+import { useSubscriptionCalendarDialog } from "@/hooks/use-subscription-calendar-dialog";
 import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
 import { cn } from "@/lib/utils";
 
-const EMPTY_SUBSCRIPTIONS: Subscription[] = [];
+const EMPTY_SUBSCRIPTIONS: SubscriptionCollectionItem[] = [];
 
 /** 仪表盘页面组件。 */
 export default function Index() {
-  const subscriptionsQuery = useSubscriptions();
+  const subscriptionsQuery = useSubscriptionAnalytics();
   const subscriptions = subscriptionsQuery.data ?? EMPTY_SUBSCRIPTIONS;
+  const facetsQuery = useSubscriptionFacets();
   const settingsQuery = useSettings();
   const settings = settingsQuery.data;
-  const { config } = useCustomConfig();
+  const { config } = useCustomConfigState();
   const { t, formatCurrency } = useI18n();
   const exchangeRateProvider = settings?.exchangeRateProvider;
   const { convert, loading: ratesLoading, sourceDate: ratesSourceDate } = useReportExchangeRates(exchangeRateProvider);
@@ -59,14 +62,16 @@ export default function Index() {
   const inheritedReminderDays = settings?.notificationReminderDays ?? DEFAULT_NOTIFICATION_REMINDER_DAYS;
   const categoryByValue = useMemo(() => new Map(config.categories.map((category) => [category.value, category])), [config.categories]);
   const paymentMethodByValue = useMemo(() => new Map(config.paymentMethods.map((method) => [method.value, method])), [config.paymentMethods]);
-  const availableTags = useMemo(() => collectSubscriptionTags(subscriptions), [subscriptions]);
+  const availableTags = facetsQuery.data?.tags ?? [];
   const today = useMemo(() => todayDateOnlyInTimeZone(new Date(), timeZone), [timeZone]);
   const {
     detailDialogOpen,
     selectedDetailSubscription,
+    detailPending,
     handleViewDetails,
     handleDetailDialogOpenChange,
-  } = useSubscriptionDetailDialog(subscriptions);
+  } = useSubscriptionDetailDialog();
+  const calendarDialog = useSubscriptionCalendarDialog();
   const { activeSubscriptions, totalMonthly, upcomingCount, trialCount } = useDashboardStats(
     subscriptions,
     defaultCurrency,
@@ -77,12 +82,14 @@ export default function Index() {
   const {
     editingSubscription,
     editDialogOpen,
+    editDetailPending,
     handleAddSubscription,
     handleDeleteSubscription,
     handleEditSubscription,
     handleTogglePublicHiddenSubscription,
     handleSaveSubscription,
     handleEditDialogOpenChange,
+    handlePrefetchSubscription,
   } = useSubscriptionCrud(subscriptions);
   const handleEditFromDetail = useCallback((subscription: Subscription) => {
     handleEditSubscription(subscription.id);
@@ -96,6 +103,17 @@ export default function Index() {
         <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
         <main className="app-main mx-auto max-w-7xl">
           <DashboardPageSkeleton withPageShell={false} />
+        </main>
+      </div>
+    );
+  }
+
+  if (subscriptionsQuery.error) {
+    return (
+      <div className="app-page bg-background">
+        <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
+        <main className="app-main mx-auto max-w-7xl">
+          <QueryErrorState error={subscriptionsQuery.error} onRetry={subscriptionsQuery.refetch} />
         </main>
       </div>
     );
@@ -125,7 +143,7 @@ export default function Index() {
             data-testid="dashboard-stat-active-subscriptions"
             title={t("dashboard.activeSubscriptions")}
             value={activeSubscriptions.length}
-            subtitle={t("dashboard.totalSubscriptions", { count: subscriptions.length })}
+            subtitle={t("dashboard.totalSubscriptions", { count: facetsQuery.data?.total ?? subscriptions.length })}
             icon={<TrendingUp className="h-6 w-6" />}
             density="compact"
             className="animate-fade-in [animation-delay:100ms]"
@@ -180,6 +198,8 @@ export default function Index() {
                     onDelete={handleDeleteSubscription}
                     onTogglePublicHidden={handleTogglePublicHiddenSubscription}
                     onViewDetails={handleViewDetails}
+                    onAddToCalendar={calendarDialog.show}
+                    onPrefetchDetails={handlePrefetchSubscription}
                   />
                 </div>
               ))}
@@ -200,7 +220,7 @@ export default function Index() {
             {/* 支出图表 */}
             <div className="rounded-xl border border-border bg-card p-6 shadow-card">
               <h3 className="mb-3 text-lg font-semibold text-foreground">{t("dashboard.spendingDistribution")}</h3>
-              <SpendingChart
+              <DeferredSpendingChart
                 subscriptions={subscriptions}
                 categories={config.categories}
                 defaultCurrency={defaultCurrency}
@@ -228,6 +248,7 @@ export default function Index() {
         onOpenChange={handleEditDialogOpenChange}
         onSave={handleSaveSubscription}
         availableTags={availableTags}
+        loading={editDetailPending}
       />
       <SubscriptionDetailDialog
         open={detailDialogOpen}
@@ -238,6 +259,13 @@ export default function Index() {
         currencyConvert={convert}
         currencyRatesReady={currencyRatesReady}
         priceReferenceCurrency={priceReferenceCurrency}
+        loading={detailPending}
+      />
+      <AddToCalendarDialog
+        open={calendarDialog.open}
+        onOpenChange={calendarDialog.onOpenChange}
+        subscription={calendarDialog.subscription}
+        loading={calendarDialog.pending}
       />
     </div>
   );

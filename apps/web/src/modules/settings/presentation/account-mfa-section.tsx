@@ -25,7 +25,7 @@ export function AccountMfaSection({
 
   const statusQuery = useQuery({
     queryKey: MFA_STATUS_QUERY_KEY,
-    queryFn: () => mfaService.status(),
+    queryFn: ({ signal }) => mfaService.status(signal),
     staleTime: 30_000,
   });
 

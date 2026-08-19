@@ -1274,6 +1274,11 @@ msgid "subscriptions.exportCsv"
 msgstr "导出 CSV"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:250
+msgid "subscriptions.exportFailed"
+msgstr "导出失败，请稍后重试"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:247
 msgid "subscriptions.exportJson"
 msgstr "导出备份 ZIP"
@@ -1452,11 +1457,6 @@ msgstr "当前一键复制不可用，请手动选择并复制本次 URL。"
 #: src/i18n/descriptors/subscription.ts:199
 msgid "subscription.renew.currentNextBillingDate"
 msgstr "当前下次扣费日"
-
-#. js-lingui-explicit-id
-#: src/i18n/descriptors/subscription.ts:458
-msgid "import.error.workerUnsupported"
-msgstr "当前浏览器不支持后台解析导入文件。"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:522

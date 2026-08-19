@@ -7,7 +7,7 @@
  * - 最多展示 5 条
  */
 
-import { Subscription } from '@/types/subscription';
+import type { SubscriptionCollectionItem } from '@/types/subscription';
 import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDateOnlyMonthDay } from '@/lib/time/date-only';
@@ -16,7 +16,7 @@ import { buildUpcomingReminderItems } from '@/modules/subscriptions/domain/upcom
 
 interface UpcomingRenewalsProps {
   /** 订阅列表（前端 domain 类型）。 */
-  subscriptions: Subscription[];
+  subscriptions: SubscriptionCollectionItem[];
   /** 用户 IANA 时区，用于计算本地“今天”。 */
   timeZone: string;
   /** 设置页默认提前提醒天数，用于解析继承型订阅。 */

@@ -14,6 +14,7 @@ import {
   expectOverlayLeavesTopScrim,
   expectScrollContentNearFooter,
   expectTouchTarget,
+  expectTouchTargetsDoNotOverlap,
   getRequiredLocatorBoundingBox,
 } from "./support/layout";
 import { installLogoCandidateRoute } from "./support/media-candidates";
@@ -21,7 +22,7 @@ import {
   fillChangedTestPhone,
   getSettingsDiscardButton,
   getSettingsSaveButton,
-  gotoSettingsAfterHydration,
+  gotoSettingsSectionAfterHydration,
 } from "./support/settings";
 
 async function expectPanelInsideViewport(page: Page, locatorLabel: string) {
@@ -285,8 +286,15 @@ test("short H5 viewport keeps dialogs and bottom actions operable", async ({ pag
   const subscriptionDialog = await openAddSubscriptionDialog(page);
   await expectPanelInsideViewport(page, "subscription dialog");
   await expectNoHorizontalOverflow(page, "mobile subscription dialog");
-  await expectTouchTarget(subscriptionDialog.getByRole("button", { name: "取消" }), "subscription dialog cancel");
-  await expectTouchTarget(subscriptionDialog.getByRole("button", { name: "添加订阅" }), "subscription dialog submit");
+  const cancelSubscriptionButton = subscriptionDialog.getByRole("button", { name: "取消" });
+  const submitSubscriptionButton = subscriptionDialog.getByRole("button", { name: "添加订阅" });
+  await expectTouchTarget(cancelSubscriptionButton, "subscription dialog cancel");
+  await expectTouchTarget(submitSubscriptionButton, "subscription dialog submit");
+  await expectTouchTargetsDoNotOverlap(
+    cancelSubscriptionButton,
+    submitSubscriptionButton,
+    "subscription dialog actions",
+  );
   await expectActionNearContainerBottom(
     subscriptionDialog,
     subscriptionDialog.getByRole("button", { name: "添加订阅" }),
@@ -299,7 +307,7 @@ test("short H5 viewport keeps dialogs and bottom actions operable", async ({ pag
   await subscriptionDialog.getByRole("button", { name: "取消" }).click();
   await expect(subscriptionDialog).toBeHidden();
 
-  await gotoSettingsAfterHydration(page);
+  await gotoSettingsSectionAfterHydration(page, "settings-notifications");
   const testPhoneInput = page.getByLabel("第三方 API 测试号码", { exact: true });
   await fillChangedTestPhone(testPhoneInput);
   const saveButton = getSettingsSaveButton(page);
@@ -308,6 +316,7 @@ test("short H5 viewport keeps dialogs and bottom actions operable", async ({ pag
   await expect(discardButton).toBeVisible();
   await expectTouchTarget(saveButton, "settings save button");
   await expectTouchTarget(discardButton, "settings discard button");
+  await expectTouchTargetsDoNotOverlap(saveButton, discardButton, "settings bottom actions");
   await expectNoHorizontalOverflow(page, "mobile settings bottom bar");
 });
 
@@ -532,7 +541,7 @@ test("mobile import Logo editor keeps search candidates scrollable", async ({ pa
 test("mobile option sheets use consistent detents and do not leak backdrop events", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 640 });
 
-  await gotoSettingsAfterHydration(page);
+  await gotoSettingsSectionAfterHydration(page, "settings-display");
   await page.getByRole("combobox", { name: "语言" }).click();
   const languageSheet = page.locator(".h5-mobile-sheet-content").filter({ hasText: "English" }).last();
   await expect(languageSheet).toBeVisible();

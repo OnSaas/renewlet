@@ -111,8 +111,8 @@ describe("useUploadedAssetsManager", () => {
       expect(result.current.logo.assets.map((item) => item.id)).toEqual(["asset_logo"]);
       expect(result.current.icon.assets.map((item) => item.id)).toEqual(["asset_icon"]);
     });
-    expect(mocks.list).toHaveBeenCalledWith("logo", 1);
-    expect(mocks.list).toHaveBeenCalledWith("icon", 1);
+    expect(mocks.list).toHaveBeenCalledWith("logo", 1, expect.any(AbortSignal));
+    expect(mocks.list).toHaveBeenCalledWith("icon", 1, expect.any(AbortSignal));
   });
 
   it("updates the icon manager when the shared uploaded icon query is invalidated", async () => {

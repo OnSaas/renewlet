@@ -14,7 +14,7 @@ import { useRouter } from '@/lib/router';
 import { LayoutDashboard, List, CalendarDays, BarChart3, Settings, Sun, Moon, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import type { SubscriptionDraft } from '@/types/subscription';
+import type { SubscriptionFormSubmission } from '@/types/subscription';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/lib/theme-provider';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   /** 新增订阅回调（传入订阅主体数据，不包含 id）。不传则隐藏“新增订阅”按钮。 */
-  onAddSubscription?: (subscription: SubscriptionDraft) => void;
+  onAddSubscription?: (submission: SubscriptionFormSubmission) => void;
   /** 当前用户已有标签建议，用于新增订阅弹窗复用。 */
   availableTags?: readonly string[] | undefined;
   /** 订阅页专属快捷动作，渲染在“新增订阅”旁边。 */

@@ -1,48 +1,55 @@
 // CRUD 控制器测试保护页面级快捷动作语义，避免字段级操作退回完整订阅快照 PATCH。
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import type { PropsWithChildren } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { assertDateOnly } from "@/lib/time/date-only";
-import type { Subscription } from "@/types/subscription";
+import type { Subscription, SubscriptionFormSubmission } from "@/types/subscription";
 import { useSubscriptionCrud } from "./use-subscription-crud";
 
 const mocks = vi.hoisted(() => ({
   createMutate: vi.fn(),
   updateMutate: vi.fn(),
   patchMutate: vi.fn(),
-  renewMutate: vi.fn(),
+  renewMutateAsync: vi.fn(),
   deleteMutate: vi.fn(),
+  prefetchDetail: vi.fn(),
+  detailById: new Map<string, Subscription>(),
 }));
 
 vi.mock("@/hooks/use-subscriptions", () => ({
+  prefetchSubscriptionDetail: mocks.prefetchDetail,
   useCreateSubscription: () => ({ mutate: mocks.createMutate }),
   useUpdateSubscription: () => ({ mutate: mocks.updateMutate }),
   usePatchSubscription: () => ({ mutate: mocks.patchMutate }),
-  useRenewSubscription: () => ({ mutate: mocks.renewMutate }),
+  useRenewSubscription: () => ({
+    mutateAsync: mocks.renewMutateAsync,
+    error: null,
+    isPending: false,
+  }),
   useDeleteSubscription: () => ({ mutate: mocks.deleteMutate }),
+  useSubscriptionDetail: (id: string | null) => ({
+    data: id === null ? undefined : mocks.detailById.get(id),
+    error: null,
+    isPending: false,
+  }),
 }));
 
-function subscription(): Subscription {
+function formSubmission(): SubscriptionFormSubmission {
   return {
-    id: "sub-1",
     name: "Codex Pro",
     logo: undefined,
     price: "20",
     currency: "USD",
     billingCycle: "monthly",
-    customDays: undefined,
-    customCycleUnit: undefined,
-    oneTimeTermCount: undefined,
-    oneTimeTermUnit: undefined,
     category: "productivity",
     status: "active",
-    pinned: false,
     publicHidden: false,
     paymentMethod: undefined,
     startDate: assertDateOnly("2026-01-01"),
     nextBillingDate: assertDateOnly("2026-02-01"),
     autoRenew: false,
     autoCalculateNextBillingDate: true,
-    trialEndDate: undefined,
     website: undefined,
     notes: undefined,
     tags: [],
@@ -50,13 +57,69 @@ function subscription(): Subscription {
     repeatReminderEnabled: false,
     repeatReminderInterval: "1h",
     repeatReminderWindow: "72h",
+  };
+}
+
+function subscription(): Subscription {
+  return {
+    ...formSubmission(),
+    id: "sub-1",
+    pinned: false,
+    trialEndDate: undefined,
     extra: {},
   };
 }
 
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  const Wrapper = ({ children }: PropsWithChildren) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+  return { queryClient, wrapper: Wrapper };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.detailById.clear();
+});
+
 describe("useSubscriptionCrud", () => {
+  it("builds create and update commands from form submissions", () => {
+    const { wrapper } = createWrapper();
+    const submission = formSubmission();
+    const { result } = renderHook(() => useSubscriptionCrud([subscription()]), { wrapper });
+
+    act(() => {
+      result.current.handleAddSubscription(submission);
+      result.current.handleEditSubscription("sub-1");
+    });
+    act(() => {
+      result.current.handleSaveSubscription(submission);
+    });
+
+    expect(mocks.createMutate).toHaveBeenCalledWith({ ...submission, pinned: false });
+    expect(mocks.updateMutate).toHaveBeenCalledWith({ id: "sub-1", changes: submission });
+  });
+
+  it("prefetches the complete detail model on interaction intent", () => {
+    const { queryClient, wrapper } = createWrapper();
+    const { result } = renderHook(() => useSubscriptionCrud([subscription()]), { wrapper });
+
+    act(() => {
+      result.current.handlePrefetchSubscription("sub-1");
+    });
+
+    expect(mocks.prefetchDetail).toHaveBeenCalledWith(queryClient, "sub-1");
+  });
+
   it("uses field-level patch mutations for card quick actions", () => {
-    const { result } = renderHook(() => useSubscriptionCrud([subscription()]));
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useSubscriptionCrud([subscription()]), { wrapper });
 
     act(() => {
       result.current.handleTogglePinnedSubscription("sub-1");

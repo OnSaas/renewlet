@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { assertDateOnly } from "@/lib/time/date-only";
+import { subscriptionCycleFixture } from "@/test/subscription-fixtures";
 import type { Subscription } from "@/types/subscription";
 import { SubscriptionDetailDialog } from "./subscription-detail-dialog";
 
@@ -26,7 +27,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/contexts/CustomConfigContext", () => ({
-  useCustomConfig: () => ({
+  useCustomConfigState: () => ({
     config: {
       categories: mocks.categories,
       statuses: [],
@@ -81,6 +82,7 @@ const baseSubscription: Subscription = {
   repeatReminderEnabled: false,
   repeatReminderInterval: "1h",
   repeatReminderWindow: "72h",
+  extra: {},
   pinned: false,
   publicHidden: false,
 };
@@ -266,10 +268,12 @@ describe("SubscriptionDetailDialog", () => {
     renderDetailDialog({
       subscription: {
         ...baseSubscription,
-        billingCycle: "custom",
-        customDays: 2,
-        customCycleUnit: "week",
-      } as Subscription,
+        ...subscriptionCycleFixture({
+          billingCycle: "custom",
+          customDays: 2,
+          customCycleUnit: "week",
+        }),
+      },
     });
 
     const dialog = screen.getByRole("dialog", { name: "Fastmail" });

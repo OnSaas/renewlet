@@ -42,6 +42,7 @@ import type { PublicStatusResponse } from "@/lib/api/schemas/public-status";
 import { CYCLE_LABELS } from "@/types/subscription";
 import type { ThemeMode } from "@/types/theme";
 import { moneyToNumber } from "@renewlet/shared/money";
+import { requireCustomBillingCycle } from "@renewlet/shared/subscription-renewal";
 
 type PublicStatusSubscription = PublicStatusResponse["subscriptions"][number];
 type PublicStatusExchangeRateBasis = NonNullable<PublicStatusResponse["page"]["exchangeRateBasis"]>;
@@ -401,10 +402,9 @@ function PublicStatusCountSummary({ data }: { data: PublicStatusResponse }) {
 function publicBillingCycleLabel(subscription: PublicStatusSubscription, locale: Locale) {
   if (!subscription.billingCycle) return null;
   if (subscription.billingCycle !== "custom") return localizedLabel(CYCLE_LABELS[subscription.billingCycle], locale);
-  const count = subscription.customDays ?? 1;
-  const unit = subscription.customCycleUnit ?? "day";
-  const unitLabel = translate(locale, customCycleUnitLabelKey(unit));
-  return translate(locale, "subscription.customCycleLabel", { count, unit: unitLabel });
+  const custom = requireCustomBillingCycle(subscription.customDays, subscription.customCycleUnit);
+  const unitLabel = translate(locale, customCycleUnitLabelKey(custom.unit));
+  return translate(locale, "subscription.customCycleLabel", { count: custom.count, unit: unitLabel });
 }
 
 function PublicSubscriptionCard({ subscription }: { subscription: PublicStatusSubscription }) {

@@ -2,7 +2,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 import { expectNoHorizontalOverflow } from "./support/layout";
-import { gotoSettingsAfterHydration } from "./support/settings";
+import { gotoSettingsSectionAfterHydration } from "./support/settings";
 import {
   createSubscription,
   openAddSubscriptionDialog,
@@ -207,7 +207,7 @@ async function expectSubscriptionDialogAdaptsToKeyboardViewport(
 
 test("mobile currency manager keeps footer visible after keyboard viewport changes", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 640 });
-  await gotoSettingsAfterHydration(page);
+  await gotoSettingsSectionAfterHydration(page, "settings-data-config");
 
   const trigger = page.getByRole("button", { name: /货币管理/ });
   await trigger.scrollIntoViewIfNeeded();
@@ -288,7 +288,7 @@ test("mobile currency manager keeps footer visible after keyboard viewport chang
 
 test("compact wide currency manager keeps header and footer fixed with only the list scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 796, height: 1448 });
-  await gotoSettingsAfterHydration(page);
+  await gotoSettingsSectionAfterHydration(page, "settings-data-config");
 
   const trigger = page.getByRole("button", { name: /货币管理/ });
   await trigger.scrollIntoViewIfNeeded();

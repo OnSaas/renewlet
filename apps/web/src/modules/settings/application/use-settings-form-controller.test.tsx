@@ -332,11 +332,7 @@ describe("useSettingsFormController", () => {
 
     const command = mocks.updateSettingsMutateAsync.mock.calls.at(0)?.at(0);
     expect(command?.patch.locale).toBe(nextLocale);
-    expect(mocks.setLocale).toHaveBeenLastCalledWith(nextLocale, {
-      persist: false,
-      markAsSaved: true,
-      rememberPreference: true,
-    });
+    expect(mocks.commitLocale).toHaveBeenLastCalledWith(nextLocale);
   });
 
   it("keeps the draft dirty and shows the server restart hint when saving the provider hits PocketBase 400", async () => {
@@ -388,10 +384,7 @@ describe("useSettingsFormController", () => {
     expect(result.current.settings.locale).toBe(BASE_SETTINGS.locale);
     expect(result.current.hasUnsavedChanges).toBe(false);
     expect(mocks.setTheme).toHaveBeenLastCalledWith(BASE_SETTINGS.themeMode, { localOverride: false });
-    expect(mocks.setLocale).toHaveBeenLastCalledWith(BASE_SETTINGS.locale, {
-      persist: false,
-      markAsSaved: true,
-    });
+    expect(mocks.syncRemoteLocale).toHaveBeenLastCalledWith(BASE_SETTINGS.locale);
     expect(localStorage.getItem(SETTINGS_APPEARANCE_PENDING_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(SETTINGS_THEME_MODE_STORAGE_KEY)).toBeNull();
   });

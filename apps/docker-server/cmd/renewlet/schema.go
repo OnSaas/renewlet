@@ -147,10 +147,6 @@ func ensureUsersCollectionSchema(app core.App, users *core.Collection) error {
 	return saveCollectionIfChanged(app, users, before, false)
 }
 
-func ensureField(collection *core.Collection, field core.Field) error {
-	return upsertField(collection, field)
-}
-
 func upsertField(collection *core.Collection, field core.Field) error {
 	existing := collection.Fields.GetByName(field.GetName())
 	if existing != nil {

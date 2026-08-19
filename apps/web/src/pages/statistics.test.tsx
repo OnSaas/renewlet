@@ -1,21 +1,34 @@
 // Statistics 页面测试保护统计模型到图表 UI 的装配，避免 Recharts 容器和金额口径脱节。
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DEFAULT_CUSTOM_CONFIG } from "@/types/config";
-import type { Subscription } from "@/types/subscription";
+import type { Subscription, SubscriptionCollectionItem } from "@/types/subscription";
 import { assertDateOnly } from "@/lib/time/date-only";
+import {
+  subscriptionCycleFixture,
+  type SubscriptionFixtureOverrides,
+} from "@/test/subscription-fixtures";
 import { moneyToNumber } from "@renewlet/shared/money";
 import Statistics from "./statistics";
 
-type RecurringBillingCycle = Exclude<Subscription["billingCycle"], "custom" | "one-time">;
-type SubscriptionBaseFixture = Omit<Subscription, "billingCycle" | "customDays" | "customCycleUnit" | "oneTimeTermCount" | "oneTimeTermUnit">;
-type SubscriptionOverrides = Partial<SubscriptionBaseFixture> & (
-  | { billingCycle?: RecurringBillingCycle; customDays?: undefined; customCycleUnit?: undefined; oneTimeTermCount?: undefined; oneTimeTermUnit?: undefined }
-  | { billingCycle: "one-time"; customDays?: undefined; customCycleUnit?: undefined; oneTimeTermCount?: number; oneTimeTermUnit?: Subscription["oneTimeTermUnit"] }
-  | { billingCycle: "custom"; customDays?: number; customCycleUnit?: Subscription["customCycleUnit"]; oneTimeTermCount?: undefined; oneTimeTermUnit?: undefined }
-);
+type SubscriptionBaseFixture = Omit<SubscriptionCollectionItem, "billingCycle" | "customDays" | "customCycleUnit" | "oneTimeTermCount" | "oneTimeTermUnit">;
+type SubscriptionOverrides = SubscriptionFixtureOverrides<SubscriptionCollectionItem>;
+
+interface MockSubscriptionAnalyticsResult {
+  data: SubscriptionCollectionItem[] | undefined;
+  isPending: boolean;
+  error?: unknown;
+  refetch?: () => void;
+}
+
+interface MockSubscriptionDetailResult {
+  data: Subscription | undefined;
+  error: unknown | null;
+  isPending: boolean;
+}
 
 const mocks = vi.hoisted(() => ({
   handleEditDialogOpenChange: vi.fn(),
@@ -35,15 +48,22 @@ const mocks = vi.hoisted(() => ({
   rechartsTooltipProps: [] as Array<Record<string, unknown>>,
   rechartsXAxisProps: [] as Array<Record<string, unknown>>,
   rechartsYAxisProps: [] as Array<Record<string, unknown>>,
-  useCustomConfig: vi.fn(),
+  useCustomConfigState: vi.fn(),
   useSettings: vi.fn(),
   useSubscriptionCrud: vi.fn(),
-  useSubscriptions: vi.fn(),
+  useSubscriptionAnalytics: vi.fn<() => MockSubscriptionAnalyticsResult>(),
+  useSubscriptionDetail: vi.fn<(id: string | null) => MockSubscriptionDetailResult>(),
 }));
+const detailSubscriptions = new Map<string, Subscription>();
 
 vi.mock("@/components/header", () => ({
   Header: () => <header data-testid="header" />,
 }));
+
+vi.mock("@/components/statistics-charts-loader", async () => {
+  const module = await vi.importActual<typeof import("@/components/statistics-charts")>("@/components/statistics-charts");
+  return { DeferredStatisticsCharts: module.StatisticsCharts };
+});
 
 vi.mock("@/components/edit-subscription-dialog", () => ({
   EditSubscriptionDialog: () => null,
@@ -142,7 +162,7 @@ vi.mock("recharts", () => ({
 }));
 
 vi.mock("@/contexts/CustomConfigContext", () => ({
-  useCustomConfig: mocks.useCustomConfig,
+  useCustomConfigState: mocks.useCustomConfigState,
 }));
 
 vi.mock("@/hooks/use-report-exchange-rates", () => ({
@@ -163,14 +183,19 @@ vi.mock("@/hooks/use-settings", () => ({
 }));
 
 vi.mock("@/hooks/use-subscriptions", () => ({
-  useSubscriptions: mocks.useSubscriptions,
+  prefetchSubscriptionDetail: vi.fn(),
+  useSubscriptionAnalytics: mocks.useSubscriptionAnalytics,
+  useSubscriptionDetail: mocks.useSubscriptionDetail,
+  useSubscriptionFacets: () => ({
+    data: { total: 0, categoryCounts: {}, tags: [], visibleCount: 0, hiddenCount: 0 },
+  }),
 }));
 
 vi.mock("@/modules/subscriptions/application/use-subscription-crud", () => ({
   useSubscriptionCrud: mocks.useSubscriptionCrud,
 }));
 
-function subscription(overrides: SubscriptionOverrides): Subscription {
+function subscription(overrides: SubscriptionOverrides): SubscriptionCollectionItem {
   const base: SubscriptionBaseFixture = {
     id: "sub",
     name: "Service",
@@ -185,57 +210,41 @@ function subscription(overrides: SubscriptionOverrides): Subscription {
     autoRenew: false,
     autoCalculateNextBillingDate: true,
     trialEndDate: undefined,
-    website: undefined,
-    notes: undefined,
-    tags: [],
     reminderDays: 3,
-    repeatReminderEnabled: false,
-    repeatReminderInterval: "1h",
-    repeatReminderWindow: "72h",
     pinned: false,
     publicHidden: false,
   };
 
-  if (overrides.billingCycle === "custom") {
-    return {
-      ...base,
-      ...overrides,
-      billingCycle: "custom",
-      customDays: overrides.customDays ?? 30,
-      customCycleUnit: overrides.customCycleUnit ?? "day",
-      oneTimeTermCount: undefined,
-      oneTimeTermUnit: undefined,
-    };
-  }
-
-  if (overrides.billingCycle === "one-time") {
-    return {
-      ...base,
-      ...overrides,
-      billingCycle: "one-time",
-      customDays: undefined,
-      customCycleUnit: undefined,
-      oneTimeTermCount: overrides.oneTimeTermCount,
-      oneTimeTermUnit: overrides.oneTimeTermUnit,
-    };
-  }
-
   return {
     ...base,
     ...overrides,
-    billingCycle: overrides.billingCycle ?? "monthly",
-    customDays: undefined,
-    customCycleUnit: undefined,
-    oneTimeTermCount: undefined,
-    oneTimeTermUnit: undefined,
+    ...subscriptionCycleFixture(overrides),
+  };
+}
+
+function toSubscriptionDetail(item: SubscriptionCollectionItem): Subscription {
+  return {
+    ...item,
+    website: undefined,
+    notes: undefined,
+    tags: [],
+    repeatReminderEnabled: false,
+    repeatReminderInterval: "1h",
+    repeatReminderWindow: "72h",
+    extra: {},
   };
 }
 
 function renderStatistics() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return render(
-    <TooltipProvider delayDuration={0}>
-      <Statistics />
-    </TooltipProvider>,
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider delayDuration={0}>
+        <Statistics />
+      </TooltipProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -250,6 +259,7 @@ function getLastTrendTooltip(): HTMLElement {
 
 describe("Statistics page", () => {
   beforeEach(() => {
+    detailSubscriptions.clear();
     Element.prototype.hasPointerCapture ??= vi.fn(() => false);
     Element.prototype.setPointerCapture ??= vi.fn();
     Element.prototype.releasePointerCapture ??= vi.fn();
@@ -269,7 +279,7 @@ describe("Statistics page", () => {
     mocks.rechartsTooltipProps.length = 0;
     mocks.rechartsXAxisProps.length = 0;
     mocks.rechartsYAxisProps.length = 0;
-    mocks.useCustomConfig.mockReturnValue({ config: DEFAULT_CUSTOM_CONFIG });
+    mocks.useCustomConfigState.mockReturnValue({ config: DEFAULT_CUSTOM_CONFIG });
     mocks.useSettings.mockReturnValue({
       data: {
         defaultCurrency: "CNY",
@@ -289,7 +299,7 @@ describe("Statistics page", () => {
       handleSaveSubscription: mocks.handleSaveSubscription,
       handleEditDialogOpenChange: mocks.handleEditDialogOpenChange,
     });
-    mocks.useSubscriptions.mockReturnValue({
+    mocks.useSubscriptionAnalytics.mockReturnValue({
       data: [
         subscription({ id: "active", status: "active", price: "20" }),
         subscription({ id: "paused", status: "paused", price: "10" }),
@@ -297,10 +307,19 @@ describe("Statistics page", () => {
       ],
       isPending: false,
     });
+    mocks.useSubscriptionDetail.mockImplementation((id: string | null) => {
+      const item = id
+        ? mocks.useSubscriptionAnalytics().data?.find((subscriptionItem: SubscriptionCollectionItem) => subscriptionItem.id === id)
+        : undefined;
+      if (item && !detailSubscriptions.has(item.id)) {
+        detailSubscriptions.set(item.id, toSubscriptionDetail(item));
+      }
+      return { data: id ? detailSubscriptions.get(id) : undefined, error: null, isPending: false };
+    });
   });
 
   it("renders a page-isomorphic skeleton while statistics inputs are pending", () => {
-    mocks.useSubscriptions.mockReturnValue({
+    mocks.useSubscriptionAnalytics.mockReturnValue({
       data: undefined,
       isPending: true,
     });
@@ -311,6 +330,24 @@ describe("Statistics page", () => {
     expect(skeleton).toHaveAttribute("aria-hidden", "true");
     expect(skeleton.querySelectorAll(".rounded-xl.border.border-border.bg-card")).toHaveLength(15);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("shows a recoverable error instead of empty analytics", async () => {
+    const user = userEvent.setup();
+    const refetch = vi.fn();
+    mocks.useSubscriptionAnalytics.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      error: new Error(),
+      refetch,
+    });
+
+    renderStatistics();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("操作失败，请稍后重试");
+    expect(screen.queryByText("总体统计")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "重试" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it("shows the inactive savings explanation on hover", async () => {
@@ -330,7 +367,7 @@ describe("Statistics page", () => {
 
   it("keeps the personal cost basis switch in the overview heading row", async () => {
     const user = userEvent.setup();
-    mocks.useSubscriptions.mockReturnValue({
+    mocks.useSubscriptionAnalytics.mockReturnValue({
       data: [
         subscription({
           id: "family-plan",
@@ -487,7 +524,7 @@ describe("Statistics page", () => {
   it("renders subscription breakdowns in the trend tooltip and screen-reader details", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
-    mocks.useSubscriptions.mockReturnValue({
+    mocks.useSubscriptionAnalytics.mockReturnValue({
       data: [
         subscription({ id: "monthly", name: "Monthly", price: "10", billingCycle: "monthly", nextBillingDate: assertDateOnly("2026-01-15") }),
         subscription({ id: "annual", name: "Annual", price: "120", billingCycle: "annual", nextBillingDate: assertDateOnly("2026-01-20") }),
@@ -545,7 +582,7 @@ describe("Statistics page", () => {
   it("opens the shared subscription detail dialog from a trend detail ledger row", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
-    mocks.useSubscriptions.mockReturnValue({
+    mocks.useSubscriptionAnalytics.mockReturnValue({
       data: [
         subscription({ id: "monthly", name: "Monthly", price: "10", billingCycle: "monthly", nextBillingDate: assertDateOnly("2026-01-15") }),
         subscription({ id: "annual", name: "Annual", price: "120", billingCycle: "annual", nextBillingDate: assertDateOnly("2026-01-20") }),
@@ -582,7 +619,7 @@ describe("Statistics page", () => {
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
     const longName =
       "ExtremelyLongSubscriptionNameWithoutSpacesThatShouldNotPushTheAmountColumnOutOfTheDetailsPanel";
-    mocks.useSubscriptions.mockReturnValue({
+    mocks.useSubscriptionAnalytics.mockReturnValue({
       data: Array.from({ length: 7 }, (_, index) => subscription({
         id: `sub-${index}`,
         name: index === 6 ? longName : `Service ${index + 1}`,

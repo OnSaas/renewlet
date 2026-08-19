@@ -16,8 +16,9 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { MobileBottomDrawerContent, MobileDrawerRoot } from "@/components/ui/mobile-drawer";
+import { SubscriptionCalendarDialogLoading } from "@/components/subscription-dialog-loading";
 import { toast } from "@/components/ui/sonner";
-import { useCustomConfig } from "@/contexts/CustomConfigContext";
+import { useCustomConfigState } from "@/contexts/CustomConfigContext";
 import { useCreateSubscriptionCalendarFeed, useDeleteSubscriptionCalendarFeed, useSubscriptionCalendarFeedStatus } from "@/hooks/use-calendar-feed";
 import { useSettings } from "@/hooks/use-settings";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -40,12 +41,13 @@ interface AddToCalendarDialogProps {
   onOpenChange: (open: boolean) => void;
   /** null 表示上层详情已被清理；此时不能渲染会创建 token 的子弹窗。 */
   subscription: Subscription | null;
+  loading?: boolean | undefined;
 }
 
-interface ResolvedAddToCalendarDialogProps {
+interface ResolvedAddToCalendarContentProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
   subscription: Subscription;
+  isExpiryEvent: boolean;
 }
 
 interface CalendarProviderLink {
@@ -80,27 +82,76 @@ interface AddToCalendarContentProps {
   syncStatusValue: string;
 }
 
-export function AddToCalendarDialog({ open, onOpenChange, subscription }: AddToCalendarDialogProps) {
-  if (!subscription) return null;
+export function AddToCalendarDialog({ open, onOpenChange, subscription, loading }: AddToCalendarDialogProps) {
+  const isMobile = useMediaQuery("(max-width: 639px)");
+  const { t } = useI18n();
+  if (!subscription && !loading) return null;
+
+  const isExpiryEvent = subscription?.billingCycle === "one-time";
+  const title = subscription
+    ? isExpiryEvent
+      ? t("subscription.addToCalendarExpiryTitle")
+      : t("subscription.addToCalendarTitle")
+    : t("subscription.addToCalendar");
+  const description = subscription
+    ? isExpiryEvent
+      ? t("subscription.addToCalendarExpiryDescription", { name: subscription.name })
+      : t("subscription.addToCalendarDescription", { name: subscription.name })
+    : t("common.loading");
+  const content = subscription
+    ? <ResolvedAddToCalendarContent open={open} subscription={subscription} isExpiryEvent={isExpiryEvent} />
+    : <SubscriptionCalendarDialogLoading />;
+
+  if (isMobile) {
+    return (
+      <MobileDrawerRoot open={open} onOpenChange={onOpenChange} shouldScaleBackground={false}>
+        {open ? (
+          <MobileBottomDrawerContent
+            title={title}
+            description={description}
+            descriptionMode={subscription ? "visible" : "sr-only"}
+            closeLabel={t("common.close")}
+            icon={<CalendarPlus className="h-5 w-5 shrink-0 text-primary" />}
+            className="max-h-[calc(var(--app-viewport-height)-1rem)]"
+            headerClassName="border-b border-border pb-4"
+            bodyClassName="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          >
+            {content}
+          </MobileBottomDrawerContent>
+        ) : null}
+      </MobileDrawerRoot>
+    );
+  }
+
   return (
-    <ResolvedAddToCalendarDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      subscription={subscription}
-    />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="overflow-hidden border-border bg-card p-0 sm:max-w-md">
+        <DialogHeader className="border-b border-border px-5 py-4 pr-12 text-left">
+          <DialogTitle className="flex items-center gap-2 text-base leading-6">
+            <CalendarPlus className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <span className="min-w-0 wrap-break-word">{title}</span>
+          </DialogTitle>
+          <DialogDescription className={subscription ? "text-left leading-5" : "sr-only"}>
+            {description}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="px-5 py-4">
+          {content}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 /**
- * ResolvedAddToCalendarDialog 管理单订阅日历入口。
+ * ResolvedAddToCalendarContent 管理单订阅日历入口。
  *
  * Feed URL 是低权限 bearer secret；创建/再生成都必须走 React Query mutation，
  * 本地 `feedUrl` 只缓存本次新 token，避免等待状态接口刷新时用户复制旧地址。
  */
-function ResolvedAddToCalendarDialog({ open, onOpenChange, subscription }: ResolvedAddToCalendarDialogProps) {
-  const isMobile = useMediaQuery("(max-width: 639px)");
+function ResolvedAddToCalendarContent({ open, subscription, isExpiryEvent }: ResolvedAddToCalendarContentProps) {
   const { t, locale, label, formatCurrency, formatDateOnly } = useI18n();
-  const { config } = useCustomConfig();
+  const { config } = useCustomConfigState();
   const { data: settings } = useSettings();
   const subscriptionFeedStatus = useSubscriptionCalendarFeedStatus(subscription.id, open);
   const createSubscriptionFeed = useCreateSubscriptionCalendarFeed();
@@ -121,7 +172,6 @@ function ResolvedAddToCalendarDialog({ open, onOpenChange, subscription }: Resol
   const categoryLabel = category ? label(category.labels) : subscription.category;
   const paymentMethodLabel = paymentMethod ? label(paymentMethod.labels) : subscription.paymentMethod;
   const billingCycleLabel = formatBillingCycleLabel(subscription, locale);
-  const isExpiryEvent = subscription.billingCycle === "one-time";
   const globalReminderDays = settings?.notificationReminderDays ?? DEFAULT_NOTIFICATION_REMINDER_DAYS;
   const reminderDays = subscription.reminderDays === DISABLED_REMINDER_DAYS
     ? undefined
@@ -275,82 +325,34 @@ function ResolvedAddToCalendarDialog({ open, onOpenChange, subscription }: Resol
     }
   }, [subscription.id, t]);
 
-  const title = isExpiryEvent ? t("subscription.addToCalendarExpiryTitle") : t("subscription.addToCalendarTitle");
-  const description = isExpiryEvent
-    ? t("subscription.addToCalendarExpiryDescription", { name: subscription.name })
-    : t("subscription.addToCalendarDescription", { name: subscription.name });
-  const content = (
-    <AddToCalendarContent
-      androidCalendarHref={isAndroidChrome ? androidSystemCalendarHref : undefined}
-      androidCalendarLabel={t("subscription.addToCalendarAndroidSingleEvent")}
-      copyFeedUrlLabel={t("subscription.addToCalendarCopyFeedUrl")}
-      downloadLabel={t("subscription.addToCalendarDownloadIcs")}
-      eventDate={formatDateOnly(subscription.nextBillingDate, "full")}
-      eventDateLabel={t("subscription.addToCalendarEventDate")}
-      eventTypeLabel={t("subscription.addToCalendarEventType")}
-      eventTypeValue={isExpiryEvent ? t("subscription.addToCalendarExpiryFeed") : t("subscription.addToCalendarSubscriptionFeed")}
-      feedUrl={visibleFeedUrl}
-      feedUrlLabel={t("subscription.addToCalendarFeedUrl")}
-      isDownloading={isDownloadingCalendar}
-      isSubscribing={isOpeningSystemCalendar || createSubscriptionFeed.isPending || deleteSubscriptionFeed.isPending || subscriptionFeedStatus.isLoading}
-      links={links}
-      notice={isExpiryEvent ? t("subscription.addToCalendarExpiryEventNotice") : t("subscription.addToCalendarSingleEventNotice")}
-      onCopyFeedUrl={handleCopyFeedUrl}
-      onDownload={handleDownload}
-      onRegenerate={() => setConfirmRegenerateOpen(true)}
-      onSubscribe={visibleFeedUrl ? handleOpenExistingFeed : handleSubscribe}
-      regenerateLabel={t("subscription.addToCalendarRegenerate")}
-      servicesLabel={t("subscription.addToCalendarOnlineServices")}
-      subscribeLabel={visibleFeedUrl ? t("subscription.addToCalendarSubscribeSystem") : t("subscription.addToCalendarGenerateFeed")}
-      subscribeLoadingLabel={t("subscription.addToCalendarSubscribeLoading")}
-      syncStatusLabel={t("subscription.addToCalendarSyncStatus")}
-      syncStatusValue={t("subscription.addToCalendarSubscriptionSync")}
-    />
-  );
-
-  if (isMobile) {
-    return (
-      <>
-        <MobileDrawerRoot open={open} onOpenChange={onOpenChange} shouldScaleBackground={false}>
-          {open && (
-            <MobileBottomDrawerContent
-              title={title}
-              description={description}
-              closeLabel={t("common.close")}
-              icon={<CalendarPlus className="h-5 w-5 shrink-0 text-primary" />}
-              className="max-h-[calc(var(--app-viewport-height)-1rem)]"
-              headerClassName="border-b border-border pb-4"
-              bodyClassName="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
-            >
-              {content}
-            </MobileBottomDrawerContent>
-          )}
-        </MobileDrawerRoot>
-        <CalendarFeedRegenerateDialog
-          open={confirmRegenerateOpen}
-          onOpenChange={setConfirmRegenerateOpen}
-          onConfirm={handleRegenerate}
-        />
-      </>
-    );
-  }
-
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="overflow-hidden border-border bg-card p-0 sm:max-w-md">
-          <DialogHeader className="border-b border-border px-5 py-4 pr-12 text-left">
-            <DialogTitle className="flex items-center gap-2 text-base leading-6">
-              <CalendarPlus className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-              <span className="min-w-0 wrap-break-word">{title}</span>
-            </DialogTitle>
-            <DialogDescription className="text-left leading-5">{description}</DialogDescription>
-          </DialogHeader>
-          <div className="px-5 py-4">
-            {content}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AddToCalendarContent
+        androidCalendarHref={isAndroidChrome ? androidSystemCalendarHref : undefined}
+        androidCalendarLabel={t("subscription.addToCalendarAndroidSingleEvent")}
+        copyFeedUrlLabel={t("subscription.addToCalendarCopyFeedUrl")}
+        downloadLabel={t("subscription.addToCalendarDownloadIcs")}
+        eventDate={formatDateOnly(subscription.nextBillingDate, "full")}
+        eventDateLabel={t("subscription.addToCalendarEventDate")}
+        eventTypeLabel={t("subscription.addToCalendarEventType")}
+        eventTypeValue={isExpiryEvent ? t("subscription.addToCalendarExpiryFeed") : t("subscription.addToCalendarSubscriptionFeed")}
+        feedUrl={visibleFeedUrl}
+        feedUrlLabel={t("subscription.addToCalendarFeedUrl")}
+        isDownloading={isDownloadingCalendar}
+        isSubscribing={isOpeningSystemCalendar || createSubscriptionFeed.isPending || deleteSubscriptionFeed.isPending || subscriptionFeedStatus.isLoading}
+        links={links}
+        notice={isExpiryEvent ? t("subscription.addToCalendarExpiryEventNotice") : t("subscription.addToCalendarSingleEventNotice")}
+        onCopyFeedUrl={handleCopyFeedUrl}
+        onDownload={handleDownload}
+        onRegenerate={() => setConfirmRegenerateOpen(true)}
+        onSubscribe={visibleFeedUrl ? handleOpenExistingFeed : handleSubscribe}
+        regenerateLabel={t("subscription.addToCalendarRegenerate")}
+        servicesLabel={t("subscription.addToCalendarOnlineServices")}
+        subscribeLabel={visibleFeedUrl ? t("subscription.addToCalendarSubscribeSystem") : t("subscription.addToCalendarGenerateFeed")}
+        subscribeLoadingLabel={t("subscription.addToCalendarSubscribeLoading")}
+        syncStatusLabel={t("subscription.addToCalendarSyncStatus")}
+        syncStatusValue={t("subscription.addToCalendarSubscriptionSync")}
+      />
       <CalendarFeedRegenerateDialog
         open={confirmRegenerateOpen}
         onOpenChange={setConfirmRegenerateOpen}

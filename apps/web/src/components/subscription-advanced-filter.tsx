@@ -8,7 +8,7 @@ import {
   AdvancedSelectionEntry,
 } from "@/components/subscription-advanced-selection-picker";
 import { AdvancedFilterFooter } from "@/components/subscription-advanced-filter-footer";
-import { SubscriptionAdvancedDateRangeFields } from "@/components/subscription-advanced-date-range-fields";
+import { DeferredSubscriptionAdvancedDateRangeFields } from "@/components/subscription-advanced-date-range-fields-loader";
 import { TagFilterChip } from "@/components/subscription-tag-filter-drawer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -186,7 +186,7 @@ function AdvancedSectionList({
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center justify-between gap-3">
               <span className="truncate text-sm font-semibold text-foreground">{section.title}</span>
-              <span data-testid={`advanced-section-${section.id}-summary`} className="max-w-[8rem] shrink-0 truncate text-right text-xs text-muted-foreground">
+              <span data-testid={`advanced-section-${section.id}-summary`} className="max-w-32 shrink-0 truncate text-right text-xs text-muted-foreground">
                 {section.summary}
               </span>
             </span>
@@ -317,7 +317,7 @@ function AdvancedFilterContent({
     currentFilters: SubscriptionAdvancedFilterState,
     onPatch: (patch: Partial<SubscriptionAdvancedFilterState>) => void,
     contentLayout: AdvancedFilterLayout,
-  ) => <SubscriptionAdvancedDateRangeFields filters={currentFilters} onChange={onPatch} mobile={contentLayout === "mobile"} />;
+  ) => <DeferredSubscriptionAdvancedDateRangeFields filters={currentFilters} onChange={onPatch} mobile={contentLayout === "mobile"} />;
   const renderFlagsContent = (
     currentFilters: SubscriptionAdvancedFilterState,
     onPatch: (patch: Partial<SubscriptionAdvancedFilterState>) => void,
@@ -595,7 +595,7 @@ export function SubscriptionAdvancedFilter({
           <DialogContent
             dismissMode="explicit"
             closeLabel={t("common.close")}
-            className="h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-full max-w-none gap-0 overflow-hidden rounded-none border-0 bg-card p-0"
+            className="h-(--app-viewport-height) max-h-(--app-viewport-height) w-full max-w-none gap-0 overflow-hidden rounded-none border-0 bg-card p-0"
             data-testid="mobile-advanced-filter-workspace"
           >
             <div className="flex min-h-0 flex-1 flex-col">
@@ -636,10 +636,10 @@ export function SubscriptionAdvancedFilter({
 
       {open ? (
         <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 z-[70] bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+          <Drawer.Overlay className="fixed inset-0 z-70 bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
           <Drawer.Content
             ref={setDesktopPanelRef}
-            className="fixed right-0 top-[var(--app-visual-viewport-offset-top)] z-[80] flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-[min(30rem,calc(100vw-2rem))] flex-col overflow-hidden border-l border-border bg-card text-card-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-right-4"
+            className="fixed right-0 top-(--app-visual-viewport-offset-top) z-80 flex h-(--app-viewport-height) max-h-(--app-viewport-height) w-[min(30rem,calc(100vw-2rem))] flex-col overflow-hidden border-l border-border bg-card text-card-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-right-4"
             data-testid="desktop-advanced-filter-panel"
           >
             <FloatingPortalContainerProvider container={desktopPortalContainer}>
@@ -758,13 +758,13 @@ export function SelectedAdvancedFilterScroller({
   return (
     <div
       data-testid={testId}
-      className={cn("min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
+      className={cn("min-w-0 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden", className)}
       aria-label={t("subscriptions.advanced.selectedCount", { count: chips.length })}
     >
       <div className="flex w-max gap-2 pr-1">
         {chips.map((chip) => (
           <span key={chip.id} className="inline-flex h-9 shrink-0 items-center rounded-full border border-primary bg-primary/10 pl-3 pr-1 text-xs font-semibold text-primary">
-            <span className="max-w-[10rem] truncate">{chip.label}</span>
+            <span className="max-w-40 truncate">{chip.label}</span>
             <button
               type="button"
               aria-label={t("subscriptions.advanced.removeChip", { label: chip.label })}

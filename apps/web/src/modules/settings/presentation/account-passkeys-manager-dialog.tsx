@@ -30,7 +30,7 @@ import { passkeyService } from "@/services/passkey-service";
 import { LoadingButtonContent } from "./settings-shared-controls";
 import { MFA_STATUS_QUERY_KEY, PASSKEYS_QUERY_KEY } from "./account-security-query-keys";
 
-interface AccountPasskeysManagerDialogProps {
+export interface AccountPasskeysManagerDialogProps {
   accountEmail: string | null;
   disabled?: boolean;
   open: boolean;

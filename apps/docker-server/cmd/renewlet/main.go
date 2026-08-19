@@ -7,7 +7,7 @@ package main
 //   - 静态前端由 embedded FS 提供，自定义 API 使用 Renewlet 产品 session。
 //   - 具体请求/响应 DTO 在 api_contracts.go，通知任务在 notifications.go，文件资产在 assets.go。
 //
-// 注意： 这里的 route 是前端 API schema 的后端真相来源；新增字段时必须同步 Zod schema 和 route 测试。
+// 注意： 跨运行面 wire shape 以 shared schema 为事实源；Go route 必须通过共享 fixture 与 Worker 保持同一契约。
 import (
 	"fmt"
 	"io/fs"
@@ -236,7 +236,10 @@ func runHealthcheck() {
 // staticWithSecurityHeaders 为嵌入式前端静态资源补安全响应头。
 // 注意： CSP connect-src 需要覆盖前端直接访问的第三方 API；新增外部 fetch 时要同步这里。
 func staticWithSecurityHeaders(staticFS fs.FS) func(*core.RequestEvent) error {
-	handler := apis.Static(customHeadScriptFS{FS: staticFS}, true)
+	handler := staticWithContentEncoding(
+		staticFS,
+		apis.Static(customHeadScriptFS{FS: staticFS}, true),
+	)
 	return func(e *core.RequestEvent) error {
 		headers := e.Response.Header()
 		headers.Set("X-Content-Type-Options", "nosniff")

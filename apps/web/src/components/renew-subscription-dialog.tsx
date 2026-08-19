@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SubscriptionFormDialogLoading } from "@/components/subscription-dialog-loading";
+import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FormField, FormFieldRow } from "@/components/ui/form-field";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { DateOnlyPickerField } from "@/components/date-only-picker-field";
-import { useCustomConfig } from "@/contexts/CustomConfigContext";
+import { useCustomConfigState } from "@/contexts/CustomConfigContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useManagedCurrencyOptions } from "@/hooks/use-managed-currency-options";
+import { useDeferredDialogInitialFocus } from "@/hooks/use-deferred-dialog-initial-focus";
 import { compareDateOnly, type DateOnly } from "@/lib/time/date-only";
 import { parseMoneyInput } from "@/lib/subscription-form";
 import type { Subscription } from "@/types/subscription";
@@ -35,7 +37,7 @@ interface RenewFormErrors {
   nextBillingDate?: string | undefined;
 }
 
-interface RenewSubscriptionDialogProps {
+export interface RenewSubscriptionDialogProps {
   subscription: Subscription | null;
   open: boolean;
   today: DateOnly;
@@ -44,6 +46,7 @@ interface RenewSubscriptionDialogProps {
   restoreFocusRef?: RefObject<HTMLElement | null> | undefined;
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: SubscriptionRenewBody) => Promise<void> | void;
+  loading?: boolean | undefined;
 }
 
 function defaultContinueNextBillingDate(subscription: Subscription, today: DateOnly): DateOnly {
@@ -67,7 +70,7 @@ function defaultRestartNextBillingDate(subscription: Subscription, startDate: Da
     subscription.billingCycle,
     subscription.customDays,
     undefined,
-    subscription.customCycleUnit ?? "day",
+    subscription.customCycleUnit,
   ) as DateOnly;
 }
 
@@ -87,20 +90,22 @@ function hasRenewBodyDates(value: SubscriptionRenewBody): value is SubscriptionR
   return value.mode !== "restart" || typeof value.startDate === "string";
 }
 
-export function RenewSubscriptionDialog({
+export function RenewSubscriptionDialogContent({
   subscription,
   open,
   today,
   submitting,
   error,
-  restoreFocusRef,
   onOpenChange,
   onSubmit,
+  loading,
 }: RenewSubscriptionDialogProps) {
   const formRef = useRef<HTMLFormElement>(null);
-  const { config } = useCustomConfig();
+  const { config } = useCustomConfigState();
   const { t, locale, formatDateOnly } = useI18n();
-  const [form, setForm] = useState<RenewFormState | null>(null);
+  const [form, setForm] = useState<RenewFormState | null>(() => (
+    open && subscription ? createInitialState(subscription, today) : null
+  ));
   const [errors, setErrors] = useState<RenewFormErrors>({});
   const includeDisabledCurrent = form?.currency ?? subscription?.currency ?? null;
   const currencyOptions = useManagedCurrencyOptions({
@@ -109,7 +114,7 @@ export function RenewSubscriptionDialog({
     locale,
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open || !subscription) return;
     setForm(createInitialState(subscription, today));
     setErrors({});
@@ -214,6 +219,16 @@ export function RenewSubscriptionDialog({
 
   const title = subscription ? t("subscription.renew.title", { name: subscription.name }) : t("subscription.renew");
   const currentForm = form;
+  const resolveInitialFocus = useCallback(
+    () => formRef.current?.querySelector<HTMLElement>('[role="radio"][data-state="checked"]') ?? null,
+    [],
+  );
+  useDeferredDialogInitialFocus(
+    open,
+    !loading && currentForm !== null,
+    subscription?.id ?? "renew-subscription",
+    resolveInitialFocus,
+  );
   const restartMode = currentForm?.mode === "restart";
   const submitLabel = restartMode ? t("subscription.renew.restartSubmit") : t("subscription.renew.submit");
   const modeDescription = useMemo(() => {
@@ -224,27 +239,18 @@ export function RenewSubscriptionDialog({
   }, [currentForm, t]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        closeLabel={t("common.close")}
-        dismissMode="explicit"
-        layout="content"
-        className="h5-dialog-auto-frame gap-0 border-border bg-card p-0 sm:max-w-lg"
-        onCloseAutoFocus={(event) => {
-          if (!restoreFocusRef?.current) return;
-          event.preventDefault();
-          restoreFocusRef.current.focus();
-        }}
-      >
-        <DialogHeader className="shrink-0 p-6 pb-0">
-          <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
-          <DialogDescription className="sr-only">
-            {t("subscription.renew.description")}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <DialogHeader className="shrink-0 p-6 pb-0">
+        <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
+        <DialogDescription className="sr-only">
+          {t("subscription.renew.description")}
+        </DialogDescription>
+      </DialogHeader>
 
-        {currentForm ? (
-          <form ref={formRef} onSubmit={submit} className="flex min-h-0 flex-col overflow-hidden" noValidate>
+      {loading ? (
+        <SubscriptionFormDialogLoading />
+      ) : currentForm ? (
+        <form ref={formRef} onSubmit={submit} className="flex min-h-0 flex-col overflow-hidden" noValidate>
             <div className="h5-mobile-sheet-scroll grid min-h-0 flex-1 gap-5 px-6 py-4">
               <FormField id="renew-mode" label={t("subscription.renew.mode")} description={modeDescription}>
                 {(field) => (
@@ -403,9 +409,8 @@ export function RenewSubscriptionDialog({
                 {submitLabel}
               </Button>
             </div>
-          </form>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+        </form>
+      ) : null}
+    </>
   );
 }

@@ -497,3 +497,8 @@ msgstr "Configuration item color must be a string."
 #: src/i18n/descriptors/error.ts:48
 msgid "error.code.COST_SHARING_COLLECTION_REMINDER_ONE_TIME_BUYOUT_INVALID"
 msgstr "Lifetime one-time purchases do not support collection reminders."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/error.ts:102
+msgid "error.code.SUBSCRIPTION_COLLECTION_LIMIT_EXCEEDED"
+msgstr "The result exceeds the processing limit. Narrow the search or filters."

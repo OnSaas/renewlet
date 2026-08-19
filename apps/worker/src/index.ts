@@ -43,6 +43,14 @@ import {
 import { readCustomConfig, readSettings, updateCustomConfig, updateSettings } from "./settings";
 import { putExchangeRateSnapshot, readExchangeRateSnapshots } from "./exchange-rate-snapshots";
 import { createSubscription, deleteSubscription, readSubscriptions, renewSubscription, updateSubscription } from "./subscriptions";
+import {
+  readSubscriptionAnalytics,
+  readSubscriptionCalendar,
+  readSubscriptionDetail,
+  readSubscriptionExport,
+  readSubscriptionFacets,
+  readSubscriptionIndex,
+} from "./subscription-collections";
 import { applyImport, previewImport } from "./import-export";
 import {
   createCloudBackup,
@@ -250,6 +258,12 @@ defineRoute(subscriptionRoutes, "/", {
   GET: (context) => readSubscriptions(context.req.raw, context.env),
   POST: (context) => createSubscription(context.req.raw, context.env),
 });
+// 集合静态路由先于 /:id 注册，避免 Hono 把 index/analytics/facets/export 当作订阅 ID。
+defineRoute(subscriptionRoutes, "/index", { GET: (context) => readSubscriptionIndex(context.req.raw, context.env) });
+defineRoute(subscriptionRoutes, "/analytics", { GET: (context) => readSubscriptionAnalytics(context.req.raw, context.env) });
+defineRoute(subscriptionRoutes, "/calendar", { GET: (context) => readSubscriptionCalendar(context.req.raw, context.env) });
+defineRoute(subscriptionRoutes, "/facets", { GET: (context) => readSubscriptionFacets(context.req.raw, context.env) });
+defineRoute(subscriptionRoutes, "/export", { GET: (context) => readSubscriptionExport(context.req.raw, context.env) });
 defineRoute(subscriptionRoutes, "/:id/calendar-feed", {
   GET: (context) => readSubscriptionCalendarFeed(context.req.raw, context.env, routeParam(context, "id")),
   POST: (context) => createSubscriptionCalendarFeed(context.req.raw, context.env, routeParam(context, "id")),
@@ -262,6 +276,7 @@ defineRoute(subscriptionRoutes, "/:id/renew", {
   POST: (context) => renewSubscription(context.req.raw, context.env, routeParam(context, "id")),
 });
 defineRoute(subscriptionRoutes, "/:id", {
+  GET: (context) => readSubscriptionDetail(context.req.raw, context.env, routeParam(context, "id")),
   PATCH: (context) => updateSubscription(context.req.raw, context.env, routeParam(context, "id")),
   DELETE: (context) => deleteSubscription(context.req.raw, context.env, routeParam(context, "id")),
 });

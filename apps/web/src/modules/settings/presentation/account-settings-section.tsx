@@ -17,8 +17,7 @@ import { passkeyService } from "@/services/passkey-service";
 import { PasswordChangeDialog } from './password-change-dialog';
 import { AccountMfaSection } from './account-mfa-section';
 import { AccountPasskeysSection } from './account-passkeys-section';
-import { AccountPasskeysManagerDialog } from "./account-passkeys-manager-dialog";
-import { AccountSecurityDialogs } from "./account-security-dialogs";
+import { DeferredAccountSecurityDialogs } from "./account-security-dialogs-loader";
 import { PASSKEYS_QUERY_KEY } from "./account-security-query-keys";
 import type { AccountSecurityDialogState, MfaPasswordAction } from "./account-security-dialog-state";
 import { getSettingsSectionClassName } from './settings-layout';
@@ -70,7 +69,7 @@ export function AccountSettingsSection({
   const [accountSecurityDialog, setAccountSecurityDialog] = useState<AccountSecurityDialogState>({ type: "none" });
   const passkeysQuery = useQuery({
     queryKey: PASSKEYS_QUERY_KEY,
-    queryFn: () => passkeyService.list(),
+    queryFn: ({ signal }) => passkeyService.list(signal),
     staleTime: 30_000,
   });
   const passkeys = passkeysQuery.data ?? [];
@@ -189,15 +188,12 @@ export function AccountSettingsSection({
         isUpdating={isUpdatingPassword}
         onSubmit={updatePassword}
       />
-      <AccountSecurityDialogs
+      <DeferredAccountSecurityDialogs
         state={accountSecurityDialog}
         onStateChange={openAccountSecurityDialog}
-      />
-      <AccountPasskeysManagerDialog
+        onPasskeysOpenChange={handlePasskeysManagerOpenChange}
         accountEmail={accountEmail}
         disabled={passwordDisabled}
-        open={accountSecurityDialog.type === "passkeys_manager"}
-        onOpenChange={handlePasskeysManagerOpenChange}
         passkeys={passkeys}
         isLoading={passkeysQuery.isLoading}
       />

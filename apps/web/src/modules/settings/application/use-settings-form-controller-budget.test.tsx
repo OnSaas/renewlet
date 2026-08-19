@@ -33,7 +33,8 @@ const mocks = vi.hoisted(() => ({
   setTheme: vi.fn(),
   clearThemeModeOverride: vi.fn(),
   theme: "dark",
-  setLocale: vi.fn(),
+  commitLocale: vi.fn(),
+  syncRemoteLocale: vi.fn(),
   testConnection: vi.fn(),
   refetchNotificationHistory: vi.fn(),
   calendarFeedStatus: { data: { enabled: false, feedUrl: undefined as string | undefined }, isLoading: false },
@@ -97,7 +98,11 @@ vi.mock("@/hooks/use-report-exchange-rates", () => ({
 }));
 
 vi.mock("@/hooks/use-subscriptions", () => ({
-  useSubscriptions: () => ({ data: [], isPending: false, status: "success" }),
+  useSubscriptionFacets: () => ({
+    data: { total: 0, categoryCounts: {}, tags: [], visibleCount: 0, hiddenCount: 0 },
+    isPending: false,
+    status: "success",
+  }),
 }));
 
 vi.mock("@/hooks/use-password-reset-availability", () => ({
@@ -147,7 +152,8 @@ vi.mock("@/lib/theme-provider", () => ({
 }));
 
 vi.mock("@/contexts/CustomConfigContext", () => ({
-  useCustomConfig: () => ({ config: mocks.customConfig, saveConfig: mocks.saveConfig }),
+  useCustomConfigState: () => ({ config: mocks.customConfig }),
+  useCustomConfigActions: () => ({ saveConfig: mocks.saveConfig }),
 }));
 
 vi.mock("@/services/runtime", () => ({
@@ -169,7 +175,8 @@ vi.mock("@/i18n/I18nProvider", () => {
   return {
     useI18n: () => ({
       t: (key: string) => messages[key] ?? key,
-      setLocale: mocks.setLocale,
+      commitLocale: mocks.commitLocale,
+      syncRemoteLocale: mocks.syncRemoteLocale,
     }),
   };
 });
@@ -227,7 +234,8 @@ describe("useSettingsFormController monthly budget input", () => {
     mocks.setTheme.mockReset();
     mocks.clearThemeModeOverride.mockReset();
     mocks.theme = "dark";
-    mocks.setLocale.mockReset();
+    mocks.commitLocale.mockReset();
+    mocks.syncRemoteLocale.mockReset();
     localStorage.removeItem(APPEARANCE_PENDING_STORAGE_KEY);
     localStorage.removeItem(SETTINGS_APPEARANCE_PENDING_STORAGE_KEY);
     localStorage.removeItem(SETTINGS_THEME_MODE_STORAGE_KEY);

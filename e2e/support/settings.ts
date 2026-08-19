@@ -18,7 +18,9 @@ function extractRemoteTestPhone(payload: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-export async function gotoSettingsAfterHydration(page: Page) {
+type SettingsSectionId = "settings-data-config" | "settings-display" | "settings-notifications";
+
+export async function gotoSettingsSectionAfterHydration(page: Page, sectionId: SettingsSectionId) {
   // 设置页会先渲染默认值再被远端设置覆盖；E2E 必须等 GET 返回后再断言表单，避免首帧默认值造成 flaky。
   const settingsRead = page.waitForResponse((response) => (
     response.request().method() === "GET"
@@ -26,13 +28,15 @@ export async function gotoSettingsAfterHydration(page: Page) {
     && response.url().includes("/api/app/settings")
   ));
 
-  await page.goto("/settings");
+  await page.goto(`/settings#${sectionId}`);
   const settingsResponse = await settingsRead;
   const remoteTestPhone = extractRemoteTestPhone(await settingsResponse.json().catch(() => null));
-  const testPhoneInput = page.getByLabel(/^(第三方 API 测试号码|Third-party API test number)$/);
-  await expect(testPhoneInput).toBeVisible();
+  const section = page.locator(`#${sectionId}`);
+  await expect(section).toBeVisible();
+  await expect(section).not.toHaveAttribute("aria-busy", "true");
 
-  if (remoteTestPhone !== null) {
+  if (sectionId === "settings-notifications" && remoteTestPhone !== null) {
+    const testPhoneInput = page.getByLabel(/^(第三方 API 测试号码|Third-party API test number)$/);
     await expect(testPhoneInput).toHaveValue(remoteTestPhone);
   }
 }

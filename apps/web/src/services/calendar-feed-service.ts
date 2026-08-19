@@ -16,8 +16,8 @@ import {
  * 承担，前端不会持久化 token 字段本身。
  */
 export const calendarFeedService = {
-  async get(): Promise<CalendarFeedStatusResponse["calendarFeed"]> {
-    const data = await apiFetch("/api/app/calendar-feed", calendarFeedStatusResponseSchema);
+  async get(signal?: AbortSignal): Promise<CalendarFeedStatusResponse["calendarFeed"]> {
+    const data = await apiFetch("/api/app/calendar-feed", calendarFeedStatusResponseSchema, signal ? { signal } : undefined);
     return data.calendarFeed;
   },
 
@@ -33,8 +33,12 @@ export const calendarFeedService = {
     await apiFetch("/api/app/calendar-feed", calendarFeedDeleteResponseSchema, { method: "DELETE" });
   },
 
-  async getSubscription(subscriptionId: string): Promise<CalendarFeedStatusResponse["calendarFeed"]> {
-    const data = await apiFetch(`/api/app/subscriptions/${encodeURIComponent(subscriptionId)}/calendar-feed`, calendarFeedStatusResponseSchema);
+  async getSubscription(subscriptionId: string, signal?: AbortSignal): Promise<CalendarFeedStatusResponse["calendarFeed"]> {
+    const data = await apiFetch(
+      `/api/app/subscriptions/${encodeURIComponent(subscriptionId)}/calendar-feed`,
+      calendarFeedStatusResponseSchema,
+      signal ? { signal } : undefined,
+    );
     return data.calendarFeed;
   },
 

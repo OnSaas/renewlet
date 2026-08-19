@@ -78,7 +78,7 @@ export function NotificationWebhookConfigPanel({
             value={settings.webhookHeaders}
             disabled={disabled}
             onChange={(e) => updateSetting('webhookHeaders', e.target.value)}
-            className="min-h-[80px] border-border bg-secondary font-mono text-sm"
+            className="min-h-20 border-border bg-secondary font-mono text-sm"
           />
           <p className="text-xs text-muted-foreground">{t("settings.webhookHeadersHelp")}</p>
         </div>
@@ -90,7 +90,7 @@ export function NotificationWebhookConfigPanel({
             value={settings.webhookPayload}
             disabled={disabled}
             onChange={(e) => updateSetting('webhookPayload', e.target.value)}
-            className="min-h-[80px] border-border bg-secondary font-mono text-sm"
+            className="min-h-20 border-border bg-secondary font-mono text-sm"
           />
           <p className="text-xs text-muted-foreground">
             {t("settings.webhookPayloadHelp")}

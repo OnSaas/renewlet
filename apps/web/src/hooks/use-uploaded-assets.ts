@@ -58,7 +58,7 @@ export function useUploadedAssetsByKind(
   const query = useInfiniteQuery({
     queryKey: uploadedAssetsQueryKeys.byKind(kind),
     initialPageParam: 1,
-    queryFn: ({ pageParam }) => assetService.list(kind, pageParam),
+    queryFn: ({ pageParam, signal }) => assetService.list(kind, pageParam, signal),
     getNextPageParam: (lastPage) => lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
     enabled,
   });

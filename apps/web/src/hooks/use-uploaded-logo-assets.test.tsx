@@ -22,8 +22,14 @@ type AssetsListFixture = {
   items: AssetRecordFixture[];
 };
 
+type ApiFetchMock = (
+  url: string,
+  schema: unknown,
+  init?: RequestInit,
+) => Promise<unknown>;
+
 const mocks = vi.hoisted(() => ({
-  apiFetch: vi.fn(),
+  apiFetch: vi.fn<ApiFetchMock>(),
   getCurrentUserId: vi.fn(() => "user_1"),
 }));
 
@@ -87,7 +93,10 @@ describe("useUploadedLogoAssets", () => {
     });
 
     await waitFor(() => expect(result.current.assets).toHaveLength(1));
-    expect(mocks.apiFetch).toHaveBeenCalledWith("/api/app/assets?kind=logo&page=1&perPage=48", expect.anything());
+    const call = mocks.apiFetch.mock.calls[0];
+    if (!call) throw new Error("Expected the asset list request");
+    expect(call[0]).toBe("/api/app/assets?kind=logo&page=1&perPage=48");
+    expect(call[2]?.signal).toBeInstanceOf(AbortSignal);
     expect(result.current.assets).toEqual([
       {
         id: "asset-1",

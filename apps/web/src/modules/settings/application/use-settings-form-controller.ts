@@ -21,10 +21,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { aiRecognitionSettingsSchema } from "@renewlet/shared/schemas/ai-recognition";
 import { clearThemeModeOverride, useTheme } from "@/lib/theme-provider";
-import { useCustomConfig } from "@/contexts/CustomConfigContext";
+import { useCustomConfigActions, useCustomConfigState } from "@/contexts/CustomConfigContext";
 import { useReportExchangeRates } from "@/hooks/use-report-exchange-rates";
 import { useSettingsEnvelope, useUpdateSettings } from "@/hooks/use-settings";
-import { useSubscriptions } from "@/hooks/use-subscriptions";
+import { useSubscriptionFacets } from "@/hooks/use-subscriptions";
 import { usePasswordResetAvailability } from "@/hooks/use-password-reset-availability";
 import { useSetupStatus } from "@/hooks/use-setup-status";
 import { useCalendarFeedStatus, useCreateCalendarFeed, useDeleteCalendarFeed } from "@/hooks/use-calendar-feed";
@@ -48,7 +48,6 @@ import type { CustomThemeColor, ThemeMode, ThemeVariant } from "@/types/theme";
 import { parseMoneyInput } from "@/lib/subscription-form";
 import { normalizeCustomConfig } from "@/modules/custom-config/domain/normalize-custom-config";
 import { isCloudflareRuntime } from "@/services/runtime";
-import { countSubscriptionsByCategory } from "../domain/category-usage";
 import { enforceCurrencyConfigPolicy } from "../domain/currency-config-policy";
 import { useAccountIdentity } from "./use-account-email";
 import { useNotificationTest } from "./use-notification-test";
@@ -94,10 +93,11 @@ export function useSettingsFormController(): SettingsFormController {
   const { data: remoteEnvelope } = useSettingsEnvelope();
   const remoteSettings = remoteEnvelope?.settings;
   const secretStatus = remoteEnvelope?.secretStatus ?? EMPTY_SETTINGS_SECRET_STATUS;
-  const subscriptionsQuery = useSubscriptions();
+  const subscriptionFacetsQuery = useSubscriptionFacets();
   const updateSettings = useUpdateSettings();
   const { theme, setTheme } = useTheme();
-  const { config: persistedCustomConfig, saveConfig } = useCustomConfig();
+  const { config: persistedCustomConfig } = useCustomConfigState();
+  const { saveConfig } = useCustomConfigActions();
   const {
     rates,
     activeProvider: activeRateProvider,
@@ -111,7 +111,7 @@ export function useSettingsFormController(): SettingsFormController {
     getCurrencySymbol,
   } = useReportExchangeRates(savedSettings.exchangeRateProvider);
   const { toast } = useToast();
-  const { t, setLocale } = useI18n();
+  const { t, commitLocale, syncRemoteLocale } = useI18n();
   const appStatus = useSetupStatus();
   const externalIntegrationsDisabled = appStatus.isLoading || appStatus.demoMode;
   // demo 模式同时禁用外部集成和账号安全写操作；这里拆成两个语义，避免后续把密码/MFA/Passkey 误归到外部集成策略里。
@@ -148,10 +148,10 @@ export function useSettingsFormController(): SettingsFormController {
   const customConfigDirtyRef = useRef(false);
 
   const categoryUsageCount = useMemo(
-    () => countSubscriptionsByCategory(subscriptionsQuery.data ?? []),
-    [subscriptionsQuery.data],
+    () => new Map(Object.entries(subscriptionFacetsQuery.data?.categoryCounts ?? {})),
+    [subscriptionFacetsQuery.data?.categoryCounts],
   );
-  const publicStatusPage = usePublicStatusPageSettingsController(subscriptionsQuery.data);
+  const publicStatusPage = usePublicStatusPageSettingsController(subscriptionFacetsQuery.data);
   const publicApi = usePublicApiSettingsController();
   const telegramBotCommands = useTelegramBotCommandsController({
     settings: settingsWithDrafts,
@@ -341,13 +341,13 @@ export function useSettingsFormController(): SettingsFormController {
         writeCustomThemeColorToStorage(nextSettings.themeCustomColor);
         clearSettingsAppearanceDraftFromStorage();
       }
-      setLocale(nextSettings.locale, {
-        persist: false,
-        markAsSaved: true,
-        ...(options.rememberLocalePreference ? { rememberPreference: true } : {}),
-      });
+      if (options.rememberLocalePreference) {
+        commitLocale(nextSettings.locale);
+      } else {
+        syncRemoteLocale(nextSettings.locale);
+      }
     },
-    [setLocale, setTheme],
+    [commitLocale, setTheme, syncRemoteLocale],
   );
 
   const handleSaveChanges = useCallback(async () => {
@@ -646,7 +646,7 @@ export function useSettingsFormController(): SettingsFormController {
     canManageUsers,
     canAccessPocketBaseAdmin: canManageUsers && !isCloudflareRuntime,
     customConfig,
-    subscriptionsQuery,
+    subscriptionFacetsQuery,
     categoryUsageCount,
     rates,
     activeRateProvider,

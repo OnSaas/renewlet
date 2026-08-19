@@ -10,6 +10,7 @@ import {
 } from "@renewlet/shared/schemas/calendar-feed";
 import { buildRenewalCalendarIcs } from "@renewlet/shared/ics";
 import { buildRenewalCalendarEvent, type RenewalCalendarEvent, type RenewalCalendarSubscription } from "@renewlet/shared/calendar-events";
+import { requireCustomBillingCycle } from "@renewlet/shared/subscription-renewal";
 import { effectiveReminderDays, isDisabledReminderDays, isValidDateOnly, type BillingCycle } from "@renewlet/shared/runtime";
 import { customConfigSchema, type ApiCustomConfig } from "@renewlet/shared/schemas/custom-config";
 import type { ApiAppSettings } from "@renewlet/shared/schemas/settings";
@@ -453,12 +454,15 @@ function calendarEvent(
 
 function billingCycleLabel(subscription: CalendarSubscription, locale: ApiAppSettings["locale"]): string {
   if (subscription.billingCycle === "custom") {
-    const unit = isCustomCycleUnit(subscription.customCycleUnit) ? subscription.customCycleUnit : "day";
-    const unitKey = `calendarFeed.customCycleUnit.${unit}` as const;
+    const custom = requireCustomBillingCycle(
+      subscription.customDays,
+      isCustomCycleUnit(subscription.customCycleUnit) ? subscription.customCycleUnit : undefined,
+    );
+    const unitKey = `calendarFeed.customCycleUnit.${custom.unit}` as const;
     const unitLabel = serverText(locale, unitKey);
     return serverFormat(locale, "calendarFeed.billingCycle.customValue", {
-      count: subscription.customDays ?? 1,
-      unit: unitLabel === unitKey ? unit : unitLabel,
+      count: custom.count,
+      unit: unitLabel === unitKey ? custom.unit : unitLabel,
     });
   }
   const cycle = subscription.billingCycle;

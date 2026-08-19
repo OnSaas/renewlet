@@ -4,15 +4,26 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Calendar from "./calendar";
 
 const mocks = vi.hoisted(() => ({
-  useSubscriptions: vi.fn(),
-  createMutation: { mutate: vi.fn() },
-  updateMutation: { mutate: vi.fn() },
+  useSubscriptionCalendar: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-subscriptions", () => ({
-  useSubscriptions: mocks.useSubscriptions,
-  useCreateSubscription: () => mocks.createMutation,
-  useUpdateSubscription: () => mocks.updateMutation,
+  useSubscriptionCalendar: mocks.useSubscriptionCalendar,
+  useSubscriptionFacets: () => ({
+    data: { total: 0, categoryCounts: {}, tags: [], visibleCount: 0, hiddenCount: 0 },
+  }),
+}));
+
+vi.mock("@/modules/subscriptions/application/use-subscription-crud", () => ({
+  useSubscriptionCrud: () => ({
+    editingSubscription: null,
+    editDialogOpen: false,
+    editDetailPending: false,
+    handleAddSubscription: vi.fn(),
+    handleEditSubscription: vi.fn(),
+    handleSaveSubscription: vi.fn(),
+    handleEditDialogOpenChange: vi.fn(),
+  }),
 }));
 
 vi.mock("@/components/header", () => ({
@@ -73,14 +84,14 @@ function renderCalendarPage({ mobile }: { mobile: boolean }) {
 
 describe("Calendar page back-to-top float button", () => {
   beforeEach(() => {
-    mocks.useSubscriptions.mockReturnValue({
+    mocks.useSubscriptionCalendar.mockReturnValue({
       data: [],
       isPending: false,
     });
   });
 
   it("renders a page-isomorphic skeleton while subscriptions are pending", () => {
-    mocks.useSubscriptions.mockReturnValue({
+    mocks.useSubscriptionCalendar.mockReturnValue({
       data: undefined,
       isPending: true,
     });
@@ -92,6 +103,23 @@ describe("Calendar page back-to-top float button", () => {
     expect(skeleton.querySelectorAll(".grid-cols-7 .animate-pulse")).toHaveLength(49);
     expect(screen.queryByTestId("subscription-calendar")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("shows a recoverable error instead of an empty calendar", () => {
+    const refetch = vi.fn();
+    mocks.useSubscriptionCalendar.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      error: new Error(),
+      refetch,
+    });
+
+    renderCalendarPage({ mobile: false });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("操作失败，请稍后重试");
+    expect(screen.queryByTestId("subscription-calendar")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it("shows the back-to-top float button on H5 calendar pages", async () => {

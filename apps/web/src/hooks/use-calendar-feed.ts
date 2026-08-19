@@ -12,7 +12,7 @@ const subscriptionCalendarFeedQueryKey = (subscriptionId: string) => ["subscript
 export function useCalendarFeedStatus() {
   return useQuery({
     queryKey: CALENDAR_FEED_QUERY_KEY,
-    queryFn: () => calendarFeedService.get(),
+    queryFn: ({ signal }) => calendarFeedService.get(signal),
   });
 }
 
@@ -70,7 +70,7 @@ export function useCreateSubscriptionCalendarFeed() {
 export function useSubscriptionCalendarFeedStatus(subscriptionId: string, enabled: boolean) {
   return useQuery({
     queryKey: subscriptionCalendarFeedQueryKey(subscriptionId),
-    queryFn: () => calendarFeedService.getSubscription(subscriptionId),
+    queryFn: ({ signal }) => calendarFeedService.getSubscription(subscriptionId, signal),
     enabled,
   });
 }

@@ -1274,6 +1274,11 @@ msgid "subscriptions.exportCsv"
 msgstr "Export CSV"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:250
+msgid "subscriptions.exportFailed"
+msgstr "Export failed. Please try again."
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:247
 msgid "subscriptions.exportJson"
 msgstr "Export backup ZIP"
@@ -1452,11 +1457,6 @@ msgstr "One-click copy is unavailable. Select and copy this URL manually."
 #: src/i18n/descriptors/subscription.ts:199
 msgid "subscription.renew.currentNextBillingDate"
 msgstr "Current next billing date"
-
-#. js-lingui-explicit-id
-#: src/i18n/descriptors/subscription.ts:458
-msgid "import.error.workerUnsupported"
-msgstr "This browser does not support background import parsing."
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:522

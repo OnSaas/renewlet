@@ -3,9 +3,37 @@ import userEvent from "@testing-library/user-event";
 import { useRef, useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { assertDateOnly } from "@/lib/time/date-only";
+import {
+  subscriptionCycleFixture,
+  type SubscriptionFixtureOverrides,
+} from "@/test/subscription-fixtures";
 import type { Subscription } from "@/types/subscription";
-import { RenewSubscriptionDialog } from "./renew-subscription-dialog";
+import {
+  RenewSubscriptionDialogContent,
+  type RenewSubscriptionDialogProps,
+} from "./renew-subscription-dialog";
+
+function RenewSubscriptionDialog(props: RenewSubscriptionDialogProps) {
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <DialogContent
+        closeLabel="关闭"
+        dismissMode="explicit"
+        layout="content"
+        className="h5-dialog-auto-frame gap-0 border-border bg-card p-0 sm:max-w-lg"
+        onCloseAutoFocus={(event) => {
+          if (!props.restoreFocusRef?.current) return;
+          event.preventDefault();
+          props.restoreFocusRef.current.focus();
+        }}
+      >
+        <RenewSubscriptionDialogContent {...props} />
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const mocks = vi.hoisted(() => ({
   config: {
@@ -17,7 +45,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/contexts/CustomConfigContext", () => ({
-  useCustomConfig: () => ({ config: mocks.config }),
+  useCustomConfigState: () => ({ config: mocks.config }),
 }));
 
 vi.mock("@/i18n/I18nProvider", () => ({
@@ -77,16 +105,13 @@ function setupUser() {
   return userEvent.setup();
 }
 
-function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
+function makeSubscription(overrides: SubscriptionFixtureOverrides<Subscription> = {}): Subscription {
   return {
     id: "sub-renew",
     name: "Renewable SaaS",
     logo: undefined,
     price: "12",
     currency: "USD",
-    billingCycle: "monthly",
-    customDays: undefined,
-    customCycleUnit: undefined,
     category: "productivity",
     status: "expired",
     pinned: false,
@@ -104,8 +129,10 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
     repeatReminderEnabled: false,
     repeatReminderInterval: "1h",
     repeatReminderWindow: "72h",
+    extra: {},
     ...overrides,
-  } as Subscription;
+    ...subscriptionCycleFixture(overrides),
+  };
 }
 
 function renderDialog(props: Partial<ComponentProps<typeof RenewSubscriptionDialog>> = {}) {

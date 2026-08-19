@@ -1,4 +1,4 @@
-// 由 scripts/generate-i18n-catalog-keys.mjs 生成；MessageKey 是前端静态翻译 helper 的唯一 key union。
+// 由 scripts/generate-i18n-artifacts.mjs 生成；MessageKey 是前端静态翻译 helper 的唯一 key union。
 export const MESSAGE_KEYS = [
   "admin.actions",
   "admin.banned",
@@ -479,6 +479,7 @@ export const MESSAGE_KEYS = [
   "error.code.SETTINGS_JSON_INVALID",
   "error.code.START_DATE_DATE_FORMAT",
   "error.code.START_DATE_DATE_INVALID",
+  "error.code.SUBSCRIPTION_COLLECTION_LIMIT_EXCEEDED",
   "error.code.SUBSCRIPTION_NAME_REQUIRED",
   "error.code.SUBSCRIPTION_NAME_TOO_LONG",
   "error.code.SUBSCRIPTION_PRICE_NEGATIVE",
@@ -542,7 +543,6 @@ export const MESSAGE_KEYS = [
   "import.error.unrecognizedFile",
   "import.error.wallosTableTooLarge",
   "import.error.workerParseFailed",
-  "import.error.workerUnsupported",
   "import.field.wallosDueDate",
   "import.field.wallosStartDate",
   "import.fileEmpty",
@@ -2069,6 +2069,7 @@ export const MESSAGE_KEYS = [
   "subscriptions.emptyNoData",
   "subscriptions.emptyTitle",
   "subscriptions.exportCsv",
+  "subscriptions.exportFailed",
   "subscriptions.exportJson",
   "subscriptions.exportJsonWithSecrets",
   "subscriptions.exportMenu",

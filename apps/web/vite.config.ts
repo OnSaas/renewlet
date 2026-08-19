@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig, loadEnv, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin, type PluginOption } from "vite";
 import {
   appendUniqueString,
   customHeadScriptEnvName,
@@ -14,6 +14,7 @@ import {
   type CustomHeadScript,
 } from "./vite/custom-head-script.js";
 import { resolveClientBuildVersion } from "./vite/build-version.js";
+import { bundleModuleGraphPlugin } from "./vite/bundle-module-graph.js";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(rootDir, "../..");
@@ -62,45 +63,25 @@ function contentSecurityPolicy(script: CustomHeadScript | undefined): string {
   ].join("; ");
 }
 
-const vendorChunkGroups = [
+const coreChunkGroups = [
   {
-    name: "react-vendor",
-    test: /node_modules[\\/](react|react-dom|react-router|@tanstack)[\\/]/,
-    priority: 50,
-  },
-  {
-    name: "radix-vendor",
-    test: /node_modules[\\/]@radix-ui[\\/]/,
-    priority: 40,
-  },
-  {
-    name: "charts-vendor",
-    test: /node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor|react-smooth|decimal\.js-light)[\\/]/,
-    priority: 35,
-  },
-  {
-    name: "forms-vendor",
-    test: /node_modules[\\/](react-hook-form|@hookform|zod|react-number-format|input-otp)[\\/]/,
+    name: "react-core",
+    test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
     priority: 30,
   },
   {
-    name: "time-vendor",
-    test: /node_modules[\\/](@js-temporal|jsbi)[\\/]/,
-    priority: 25,
-  },
-  {
-    name: "runtime-ui-vendor",
-    test: /node_modules[\\/](lucide-react|framer-motion|vaul|cmdk|sonner|react-day-picker|date-fns|embla-carousel-react|@dnd-kit|class-variance-authority|clsx|tailwind-merge|react-resizable-panels)[\\/]/,
+    name: "router-core",
+    test: /node_modules[\\/]react-router[\\/]/,
     priority: 20,
   },
   {
-    name: "data-vendor",
-    test: /node_modules[\\/](pocketbase)[\\/]/,
+    name: "query-core",
+    test: /node_modules[\\/]@tanstack[\\/](query-core|react-query)[\\/]/,
     priority: 10,
   },
 ];
 
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(async ({ command, mode }) => {
   const env = loadEnv(mode, repoRoot, "");
   const devProxyTarget = process.env["VITE_DEV_PROXY_TARGET"] ?? env["VITE_DEV_PROXY_TARGET"] ?? "http://127.0.0.1:3000";
   const renewletRuntime = process.env["VITE_RENEWLET_RUNTIME"] ?? env["VITE_RENEWLET_RUNTIME"];
@@ -111,15 +92,31 @@ export default defineConfig(({ command, mode }) => {
     ? parseCustomHeadScript(process.env[customHeadScriptEnvName] ?? env[customHeadScriptEnvName])
     : undefined;
 
+  const plugins: PluginOption[] = [
+    customHeadScriptPlugin(customHeadScript, {
+      updateStaticHeaders: command === "build" && renewletRuntime === "cloudflare",
+    }),
+    lingui({ failOnCompileError: true }),
+    tailwindcss(),
+    react(),
+    bundleModuleGraphPlugin(repoRoot),
+  ];
+  if (process.env["ANALYZE"] === "1") {
+    const { visualizer } = await import("rollup-plugin-visualizer");
+    plugins.push(visualizer({
+      filename: path.resolve(rootDir, "dist/bundle-report.html"),
+      gzipSize: true,
+      brotliSize: true,
+      open: false,
+    }));
+  }
+
   return {
-    plugins: [
-      customHeadScriptPlugin(customHeadScript, {
-        updateStaticHeaders: command === "build" && renewletRuntime === "cloudflare",
-      }),
-      lingui({ failOnCompileError: true }),
-      tailwindcss(),
-      react(),
-    ],
+    plugins,
+    // 这两个依赖只在 Dedicated Worker 内动态加载，HTML 入口扫描不可见；启动前预优化可避免运行中 reload 丢失导入弹窗状态。
+    optimizeDeps: {
+      include: ["jszip", "sql.js"],
+    },
     worker: {
       plugins: () => [lingui({ failOnCompileError: true })],
     },
@@ -150,8 +147,11 @@ export default defineConfig(({ command, mode }) => {
         output: {
           // Workers Static Assets 直接下发前端产物；按依赖边界拆主包，避免首屏 JS 重新越过 Vite 500KB 预警线。
           codeSplitting: {
-            groups: vendorChunkGroups,
+            groups: coreChunkGroups,
           },
+          entryFileNames: "assets/[name]-[hash].js",
+          chunkFileNames: "assets/[name]-[hash].js",
+          assetFileNames: "assets/[name]-[hash][extname]",
         },
       },
     },

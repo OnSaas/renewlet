@@ -66,7 +66,7 @@ describe("SettingsPageSkeleton", () => {
     expect(mobileHeader).not.toHaveClass("-mx-4", "border-b", "top-[calc(8.25rem+env(safe-area-inset-top))]");
     expect(desktopNav).toHaveClass(
       "sticky",
-      "top-[var(--settings-desktop-sticky-top)]",
+      "top-(--settings-desktop-sticky-top)",
       "max-h-[calc(var(--app-viewport-height)-var(--settings-desktop-sticky-top)-1rem)]",
       "bg-card/70",
       "shadow-card",

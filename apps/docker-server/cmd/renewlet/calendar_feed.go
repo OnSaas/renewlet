@@ -707,18 +707,11 @@ func calendarFeedDescription(item calendarFeedSubscription, settings appSettings
 func calendarFeedBillingCycleLabel(item calendarFeedSubscription, locale appLocale) string {
 	if item.BillingCycle == "custom" {
 		unit := item.CustomCycleUnit
-		if !isValidCustomCycleUnit(unit) {
-			unit = "day"
-		}
 		unitLabel := serverText(locale, "calendarFeed.customCycleUnit."+unit)
 		if unitLabel == "calendarFeed.customCycleUnit."+unit {
 			unitLabel = unit
 		}
-		count := item.CustomDays
-		if count <= 0 {
-			count = 1
-		}
-		return serverFormat(locale, "calendarFeed.billingCycle.customValue", map[string]interface{}{"count": count, "unit": unitLabel})
+		return serverFormat(locale, "calendarFeed.billingCycle.customValue", map[string]interface{}{"count": item.CustomDays, "unit": unitLabel})
 	}
 	key := "calendarFeed.billingCycle." + item.BillingCycle
 	label := serverText(locale, key)
@@ -759,7 +752,7 @@ func addCalendarFeedSource(cal *ics.Calendar, sourceURL string) {
 	cal.CalendarProperties = append(cal.CalendarProperties, ics.CalendarProperty{
 		BaseProperty: ics.BaseProperty{
 			IANAToken:      "SOURCE",
-			ICalParameters: map[string][]string{"VALUE": []string{string(ics.ValueDataTypeUri)}},
+			ICalParameters: map[string][]string{"VALUE": {string(ics.ValueDataTypeUri)}},
 			Value:          sourceURL,
 		},
 	})
