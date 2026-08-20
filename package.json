@@ -91,14 +91,14 @@
     "update:built-in-icons-index": "node scripts/update-built-in-icons-index.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260811.1",
+    "@cloudflare/workers-types": "^5.20260815.1",
     "@lingui/format-po": "6.6.0",
     "@playwright/test": "^1.62.1",
     "@redocly/cli": "2.45.0",
     "@types/node": "24.13.3",
     "tsx": "4.23.9",
     "typescript": "6.0.3",
-    "wrangler": "^4.123.0",
+    "wrangler": "^4.124.0",
     "zod": "4.4.3"
   }
 }
