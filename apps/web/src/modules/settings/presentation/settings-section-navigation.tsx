@@ -1,9 +1,16 @@
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Drawer } from "vaul";
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  SideDrawerClose,
+  SideDrawerContent,
+  SideDrawerDescription,
+  SideDrawerRoot,
+  SideDrawerTitle,
+  SideDrawerTrigger,
+} from '@/components/ui/side-drawer';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n/I18nProvider';
 import { settingsLayout } from './settings-layout';
@@ -403,54 +410,51 @@ export function MobileSettingsSectionDrawer({
   };
 
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} direction="left">
-      {open ? (
-        <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 z-70 bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
-          <Drawer.Content
-            className="fixed left-0 top-(--app-visual-viewport-offset-top) z-80 flex h-(--app-viewport-height) max-h-(--app-viewport-height) w-[min(18rem,calc(100vw-3.5rem))] flex-col overflow-hidden rounded-r-xl border-r border-border bg-card/95 text-card-foreground shadow-lg backdrop-blur-xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-left-4"
-            data-testid="settings-section-nav-drawer"
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-border px-4 pb-3 pt-[calc(1rem+env(safe-area-inset-top))]">
-              <div className="min-w-0">
-                <Drawer.Title className="text-base font-semibold text-foreground">
-                  {t("settings.sectionNavTitle")}
-                </Drawer.Title>
-                <Drawer.Description className="sr-only">
-                  {t("settings.sectionNavLabel")}
-                </Drawer.Description>
-              </div>
-              <Drawer.Close asChild>
-                <Button variant="ghost" size="icon" className="-mr-2 -mt-2 h-10 w-10 text-muted-foreground">
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">{t("common.close")}</span>
-                </Button>
-              </Drawer.Close>
-            </div>
+    <SideDrawerRoot open={open} onOpenChange={onOpenChange}>
+      <MobileSettingsPageHeader />
+      <SideDrawerContent
+        side="left"
+        className="w-[min(18rem,calc(100vw-3.5rem))] rounded-r-xl bg-card/95 backdrop-blur-xl"
+        data-testid="settings-section-nav-drawer"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border px-4 pb-3 pt-[calc(1rem+env(safe-area-inset-top))]">
+          <div className="min-w-0">
+            <SideDrawerTitle className="text-base font-semibold text-foreground">
+              {t("settings.sectionNavTitle")}
+            </SideDrawerTitle>
+            <SideDrawerDescription className="sr-only">
+              {t("settings.sectionNavLabel")}
+            </SideDrawerDescription>
+          </div>
+          <SideDrawerClose asChild>
+            <Button variant="ghost" size="icon" className="-mr-2 -mt-2 h-10 w-10 text-muted-foreground">
+              <X className="h-4 w-4" />
+              <span className="sr-only">{t("common.close")}</span>
+            </Button>
+          </SideDrawerClose>
+        </div>
 
-            <nav aria-label={t("settings.sectionNavLabel")} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-              <ul className="grid gap-1">
-                {sections.map((section) => (
-                  <li key={section.id}>
-                    <SettingsSectionNavLink
-                      section={section}
-                      active={activeSectionId === section.id}
-                      onSectionClick={handleSectionClick}
-                      onSectionIntent={onSectionIntent}
-                      variant="mobileDrawer"
-                    />
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </Drawer.Content>
-        </Drawer.Portal>
-      ) : null}
-    </Drawer.Root>
+        <nav aria-label={t("settings.sectionNavLabel")} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+          <ul className="grid gap-1">
+            {sections.map((section) => (
+              <li key={section.id}>
+                <SettingsSectionNavLink
+                  section={section}
+                  active={activeSectionId === section.id}
+                  onSectionClick={handleSectionClick}
+                  onSectionIntent={onSectionIntent}
+                  variant="mobileDrawer"
+                />
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </SideDrawerContent>
+    </SideDrawerRoot>
   );
 }
 
-export function MobileSettingsPageHeader({ onOpen }: { onOpen: () => void }) {
+function MobileSettingsPageHeader() {
   const { t } = useI18n();
 
   return (
@@ -465,16 +469,17 @@ export function MobileSettingsPageHeader({ onOpen }: { onOpen: () => void }) {
             {t("settings.subtitle")}
           </p>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={settingsLayout.mobileHeaderTrigger}
-          aria-label={t("settings.sectionNavOpen")}
-          onClick={onOpen}
-        >
-          <Menu className="h-4 w-4" />
-        </Button>
+        <SideDrawerTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={settingsLayout.mobileHeaderTrigger}
+            aria-label={t("settings.sectionNavOpen")}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+        </SideDrawerTrigger>
       </div>
     </div>
   );

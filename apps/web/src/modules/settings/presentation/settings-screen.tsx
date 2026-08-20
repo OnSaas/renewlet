@@ -29,7 +29,6 @@ import {
 import { isAdvancedSettingsSection } from "./settings-section-groups";
 import {
   DesktopSettingsSectionNav,
-  MobileSettingsPageHeader,
   MobileSettingsSectionDrawer,
   createSettingsSections,
   useSettingsSectionNavigation,
@@ -100,15 +99,6 @@ export function SettingsScreen() {
     <div className="app-page flex flex-col bg-background">
       <Header />
 
-      <MobileSettingsSectionDrawer
-        sections={settingsSections}
-        activeSectionId={activeSectionId}
-        onSectionClick={handleSectionClick}
-        onSectionIntent={handleSectionIntent}
-        open={mobileSectionNavOpen}
-        onOpenChange={setMobileSectionNavOpen}
-      />
-
       <main className={cn("flex-1", hasUnsavedChanges && "h5-bottom-bar-space")} data-testid="settings-main">
         <div className="app-main mx-auto max-w-7xl">
           <div className={settingsLayout.pageGrid} data-testid="settings-page-layout">
@@ -122,7 +112,14 @@ export function SettingsScreen() {
             </aside>
 
             <div className={settingsLayout.content} data-testid="settings-section-content">
-              <MobileSettingsPageHeader onOpen={() => setMobileSectionNavOpen(true)} />
+              <MobileSettingsSectionDrawer
+                sections={settingsSections}
+                activeSectionId={activeSectionId}
+                onSectionClick={handleSectionClick}
+                onSectionIntent={handleSectionIntent}
+                open={mobileSectionNavOpen}
+                onOpenChange={setMobileSectionNavOpen}
+              />
 
               <div className={settingsLayout.desktopHeader}>
                 <h1 className="text-2xl font-bold text-foreground">{t("settings.title")}</h1>

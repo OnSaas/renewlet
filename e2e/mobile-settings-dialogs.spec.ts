@@ -3,6 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 import { expectNoHorizontalOverflow } from "./support/layout";
 import { gotoSettingsSectionAfterHydration } from "./support/settings";
+import { expectSideDrawerExitLifecycle } from "./support/side-drawer";
 import {
   createSubscription,
   openAddSubscriptionDialog,
@@ -11,6 +12,23 @@ import {
 } from "./support/subscriptions";
 
 const VIEWPORT_SYNC_SETTLE_MS = 540;
+
+test("mobile settings navigation completes the left-side exit lifecycle", async ({ page }) => {
+  await gotoSettingsSectionAfterHydration(page, "settings-display");
+
+  const trigger = page.getByTestId("settings-mobile-page-header")
+    .getByRole("button", { name: "打开设置目录" });
+  await trigger.click();
+  const panel = page.getByTestId("settings-section-nav-drawer");
+  await expect(panel).toBeVisible();
+
+  await expectSideDrawerExitLifecycle(
+    page,
+    panel,
+    () => panel.getByRole("button", { name: "关闭" }).click(),
+  );
+  await expect(trigger).toBeFocused();
+});
 
 async function setVisualViewportVars(page: Page, height: number, offsetTop = 0) {
   // 先驱动 visualViewport 同步器，再固定本轮测试变量；恢复阶段不能继承上一轮键盘高度。

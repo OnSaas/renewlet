@@ -17,6 +17,24 @@ import {
   expectVerticallyCenteredInViewport,
 } from "./support/layout";
 import { installLogoCandidateRoute } from "./support/media-candidates";
+import { expectSideDrawerExitLifecycle } from "./support/side-drawer";
+
+test("desktop advanced filters complete the right-side exit lifecycle", async ({ page }) => {
+  await page.goto("/subscriptions");
+  await expect(page.getByRole("heading", { name: "订阅列表" })).toBeVisible();
+
+  const trigger = page.getByTestId("desktop-advanced-filter").getByRole("button", { name: "更多筛选" });
+  await trigger.click();
+  const panel = page.getByTestId("desktop-advanced-filter-panel");
+  await expect(panel).toBeVisible();
+
+  await expectSideDrawerExitLifecycle(
+    page,
+    panel,
+    () => panel.getByRole("button", { name: "关闭" }).click(),
+  );
+  await expect(trigger).toBeFocused();
+});
 
 test("desktop tall subscription dialog keeps footer tight to the panel bottom", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 900 });

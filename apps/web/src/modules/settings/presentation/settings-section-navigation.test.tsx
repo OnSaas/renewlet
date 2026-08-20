@@ -357,7 +357,9 @@ describe("SettingsScreen section navigation", () => {
     const user = userEvent.setup();
     renderSettingsScreen();
 
-    await user.click(within(screen.getByTestId("settings-mobile-page-header")).getByRole("button", { name: /打开设置目录/ }));
+    const trigger = within(screen.getByTestId("settings-mobile-page-header"))
+      .getByRole("button", { name: /打开设置目录/ });
+    await user.click(trigger);
     const drawer = await screen.findByTestId("settings-section-nav-drawer");
     await user.click(within(drawer).getByRole("link", { name: "通知" }));
     const root = setSectionAnchorGeometry("settings-notifications");
@@ -366,8 +368,9 @@ describe("SettingsScreen section navigation", () => {
 
     await waitFor(() => expect(screen.queryByTestId("settings-section-nav-drawer")).not.toBeInTheDocument());
     expect(window.location.hash).toBe("#settings-notifications");
+    expect(trigger).toHaveFocus();
 
-    await user.click(within(screen.getByTestId("settings-mobile-page-header")).getByRole("button", { name: /打开设置目录/ }));
+    await user.click(trigger);
     const reopenedDrawer = await screen.findByTestId("settings-section-nav-drawer");
     const activeNotificationLink = within(reopenedDrawer).getByRole("link", { name: "通知" });
     expect(activeNotificationLink).toHaveAttribute("aria-current", "location");

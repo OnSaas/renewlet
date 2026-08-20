@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronRight, SlidersHorizontal, X } from "lucide-react";
-import { Drawer } from "vaul";
 
 import {
   AdvancedFilterGroupDialog,
@@ -12,9 +11,16 @@ import { DeferredSubscriptionAdvancedDateRangeFields } from "@/components/subscr
 import { TagFilterChip } from "@/components/subscription-tag-filter-drawer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FloatingPortalContainerProvider } from "@/components/ui/floating-portal-container";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  SideDrawerClose,
+  SideDrawerContent,
+  SideDrawerDescription,
+  SideDrawerRoot,
+  SideDrawerTitle,
+  SideDrawerTrigger,
+} from "@/components/ui/side-drawer";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import {
@@ -544,7 +550,6 @@ export function SubscriptionAdvancedFilter({
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState(filters);
-  const [desktopPortalContainer, setDesktopPortalContainer] = useState<HTMLElement | null>(null);
   const activeCount = useMemo(() => countAdvancedFilters(filters), [filters]);
   const draftActive = hasActiveSubscriptionAdvancedFilters(draftFilters);
   const triggerLabel = activeCount > 0
@@ -568,9 +573,6 @@ export function SubscriptionAdvancedFilter({
     handleOpenChange(false);
   };
   const resetDraftFilters = () => setDraftFilters(DEFAULT_SUBSCRIPTION_ADVANCED_FILTERS);
-  const setDesktopPanelRef = useCallback((node: HTMLDivElement | null) => {
-    setDesktopPortalContainer(node);
-  }, []);
   const contentProps = {
     filters: draftFilters,
     onChange: setDraftFilters,
@@ -624,56 +626,49 @@ export function SubscriptionAdvancedFilter({
   }
 
   return (
-    <Drawer.Root open={open} onOpenChange={handleOpenChange} shouldScaleBackground={false} direction="right">
+    <SideDrawerRoot open={open} onOpenChange={handleOpenChange}>
       <div className={cn("shrink-0", className)} data-testid="desktop-advanced-filter">
-        <Drawer.Trigger asChild>
+        <SideDrawerTrigger asChild>
           <Button variant="outline" className="h-10 shrink-0 border-border bg-secondary px-3">
             <SlidersHorizontal className="h-4 w-4" />
             <span>{triggerLabel}</span>
           </Button>
-        </Drawer.Trigger>
+        </SideDrawerTrigger>
       </div>
 
-      {open ? (
-        <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 z-70 bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
-          <Drawer.Content
-            ref={setDesktopPanelRef}
-            className="fixed right-0 top-(--app-visual-viewport-offset-top) z-80 flex h-(--app-viewport-height) max-h-(--app-viewport-height) w-[min(30rem,calc(100vw-2rem))] flex-col overflow-hidden border-l border-border bg-card text-card-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-right-4"
-            data-testid="desktop-advanced-filter-panel"
-          >
-            <FloatingPortalContainerProvider container={desktopPortalContainer}>
-              <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
-                <div className="min-w-0">
-                  <Drawer.Title className="text-base font-semibold text-foreground">
-                    {t("subscriptions.advanced.drawerTitle")}
-                  </Drawer.Title>
-                  <Drawer.Description className="sr-only">
-                    {t("subscriptions.advanced.panelDescription")}
-                  </Drawer.Description>
-                </div>
-                <Drawer.Close asChild>
-                  <Button variant="ghost" size="icon" className="-mr-2 -mt-2 h-10 w-10 text-muted-foreground">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">{t("common.close")}</span>
-                  </Button>
-                </Drawer.Close>
-              </div>
+      <SideDrawerContent
+        side="right"
+        className="w-[min(30rem,calc(100vw-2rem))]"
+        data-testid="desktop-advanced-filter-panel"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <SideDrawerTitle className="text-base font-semibold text-foreground">
+              {t("subscriptions.advanced.drawerTitle")}
+            </SideDrawerTitle>
+            <SideDrawerDescription className="sr-only">
+              {t("subscriptions.advanced.panelDescription")}
+            </SideDrawerDescription>
+          </div>
+          <SideDrawerClose asChild>
+            <Button variant="ghost" size="icon" className="-mr-2 -mt-2 h-10 w-10 text-muted-foreground">
+              <X className="h-4 w-4" />
+              <span className="sr-only">{t("common.close")}</span>
+            </Button>
+          </SideDrawerClose>
+        </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5" data-testid="desktop-advanced-filter-scroll">
-                <AdvancedFilterContent {...contentProps} layout="desktop" />
-              </div>
-              <AdvancedFilterFooter
-                active={draftActive}
-                onClear={resetDraftFilters}
-                onApply={applyDraftFilters}
-                className="px-5"
-              />
-            </FloatingPortalContainerProvider>
-          </Drawer.Content>
-        </Drawer.Portal>
-      ) : null}
-    </Drawer.Root>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5" data-testid="desktop-advanced-filter-scroll">
+          <AdvancedFilterContent {...contentProps} layout="desktop" />
+        </div>
+        <AdvancedFilterFooter
+          active={draftActive}
+          onClear={resetDraftFilters}
+          onApply={applyDraftFilters}
+          className="px-5"
+        />
+      </SideDrawerContent>
+    </SideDrawerRoot>
   );
 }
 
