@@ -16,8 +16,8 @@ type CatalogModule = {
 };
 
 const catalogLoaders = {
-  "zh-CN": () => import("@/i18n/catalogs/zh-CN"),
-  "en-US": () => import("@/i18n/catalogs/en-US"),
+  "zh-CN": () => import("@/i18n/catalog-loaders/zh-CN"),
+  "en-US": () => import("@/i18n/catalog-loaders/en-US"),
 } satisfies Record<Locale, () => Promise<CatalogModule>>;
 
 const loadedCatalogs = new Map<Locale, Messages>();

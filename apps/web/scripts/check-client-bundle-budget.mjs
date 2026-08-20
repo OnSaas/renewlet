@@ -14,6 +14,7 @@ const distRoot = join(workspaceRoot, "dist");
 const manifest = JSON.parse(readFileSync(join(distRoot, ".vite/manifest.json"), "utf8"));
 const moduleGraph = JSON.parse(readFileSync(join(distRoot, ".vite/module-graph.json"), "utf8"));
 const locales = ["en-US", "zh-CN"];
+const catalogEntryKey = (locale) => `src/i18n/catalog-loaders/${locale}.ts`;
 const privateRouteKeys = new Set([
   "src/pages/dashboard.tsx",
   "src/pages/subscriptions.tsx",
@@ -105,7 +106,7 @@ function assertStartupDependencies(locale, closure) {
   const otherLocales = locales.filter((candidate) => candidate !== locale);
   const unexpectedCatalogs = modules.filter((id) => otherLocales.some((candidate) => (
     id.includes(`apps/web/src/i18n/catalogs/${candidate}/`)
-    || id.endsWith(`apps/web/src/i18n/catalogs/${candidate}.ts`)
+    || id.endsWith(`apps/web/src/i18n/catalog-loaders/${candidate}.ts`)
   )));
   if (unexpectedCatalogs.length > 0) {
     throw new Error(`${locale} startup closure includes non-current locale catalog: ${unexpectedCatalogs[0]}`);
@@ -121,7 +122,7 @@ if (!manifest[privateShellKey]) throw new Error("Client bundle manifest has no p
 const privateShellClosure = collectStaticClosure(privateShellKey);
 
 for (const locale of locales) {
-  const localeKey = `src/i18n/catalogs/${locale}.ts`;
+  const localeKey = catalogEntryKey(locale);
   if (!manifest[localeKey]) throw new Error(`Client bundle manifest has no ${locale} catalog entry`);
   const startupClosure = mergeClosures(appClosure, collectStaticClosure(localeKey));
   const startupSizes = sumCompressed(startupClosure.files);

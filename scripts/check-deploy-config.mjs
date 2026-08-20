@@ -255,26 +255,39 @@ function checkGoToolchainConsistency() {
 
 function checkDockerSelfUpdateLayout() {
   const dockerfile = readFileSync(join(repoRoot, "Dockerfile"), "utf8");
-  const entrypoint = readFileSync(join(repoRoot, "deploy/docker-entrypoint.sh"), "utf8");
+  const containerInit = readFileSync(join(repoRoot, "apps/docker-server/cmd/container-init/main.go"), "utf8");
   const compose = readFileSync(join(repoRoot, "deploy/docker-compose.yml"), "utf8");
   const releaseWorkflow = readFileSync(join(repoRoot, ".github/workflows/release-publish.yml"), "utf8");
 
-  // 页面内更新依赖 Dockerfile、entrypoint、compose、release 资产四处同频；这里把布局当契约锁住。
+  // 页面内更新依赖 Dockerfile、静态 init、compose、release 资产四处同频；这里把布局当契约锁住。
   for (const snippet of [
     "/opt/renewlet/current/renewlet",
     "RENEWLET_SELF_UPDATE_ENABLED=true",
-    "ln -s /opt/renewlet/current/renewlet /renewlet",
+    "COPY --from=server-builder --chown=1000:1000 /out/renewlet /opt/renewlet/current/renewlet",
+    'ENTRYPOINT ["/container-init"]',
   ]) {
     if (!dockerfile.includes(snippet)) {
       throw new Error(`Dockerfile must keep self-update layout snippet: ${snippet}`);
     }
   }
-  if (
-    !entrypoint.includes("mkdir -p /pb_data /opt/renewlet/current /opt/renewlet/backups") ||
-    !entrypoint.includes("rm -f /renewlet") ||
-    !entrypoint.includes("ln -s /opt/renewlet/current/renewlet /renewlet")
-  ) {
-    throw new Error("docker-entrypoint.sh must keep /opt/renewlet/current and backups writable");
+  for (const { pattern, label } of [
+    { pattern: /stableBinaryPath\s*=\s*"\/renewlet"/, label: "stable /renewlet path" },
+    { pattern: /renewletBinaryPath\s*=\s*"\/opt\/renewlet\/current\/renewlet"/, label: "replaceable binary path" },
+    { pattern: /dataPath\s*=\s*"\/pb_data"/, label: "PocketBase data path" },
+    { pattern: /backupPath\s*=\s*"\/opt\/renewlet\/backups"/, label: "self-update backup path" },
+    { pattern: /os\.Symlink\(targetPath, linkPath\)/, label: "stable symlink creation" },
+    { pattern: /os\.Lchown/, label: "symlink-safe ownership" },
+    { pattern: /syscall\.Setgroups/, label: "all-thread supplementary group cleanup" },
+    { pattern: /syscall\.Setgid/, label: "all-thread gid drop" },
+    { pattern: /syscall\.Setuid/, label: "all-thread uid drop" },
+    { pattern: /unix\.Exec/, label: "PID 1 exec" },
+  ]) {
+    if (!pattern.test(containerInit)) {
+      throw new Error(`container-init must keep runtime ownership and exec contract: ${label}`);
+    }
+  }
+  if (existsSync(join(repoRoot, "deploy/docker-entrypoint.sh"))) {
+    throw new Error("The removed shell Docker entrypoint must not return alongside container-init.");
   }
   if (!compose.includes('test: [ "CMD", "/renewlet", "healthcheck" ]')) {
     throw new Error("Docker healthcheck must keep /renewlet as the stable entrypoint");
