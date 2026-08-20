@@ -46,6 +46,7 @@ describe("SubscriptionDialog validation lifecycle", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}

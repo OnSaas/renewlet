@@ -106,7 +106,13 @@ describe("SubscriptionDialog currency order", () => {
 
     render(
       <TooltipProvider delayDuration={0}>
-        <SubscriptionDialog mode="create" open onOpenChange={vi.fn()} onSubmit={vi.fn()} />
+        <SubscriptionDialog
+          mode="create"
+          loadingPreview={null}
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+        />
       </TooltipProvider>,
     );
 
@@ -121,6 +127,7 @@ describe("SubscriptionDialog currency order", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="edit"
           open
           onOpenChange={vi.fn()}
@@ -146,6 +153,7 @@ describe("SubscriptionDialog currency order", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="edit"
           open
           onOpenChange={vi.fn()}

@@ -113,8 +113,10 @@ const Statistics = () => {
   const stats = useStatisticsModel(subscriptions, config, monthlyBudget, defaultCurrency, convert, timeZone, locale, personalCostBasis ? "personal" : "total");
   const {
     editingSubscription,
+    editingCollectionItem,
     editDialogOpen,
     renewingSubscription,
+    renewingCollectionItem,
     renewDialogOpen,
     editDetailPending,
     renewDetailPending,
@@ -134,10 +136,11 @@ const Statistics = () => {
   const {
     detailDialogOpen,
     selectedDetailSubscription,
+    selectedDetailCollectionItem,
     detailPending,
     handleViewDetails: handleViewTrendSubscriptionDetails,
     handleDetailDialogOpenChange,
-  } = useSubscriptionDetailDialog();
+  } = useSubscriptionDetailDialog(subscriptions);
   const handleEditFromDetail = useCallback((subscription: Subscription) => {
     handleEditSubscription(subscription.id);
   }, [handleEditSubscription]);
@@ -283,6 +286,7 @@ const Statistics = () => {
 
       <EditSubscriptionDialog
         subscription={editingSubscription}
+        loadingPreview={editingCollectionItem}
         open={editDialogOpen}
         onOpenChange={handleEditDialogOpenChange}
         onSave={handleSaveSubscription}
@@ -293,6 +297,7 @@ const Statistics = () => {
         open={detailDialogOpen}
         onOpenChange={handleDetailDialogOpenChange}
         subscription={selectedDetailSubscription}
+        loadingPreview={selectedDetailCollectionItem}
         onEditSubscription={handleEditFromDetail}
         onRenewSubscription={handleRenewSubscription}
         today={today}
@@ -303,6 +308,7 @@ const Statistics = () => {
       />
       <DeferredRenewSubscriptionDialog
         subscription={renewingSubscription}
+        loadingPreview={renewingCollectionItem}
         open={renewDialogOpen}
         today={today}
         submitting={renewSubmitting}

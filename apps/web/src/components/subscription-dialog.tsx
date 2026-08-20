@@ -7,7 +7,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { SubscriptionFormDialogLoading } from "@/components/subscription-dialog-loading";
+import { DialogModulePending } from "@/components/ui/dialog-module-pending";
 import { createLazyDialogResource, useLazyDialogSession } from "@/hooks/use-lazy-dialog-session";
 import { useNestedDialogCloseGuard } from "@/hooks/use-nested-dialog-close-guard";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -38,8 +38,11 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
   const { value: Content, error, sessionKey } = useLazyDialogSession(props.open, subscriptionDialogResource);
   const handleRequestClose = useCallback(() => handleParentOpenChange(false), [handleParentOpenChange]);
   const initialCreateSubscription = props.mode === "create" ? props.initialSubscription ?? null : null;
-  const isCloneCreateMode = Boolean(initialCreateSubscription) || (props.mode === "create" && props.loading === true);
-  const showLoading = props.loading === true || Content === null;
+  const clonePreview = props.mode === "create"
+    ? initialCreateSubscription ?? props.loadingPreview
+    : null;
+  const isCloneCreateMode = Boolean(clonePreview);
+  const modulePending = Content === null;
 
   if (props.open && error) throw error;
 
@@ -61,7 +64,7 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
         dismissMode="explicit"
         layout="frame"
         className="h5-dialog-frame h5-subscription-dialog-panel border-border bg-card p-0 sm:max-w-2xl"
-        aria-busy={showLoading ? true : undefined}
+        aria-busy={modulePending || props.loading ? true : undefined}
       >
         <DialogHeader data-subscription-dialog-header="" className="shrink-0 p-6 pb-0">
           <DialogTitle className="text-xl font-semibold">
@@ -72,16 +75,16 @@ export function SubscriptionDialog(props: SubscriptionDialogProps) {
               : t("subscription.dialogEditTitle")}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {props.mode === "create" && isCloneCreateMode && initialCreateSubscription
-              ? t("subscription.cloneDialogDescription", { name: initialCreateSubscription.name })
+            {props.mode === "create" && clonePreview
+              ? t("subscription.cloneDialogDescription", { name: clonePreview.name })
               : props.mode === "create"
                 ? t("subscription.dialogCreateDescription")
                 : t("subscription.dialogEditDescription")}
           </DialogDescription>
         </DialogHeader>
 
-        {showLoading ? (
-          <SubscriptionFormDialogLoading />
+        {modulePending ? (
+          <DialogModulePending label={t("common.loading")} className="min-h-0" />
         ) : (
           <Content
             key={sessionKey}

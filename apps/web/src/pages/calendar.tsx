@@ -34,6 +34,7 @@ const Calendar = () => {
   const availableTags = facetsQuery.data?.tags ?? [];
   const {
     editingSubscription,
+    editingCollectionItem,
     editDialogOpen,
     editDetailPending,
     handleAddSubscription,
@@ -85,6 +86,7 @@ const Calendar = () => {
 
       <EditSubscriptionDialog
         subscription={editingSubscription}
+        loadingPreview={editingCollectionItem}
         open={editDialogOpen}
         onOpenChange={handleEditDialogOpenChange}
         onSave={handleSaveSubscription}

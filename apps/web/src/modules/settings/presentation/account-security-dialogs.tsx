@@ -16,7 +16,11 @@ import { useDeferredDialogInitialFocus } from "@/hooks/use-deferred-dialog-initi
 import { getDisplayErrorMessage } from "@/lib/display-error";
 import { mfaService } from "@/services/mfa-service";
 import { MFA_STATUS_QUERY_KEY } from "./account-security-query-keys";
-import type { AccountSecurityDialogState } from "./account-security-dialog-state";
+import {
+  accountSecurityDialogCopyKeys,
+  isAuthenticatorDialogState,
+  type AccountSecurityDialogState,
+} from "./account-security-dialog-state";
 
 export interface AccountSecurityDialogsProps {
   state: AccountSecurityDialogState;
@@ -105,14 +109,15 @@ export function AccountSecurityDialogContent({ state, onStateChange }: AccountSe
     },
   });
 
-  if (state.type === "none") return null;
+  if (!isAuthenticatorDialogState(state)) return null;
+  const copy = accountSecurityDialogCopyKeys(state);
 
   if (state.type === "mfa_setup") {
     return (
       <>
         <DialogHeader>
-          <DialogTitle>{t("settings.mfaSetupTitle")}</DialogTitle>
-          <DialogDescription>{t("settings.mfaSetupDescription")}</DialogDescription>
+          <DialogTitle>{t(copy.title)}</DialogTitle>
+          <DialogDescription>{t(copy.description)}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div className="mx-auto rounded-md border border-border bg-white p-3">
@@ -170,12 +175,8 @@ export function AccountSecurityDialogContent({ state, onStateChange }: AccountSe
     return (
       <>
         <DialogHeader>
-          <DialogTitle>
-            {state.action === "disable" ? t("settings.mfaDisableTitle") : t("settings.mfaRegenerateTitle")}
-          </DialogTitle>
-          <DialogDescription>
-            {state.action === "disable" ? t("settings.mfaDisableDescription") : t("settings.mfaRegenerateDescription")}
-          </DialogDescription>
+          <DialogTitle>{t(copy.title)}</DialogTitle>
+          <DialogDescription>{t(copy.description)}</DialogDescription>
         </DialogHeader>
         <FormField id="mfa-current-password" label={t("settings.currentPassword")}>
           {({ id }) => (
@@ -224,8 +225,8 @@ export function AccountSecurityDialogContent({ state, onStateChange }: AccountSe
     return (
       <>
         <DialogHeader>
-          <DialogTitle>{t("settings.mfaRecoveryCodesTitle")}</DialogTitle>
-          <DialogDescription>{t("settings.mfaRecoveryCodesDescription")}</DialogDescription>
+          <DialogTitle>{t(copy.title)}</DialogTitle>
+          <DialogDescription>{t(copy.description)}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-2 rounded-md border border-border bg-secondary/30 p-3">
           {state.codes.map((code) => (

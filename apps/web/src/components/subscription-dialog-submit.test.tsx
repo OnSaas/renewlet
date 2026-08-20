@@ -124,6 +124,7 @@ describe("SubscriptionDialog submit", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}
@@ -147,6 +148,7 @@ describe("SubscriptionDialog submit", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}
@@ -168,6 +170,7 @@ describe("SubscriptionDialog submit", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}
@@ -191,6 +194,7 @@ describe("SubscriptionDialog submit", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}
@@ -216,6 +220,7 @@ describe("SubscriptionDialog submit", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}

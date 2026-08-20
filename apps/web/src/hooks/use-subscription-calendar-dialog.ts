@@ -3,20 +3,25 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchSubscriptionDetail, useSubscriptionDetail } from "@/hooks/use-subscriptions";
 import { useDeferredDialogCleanup } from "@/hooks/use-deferred-dialog-cleanup";
 import { useDialogSessionSnapshot } from "@/hooks/use-dialog-session-snapshot";
-
-/** 卡片日历动作只保存目标 id，完整事件数据与详情/编辑共享同一个 detail cache。 */
-export function useSubscriptionCalendarDialog() {
+import {
+  createSubscriptionDialogTarget,
+  type SubscriptionDialogTarget,
+} from "@/hooks/subscription-dialog-target";
+import type { SubscriptionCollectionItem } from "@/types/subscription";
+export function useSubscriptionCalendarDialog(subscriptions: readonly SubscriptionCollectionItem[]) {
   const queryClient = useQueryClient();
-  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+  const [target, setTarget] = useState<SubscriptionDialogTarget | null>(null);
   const [open, setOpen] = useState(false);
+  const subscriptionId = target?.id ?? null;
   const detailQuery = useSubscriptionDetail(subscriptionId, open);
   const currentDialogSession = useMemo(() => ({
     subscription: detailQuery.data ?? null,
+    collectionItem: target?.collectionItem ?? null,
     pending: detailQuery.isPending,
     error: detailQuery.error,
-  }), [detailQuery.data, detailQuery.error, detailQuery.isPending]);
+  }), [detailQuery.data, detailQuery.error, detailQuery.isPending, target?.collectionItem]);
   const dialogSession = useDialogSessionSnapshot(open, subscriptionId, currentDialogSession);
-  const { scheduleCleanup, cancelCleanup } = useDeferredDialogCleanup(() => setSubscriptionId(null));
+  const { scheduleCleanup, cancelCleanup } = useDeferredDialogCleanup(() => setTarget(null));
 
   const prefetch = useCallback((id: string) => {
     void prefetchSubscriptionDetail(queryClient, id);
@@ -24,9 +29,9 @@ export function useSubscriptionCalendarDialog() {
 
   const show = useCallback((id: string) => {
     cancelCleanup();
-    setSubscriptionId(id);
+    setTarget(createSubscriptionDialogTarget(subscriptions, id));
     setOpen(true);
-  }, [cancelCleanup]);
+  }, [cancelCleanup, subscriptions]);
 
   const onOpenChange = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
@@ -40,6 +45,7 @@ export function useSubscriptionCalendarDialog() {
   return {
     open,
     subscription: dialogSession.subscription,
+    collectionItem: dialogSession.collectionItem,
     pending: dialogSession.pending,
     error: dialogSession.error,
     prefetch,

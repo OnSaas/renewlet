@@ -41,6 +41,7 @@ export function AddSubscriptionDialog({ onAdd, availableTags, trigger }: AddSubs
       open={open}
       onOpenChange={setOpen}
       onSubmit={onAdd}
+      loadingPreview={null}
       availableTags={availableTags}
       trigger={trigger || defaultTrigger}
     />

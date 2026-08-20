@@ -15,8 +15,17 @@ const moduleGate = vi.hoisted(() => {
 
 vi.mock("@/components/renew-subscription-dialog", async () => {
   await moduleGate.promise;
+  const dialog = await vi.importActual<typeof import("@/components/ui/dialog")>("@/components/ui/dialog");
   return {
-    RenewSubscriptionDialogContent: () => <div data-testid="renew-dialog-real-content">真实续订内容</div>,
+    RenewSubscriptionDialogContent: () => (
+      <>
+        <dialog.DialogHeader>
+          <dialog.DialogTitle>续订</dialog.DialogTitle>
+          <dialog.DialogDescription>续订说明</dialog.DialogDescription>
+        </dialog.DialogHeader>
+        <div data-testid="renew-dialog-real-content">真实续订内容</div>
+      </>
+    ),
   };
 });
 
@@ -38,6 +47,7 @@ function Harness() {
       <button type="button" onClick={() => setOpen(true)}>打开续订</button>
       <DeferredRenewSubscriptionDialog
         subscription={null}
+        loadingPreview={null}
         open={open}
         today={assertDateOnly("2026-08-19")}
         submitting={false}
@@ -49,12 +59,12 @@ function Harness() {
 }
 
 describe("DeferredRenewSubscriptionDialog", () => {
-  it("does not replace a closing skeleton with late content and reuses the cached module next time", async () => {
+  it("does not replace closing module pending with late content and reuses the cached module next time", async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
-    expect(screen.getByTestId("renew-subscription-dialog-loading")).toBeInTheDocument();
+    expect(screen.getByTestId("renew-subscription-dialog-module-pending")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "关闭" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -67,7 +77,8 @@ describe("DeferredRenewSubscriptionDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "打开续订" }));
     expect(await screen.findByTestId("renew-dialog-real-content")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "续订" })).not.toHaveAttribute("aria-busy");
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
-    expect(screen.queryByTestId("renew-subscription-dialog-loading")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("renew-subscription-dialog-module-pending")).not.toBeInTheDocument();
   });
 });

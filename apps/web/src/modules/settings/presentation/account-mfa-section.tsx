@@ -9,6 +9,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import type { MfaTotpSetupResponse } from "@/lib/api/schemas/auth";
 import { MFA_STATUS_QUERY_KEY } from "./account-security-query-keys";
 import type { MfaPasswordAction } from "./account-security-dialog-state";
+import { preloadAccountSecurityDialogs } from "./account-security-dialogs-loader";
 
 export interface AccountMfaSectionProps {
   disabled?: boolean;
@@ -67,6 +68,9 @@ export function AccountMfaSection({
           size="sm"
           variant={enabled ? "outline" : "default"}
           disabled={disabled || setupMutation.isPending}
+          onFocus={preloadAccountSecurityDialogs}
+          onPointerEnter={preloadAccountSecurityDialogs}
+          onTouchStart={preloadAccountSecurityDialogs}
           onClick={() => setupMutation.mutate()}
         >
           <ShieldCheck className="h-4 w-4" />
@@ -93,6 +97,9 @@ export function AccountMfaSection({
           size="sm"
           variant="outline"
           disabled={disabled || !enabled}
+          onFocus={preloadAccountSecurityDialogs}
+          onPointerEnter={preloadAccountSecurityDialogs}
+          onTouchStart={preloadAccountSecurityDialogs}
           onClick={() => onPasswordAction("regenerate")}
         >
           <RefreshCw className="h-4 w-4" />
@@ -103,6 +110,9 @@ export function AccountMfaSection({
           size="sm"
           variant="outline"
           disabled={disabled || !enabled}
+          onFocus={preloadAccountSecurityDialogs}
+          onPointerEnter={preloadAccountSecurityDialogs}
+          onTouchStart={preloadAccountSecurityDialogs}
           onClick={() => onPasswordAction("disable")}
         >
           <ShieldOff className="h-4 w-4" />

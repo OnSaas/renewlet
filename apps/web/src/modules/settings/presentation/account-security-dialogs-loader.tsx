@@ -6,10 +6,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DialogModulePending } from "@/components/ui/dialog-module-pending";
 import { createLazyDialogResource, useLazyDialogSession } from "@/hooks/use-lazy-dialog-session";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { AccountSecurityDialogsProps } from "./account-security-dialogs";
+import {
+  accountSecurityDialogCopyKeys,
+  isAuthenticatorDialogState,
+  type AuthenticatorDialogState,
+} from "./account-security-dialog-state";
 import {
   AccountPasskeysManagerDialog,
   type AccountPasskeysManagerDialogProps,
@@ -19,39 +24,14 @@ const accountSecurityDialogResource = createLazyDialogResource(() =>
   import("./account-security-dialogs").then((module) => module.AccountSecurityDialogContent),
 );
 
-function AccountSecurityDialogLoading() {
-  const { t } = useI18n();
-
-  return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{t("common.loading")}</DialogTitle>
-        <DialogDescription className="sr-only">{t("common.loading")}</DialogDescription>
-      </DialogHeader>
-      <div className="grid gap-3" aria-hidden="true">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-28 justify-self-end" />
-      </div>
-    </>
-  );
+export function preloadAccountSecurityDialogs(): void {
+  void accountSecurityDialogResource.load().catch(() => undefined);
 }
 
 type DeferredAccountSecurityDialogsProps = AccountSecurityDialogsProps &
   Omit<AccountPasskeysManagerDialogProps, "open" | "onOpenChange"> & {
     onPasskeysOpenChange: (open: boolean) => void;
   };
-
-type AuthenticatorDialogState = Exclude<
-  AccountSecurityDialogsProps["state"],
-  { type: "none" } | { type: "passkeys_manager" }
->;
-
-function isAuthenticatorDialogState(
-  state: AccountSecurityDialogsProps["state"],
-): state is AuthenticatorDialogState {
-  return state.type !== "none" && state.type !== "passkeys_manager";
-}
 
 /** 账号安全入口保留单一状态机；二维码和凭据管理表单仅在对应会话存活期间装载。 */
 export function DeferredAccountSecurityDialogs({
@@ -66,6 +46,8 @@ export function DeferredAccountSecurityDialogs({
     isAuthenticatorDialogState(state) ? state : null
   ));
   const { value: Content, error, sessionKey } = useLazyDialogSession(securityDialogOpen, accountSecurityDialogResource);
+  const dialogState = isAuthenticatorDialogState(state) ? state : activeSecurityState;
+  const pendingCopy = dialogState ? accountSecurityDialogCopyKeys(dialogState) : null;
 
   useLayoutEffect(() => {
     if (isAuthenticatorDialogState(state)) setActiveSecurityState(state);
@@ -93,12 +75,22 @@ export function DeferredAccountSecurityDialogs({
       <DialogContent
         closeLabel={t("common.close")}
         dismissMode="explicit"
-        aria-busy={Content && activeSecurityState ? undefined : true}
-        data-testid={Content && activeSecurityState ? undefined : "account-security-dialog-loading"}
+        aria-busy={Content && dialogState ? undefined : true}
+        data-testid={Content && dialogState ? undefined : "account-security-dialog-loading"}
       >
-        {Content && activeSecurityState
-          ? <Content key={sessionKey} state={activeSecurityState} onStateChange={onStateChange} />
-          : <AccountSecurityDialogLoading />}
+        {Content && dialogState
+          ? <Content key={sessionKey} state={dialogState} onStateChange={onStateChange} />
+          : (
+            <>
+              <DialogHeader>
+                <DialogTitle>{pendingCopy ? t(pendingCopy.title) : t("common.loading")}</DialogTitle>
+                <DialogDescription>
+                  {pendingCopy ? t(pendingCopy.description) : t("common.loading")}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogModulePending label={t("common.loading")} />
+            </>
+          )}
       </DialogContent>
     </Dialog>
   );

@@ -5,6 +5,11 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubscriptionFormFields } from "@/components/subscription-form-fields";
 import {
+  createSubscriptionFormLoadingSlots,
+  SubscriptionFormScaffold,
+  type SubscriptionFormLoadingStructure,
+} from "@/components/subscription-form-scaffold";
+import {
   costSharingCollectionReminderIsAllowedForBillingCycle,
   getSubscriptionFormValidationIssues,
   normalizeTagsArray,
@@ -19,12 +24,50 @@ import { useSubscriptionFormAutoDates } from "@/hooks/use-subscription-form-auto
 import { useManagedCurrencyOptions } from "@/hooks/use-managed-currency-options";
 import { useDeferredDialogInitialFocus } from "@/hooks/use-deferred-dialog-initial-focus";
 import { useSettings } from "@/hooks/use-settings";
-import { DEFAULT_NOTIFICATION_REMINDER_DAYS } from "@/types/subscription";
+import {
+  DEFAULT_NOTIFICATION_REMINDER_DAYS,
+  DISABLED_REMINDER_DAYS,
+  type Subscription,
+  type SubscriptionCollectionItem,
+} from "@/types/subscription";
 import type { SubscriptionFormState } from "@/types/subscription-form";
 import { useI18n } from "@/i18n/I18nProvider";
 import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
 import { getSystemTimeZone } from "@/lib/time/time-zone";
 import type { SubscriptionDialogContentProps } from "@/components/subscription-dialog-types";
+
+type SubscriptionFormLoadingPreview = Subscription | SubscriptionCollectionItem | SubscriptionFormState | null;
+
+function resolveLoadingStructure(preview: SubscriptionFormLoadingPreview): SubscriptionFormLoadingStructure {
+  if (!preview) {
+    return { cycle: "recurring", reminderEnabled: true, repeatReminderEnabled: false };
+  }
+  if ("oneTimeMode" in preview) {
+    return {
+      cycle: preview.billingCycle === "custom"
+        ? "custom"
+        : preview.billingCycle !== "one-time"
+          ? "recurring"
+          : preview.oneTimeMode === "term"
+            ? "one-time-fixed-term"
+            : "one-time-buyout",
+      reminderEnabled: preview.reminderType !== "disabled",
+      repeatReminderEnabled: preview.repeatReminderEnabled,
+    };
+  }
+  return {
+    cycle: preview.billingCycle === "custom"
+      ? "custom"
+      : preview.billingCycle !== "one-time"
+        ? "recurring"
+        : "oneTimeTermCount" in preview && typeof preview.oneTimeTermCount === "number"
+          ? "one-time-fixed-term"
+          : "one-time-buyout",
+    reminderEnabled: preview.reminderDays !== DISABLED_REMINDER_DAYS,
+    repeatReminderEnabled:
+      "repeatReminderEnabled" in preview && preview.repeatReminderEnabled,
+  };
+}
 
 export function SubscriptionDialogContent(props: SubscriptionDialogContentProps) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -74,7 +117,7 @@ export function SubscriptionDialogContent(props: SubscriptionDialogContentProps)
     () => formRef.current?.querySelector<HTMLElement>('input:not([type="hidden"]):not([disabled])') ?? null,
     [],
   );
-  useDeferredDialogInitialFocus(props.open, true, "subscription-form", resolveInitialFocus);
+  useDeferredDialogInitialFocus(props.open, props.loading !== true, "subscription-form", resolveInitialFocus);
   const idPrefix = props.mode === "edit" ? "edit-" : "";
   // 主表单和家庭共享成员管理器复用同一选项数组，避免嵌套弹层在顺序或禁用当前项回显上分叉。
   const currencyOptions = useManagedCurrencyOptions({
@@ -161,17 +204,23 @@ export function SubscriptionDialogContent(props: SubscriptionDialogContentProps)
   };
 
   const submitDisabled = logoUploadStatus === "uploading";
+  const loadingPreview = props.mode === "create"
+    ? props.initialSubscription ?? props.loadingPreview ?? formData
+    : props.loadingPreview;
+  const loadingSlots = props.loading
+    ? createSubscriptionFormLoadingSlots({
+        label: t("common.loading"),
+        structure: resolveLoadingStructure(loadingPreview),
+      })
+    : null;
+
   return (
-    <form
-      ref={formRef}
+    <SubscriptionFormScaffold
+      formRef={formRef}
       onSubmit={handleSubmit}
-      className="h5-subscription-dialog-form overflow-hidden"
       noValidate
-    >
-      <div
-        data-subscription-dialog-scroll=""
-        className="h5-mobile-sheet-scroll h5-subscription-dialog-scroll grid gap-5 px-6 py-4"
-      >
+      data-testid={props.loading ? "subscription-form-data-loading" : undefined}
+      fields={loadingSlots?.fields ?? (
         <SubscriptionFormFields
           idPrefix={idPrefix}
           config={config}
@@ -187,38 +236,36 @@ export function SubscriptionDialogContent(props: SubscriptionDialogContentProps)
           costSharingCurrencyConvert={convertCurrency}
           onNestedDialogOpenChange={props.onNestedDialogOpenChange}
         />
-      </div>
-
-      <div
-        data-subscription-dialog-footer=""
-        className="h5-subscription-dialog-footer flex shrink-0 flex-col gap-3 border-t border-border bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end md:p-6 md:pt-4"
-      >
-        {submitError ? (
-          <p className="w-full min-w-0 wrap-break-word text-center text-sm text-destructive sm:mr-auto sm:w-auto sm:text-left">
-            {submitError}
-          </p>
-        ) : null}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={props.onRequestClose}
-          className="w-full border-border sm:w-auto"
-        >
-          {t("common.cancel")}
-        </Button>
-        <Button
-          type="submit"
-          disabled={submitDisabled}
-          className="w-full bg-primary text-primary-foreground hover:bg-primary-glow sm:w-auto"
-        >
-          {logoUploadStatus === "uploading" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {props.mode === "create"
-            ? isCloneCreateMode
-              ? t("subscription.cloneSubmit")
-              : t("subscription.dialogCreateSubmit")
-            : t("subscription.dialogEditSubmit")}
-        </Button>
-      </div>
-    </form>
+      )}
+      actions={loadingSlots?.actions ?? (
+        <>
+          {submitError ? (
+            <p className="w-full min-w-0 wrap-break-word text-center text-sm text-destructive sm:mr-auto sm:w-auto sm:text-left">
+              {submitError}
+            </p>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={props.onRequestClose}
+            className="w-full border-border sm:w-auto"
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="submit"
+            disabled={submitDisabled}
+            className="w-full bg-primary text-primary-foreground hover:bg-primary-glow sm:w-auto"
+          >
+            {logoUploadStatus === "uploading" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {props.mode === "create"
+              ? isCloneCreateMode
+                ? t("subscription.cloneSubmit")
+                : t("subscription.dialogCreateSubmit")
+              : t("subscription.dialogEditSubmit")}
+          </Button>
+        </>
+      )}
+    />
   );
 }

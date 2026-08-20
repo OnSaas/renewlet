@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertDateOnly } from "@/lib/time/date-only";
-import type { Subscription } from "@/types/subscription";
+import type { Subscription, SubscriptionCollectionItem } from "@/types/subscription";
 import { useSubscriptionDetailDialog } from "./use-subscription-detail-dialog";
 
 const mocks = vi.hoisted(() => ({
@@ -77,20 +77,23 @@ describe("useSubscriptionDetailDialog", () => {
     vi.useFakeTimers();
     const first = subscription("sub_1", "First");
     mocks.details.set(first.id, first);
-    const { result } = renderHook(() => useSubscriptionDetailDialog(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useSubscriptionDetailDialog([first]), { wrapper: createWrapper() });
 
     act(() => result.current.handleViewDetails("sub_1"));
     expect(result.current.detailDialogOpen).toBe(true);
     expect(result.current.selectedDetailSubscription?.name).toBe("First");
+    expect(result.current.selectedDetailCollectionItem?.name).toBe("First");
 
     act(() => result.current.handleDetailDialogOpenChange(false));
     expect(result.current.detailDialogOpen).toBe(false);
     expect(result.current.selectedDetailSubscription?.name).toBe("First");
+    expect(result.current.selectedDetailCollectionItem?.name).toBe("First");
 
     act(() => {
       vi.advanceTimersByTime(200);
     });
     expect(result.current.selectedDetailSubscription).toBeNull();
+    expect(result.current.selectedDetailCollectionItem).toBeNull();
   });
 
   it("cancels pending cleanup when another detail dialog opens", () => {
@@ -99,7 +102,7 @@ describe("useSubscriptionDetailDialog", () => {
     const second = subscription("sub_2", "Second");
     mocks.details.set(first.id, first);
     mocks.details.set(second.id, second);
-    const { result } = renderHook(() => useSubscriptionDetailDialog(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useSubscriptionDetailDialog([first, second]), { wrapper: createWrapper() });
 
     act(() => result.current.handleViewDetails("sub_1"));
     act(() => result.current.handleDetailDialogOpenChange(false));
@@ -110,5 +113,22 @@ describe("useSubscriptionDetailDialog", () => {
 
     expect(result.current.detailDialogOpen).toBe(true);
     expect(result.current.selectedDetailSubscription?.name).toBe("Second");
+    expect(result.current.selectedDetailCollectionItem?.name).toBe("Second");
+  });
+
+  it("keeps the intent preview when the collection changes during the dialog session", () => {
+    const first = subscription("sub_1", "First");
+    const { result, rerender } = renderHook(
+      ({ items }: { items: readonly SubscriptionCollectionItem[] }) => useSubscriptionDetailDialog(items),
+      {
+        initialProps: { items: [first] },
+        wrapper: createWrapper(),
+      },
+    );
+
+    act(() => result.current.handleViewDetails(first.id));
+    rerender({ items: [] });
+
+    expect(result.current.selectedDetailCollectionItem).toBe(first);
   });
 });

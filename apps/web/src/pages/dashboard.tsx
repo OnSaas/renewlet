@@ -67,11 +67,12 @@ export default function Index() {
   const {
     detailDialogOpen,
     selectedDetailSubscription,
+    selectedDetailCollectionItem,
     detailPending,
     handleViewDetails,
     handleDetailDialogOpenChange,
-  } = useSubscriptionDetailDialog();
-  const calendarDialog = useSubscriptionCalendarDialog();
+  } = useSubscriptionDetailDialog(subscriptions);
+  const calendarDialog = useSubscriptionCalendarDialog(subscriptions);
   const { activeSubscriptions, totalMonthly, upcomingCount, trialCount } = useDashboardStats(
     subscriptions,
     defaultCurrency,
@@ -81,6 +82,7 @@ export default function Index() {
   );
   const {
     editingSubscription,
+    editingCollectionItem,
     editDialogOpen,
     editDetailPending,
     handleAddSubscription,
@@ -244,6 +246,7 @@ export default function Index() {
 
       <EditSubscriptionDialog
         subscription={editingSubscription}
+        loadingPreview={editingCollectionItem}
         open={editDialogOpen}
         onOpenChange={handleEditDialogOpenChange}
         onSave={handleSaveSubscription}
@@ -254,6 +257,7 @@ export default function Index() {
         open={detailDialogOpen}
         onOpenChange={handleDetailDialogOpenChange}
         subscription={selectedDetailSubscription}
+        loadingPreview={selectedDetailCollectionItem}
         onEditSubscription={handleEditFromDetail}
         today={today}
         currencyConvert={convert}
@@ -265,6 +269,7 @@ export default function Index() {
         open={calendarDialog.open}
         onOpenChange={calendarDialog.onOpenChange}
         subscription={calendarDialog.subscription}
+        loadingPreview={calendarDialog.collectionItem}
         loading={calendarDialog.pending}
       />
     </div>

@@ -180,10 +180,13 @@ const Subscriptions = () => {
   const retryDisplayQuery = hasActiveControls ? indexQuery.refetch : subscriptionsQuery.refetch;
   const {
     editingSubscription,
+    editingCollectionItem,
     editDialogOpen,
     cloningSubscription,
+    cloningCollectionItem,
     cloneDialogOpen,
     renewingSubscription,
+    renewingCollectionItem,
     renewDialogOpen,
     editDetailPending,
     cloneDetailPending,
@@ -214,11 +217,12 @@ const Subscriptions = () => {
   const {
     detailDialogOpen,
     selectedDetailSubscription,
+    selectedDetailCollectionItem,
     detailPending,
     handleViewDetails,
     handleDetailDialogOpenChange,
-  } = useSubscriptionDetailDialog();
-  const calendarDialog = useSubscriptionCalendarDialog();
+  } = useSubscriptionDetailDialog(displaySourceSubscriptions);
+  const calendarDialog = useSubscriptionCalendarDialog(displaySourceSubscriptions);
   const selectedStatus = config.statuses.find((status) => status.value === statusFilter);
   const statusFilterLabel = statusFilter === "all"
     ? t("subscriptions.allStatuses")
@@ -626,6 +630,7 @@ const Subscriptions = () => {
 
       <EditSubscriptionDialog
         subscription={editingSubscription}
+        loadingPreview={editingCollectionItem}
         open={editDialogOpen}
         onOpenChange={handleEditDialogOpenChange}
         onSave={handleSaveSubscription}
@@ -638,11 +643,13 @@ const Subscriptions = () => {
         onOpenChange={handleCloneDialogOpenChange}
         onSubmit={handleSaveClonedSubscription}
         initialSubscription={cloningSubscription}
+        loadingPreview={cloningCollectionItem}
         availableTags={allTags}
         loading={cloneDetailPending}
       />
       <DeferredRenewSubscriptionDialog
         subscription={renewingSubscription}
+        loadingPreview={renewingCollectionItem}
         open={renewDialogOpen}
         today={today}
         submitting={renewSubmitting}
@@ -656,6 +663,7 @@ const Subscriptions = () => {
         open={detailDialogOpen}
         onOpenChange={handleDetailDialogOpenChange}
         subscription={selectedDetailSubscription}
+        loadingPreview={selectedDetailCollectionItem}
         onEditSubscription={handleEditFromDetail}
         onRenewSubscription={handleRenewSubscription}
         today={today}
@@ -668,6 +676,7 @@ const Subscriptions = () => {
         open={calendarDialog.open}
         onOpenChange={calendarDialog.onOpenChange}
         subscription={calendarDialog.subscription}
+        loadingPreview={calendarDialog.collectionItem}
         loading={calendarDialog.pending}
       />
       <DeferredImportDataDialog

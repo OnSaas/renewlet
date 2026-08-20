@@ -86,6 +86,7 @@ function CreateDialogHarness({
     <TooltipProvider delayDuration={0}>
       <button type="button" onClick={() => setOpen(true)}>打开新增弹窗</button>
       <SubscriptionDialog
+          loadingPreview={null}
         mode="create"
         open={open}
         onOpenChange={setOpen}
@@ -115,6 +116,7 @@ function CreateCloneDialogHarness({
       <button type="button" onClick={() => setDialogKind("create")}>打开普通新增弹窗</button>
       <button type="button" onClick={() => setDialogKind("clone")}>打开复制弹窗</button>
       <SubscriptionDialog
+          loadingPreview={null}
         mode="create"
         open={dialogKind !== null}
         onOpenChange={(open) => {
@@ -135,6 +137,7 @@ function EditDialogHarness() {
     <TooltipProvider delayDuration={0}>
       <button type="button" onClick={() => setOpen(true)}>打开编辑弹窗</button>
       <SubscriptionDialog
+          loadingPreview={null}
         mode="edit"
         open={open}
         onOpenChange={setOpen}
@@ -146,6 +149,46 @@ function EditDialogHarness() {
 }
 
 describe("SubscriptionDialog lifecycle", () => {
+  it("hands data loading to the resolved form scaffold without replacing the dialog shell", () => {
+    const preview = makeSubscription();
+    const { rerender } = render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          loadingPreview={preview}
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          subscription={null}
+          loading
+        />
+      </TooltipProvider>,
+    );
+    const dialog = screen.getByRole("dialog", { name: "编辑订阅" });
+    const form = dialog.querySelector("form");
+    expect(screen.getByTestId("subscription-form-data-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("dialog-module-pending")).not.toBeInTheDocument();
+
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          loadingPreview={preview}
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          subscription={preview}
+          loading={false}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("dialog", { name: "编辑订阅" })).toBe(dialog);
+    expect(dialog.querySelector("form")).toBe(form);
+    expect(screen.queryByTestId("subscription-form-data-loading")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("服务名称")).toHaveValue("Original SaaS");
+  });
+
   it("clears an unsubmitted create draft after cancelling and reopening", async () => {
     const user = userEvent.setup();
 

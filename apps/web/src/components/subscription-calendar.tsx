@@ -79,11 +79,12 @@ export const SubscriptionCalendar = ({
   const {
     detailDialogOpen,
     selectedDetailSubscription,
+    selectedDetailCollectionItem,
     detailPending,
     handlePrefetchDetails,
     handleViewDetails,
     handleDetailDialogOpenChange,
-  } = useSubscriptionDetailDialog();
+  } = useSubscriptionDetailDialog(subscriptions);
   const [dayListOpen, setDayListOpen] = useState(false);
   const [selectedDaySubs, setSelectedDaySubs] = useState<CalendarDaySubscriptions | null>(null);
   const [yearPickerOpen, setYearPickerOpen] = useState(false);
@@ -590,6 +591,7 @@ export const SubscriptionCalendar = ({
         open={detailDialogOpen}
         onOpenChange={handleDetailDialogOpenChange}
         subscription={selectedDetailSubscription}
+        loadingPreview={selectedDetailCollectionItem}
         today={today}
         currencyConvert={convert}
         currencyRatesReady={currencyRatesReady}

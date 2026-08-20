@@ -109,6 +109,7 @@ function renderDialog(value: Subscription = subscription) {
       open
       onOpenChange={vi.fn()}
       subscription={value}
+      loadingPreview={value}
     />,
   );
 }
@@ -189,22 +190,28 @@ describe("AddToCalendarDialog", () => {
         open
         onOpenChange={onOpenChange}
         subscription={null}
+        loadingPreview={subscription}
         loading
       />,
     );
     const loadingDialog = screen.getByRole("dialog", { name: "添加到日历" });
+    const factsRegion = loadingDialog.querySelector('[data-dialog-region="calendar-facts"]');
+    expect(screen.getByTestId("subscription-calendar-data-loading")).toBeInTheDocument();
 
     rerender(
       <AddToCalendarDialog
         open
         onOpenChange={onOpenChange}
         subscription={subscription}
+        loadingPreview={subscription}
         loading={false}
       />,
     );
 
     expect(screen.getByRole("dialog", { name: "添加到日历" })).toBe(loadingDialog);
+    expect(loadingDialog.querySelector('[data-dialog-region="calendar-facts"]')).toBe(factsRegion);
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.queryByTestId("subscription-calendar-data-loading")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "下载 ICS 文件" })).toBeInTheDocument();
   });
 

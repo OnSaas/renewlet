@@ -142,6 +142,7 @@ function renderDialog(props: Partial<ComponentProps<typeof RenewSubscriptionDial
     <TooltipProvider delayDuration={0}>
       <RenewSubscriptionDialog
         subscription={makeSubscription()}
+        loadingPreview={null}
         open
         today={assertDateOnly("2026-08-12")}
         submitting={false}
@@ -162,6 +163,7 @@ function FocusRestoreHarness() {
       <button type="button" ref={triggerRef}>续订入口</button>
       <RenewSubscriptionDialog
         subscription={makeSubscription()}
+        loadingPreview={null}
         open={open}
         today={assertDateOnly("2026-08-12")}
         submitting={false}
@@ -174,6 +176,47 @@ function FocusRestoreHarness() {
 }
 
 describe("RenewSubscriptionDialog", () => {
+  it("uses the resolved renewal scaffold while detail data is pending", () => {
+    const preview = makeSubscription({ status: "expired" });
+    const { rerender } = render(
+      <TooltipProvider delayDuration={0}>
+        <RenewSubscriptionDialog
+          subscription={null}
+          loadingPreview={preview}
+          open
+          today={assertDateOnly("2026-08-12")}
+          submitting={false}
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          loading
+        />
+      </TooltipProvider>,
+    );
+    const dialog = screen.getByRole("dialog", { name: "续订「Renewable SaaS」" });
+    const form = dialog.querySelector("form");
+    expect(screen.getByTestId("renew-subscription-data-loading")).toBeInTheDocument();
+
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <RenewSubscriptionDialog
+          subscription={preview}
+          loadingPreview={preview}
+          open
+          today={assertDateOnly("2026-08-12")}
+          submitting={false}
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          loading={false}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("dialog", { name: "续订「Renewable SaaS」" })).toBe(dialog);
+    expect(dialog.querySelector("form")).toBe(form);
+    expect(screen.queryByTestId("renew-subscription-data-loading")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /重新开始订阅/ })).toBeChecked();
+  });
+
   it("opens expired subscriptions in restart mode by default", async () => {
     renderDialog();
 
@@ -246,6 +289,7 @@ describe("RenewSubscriptionDialog", () => {
       <TooltipProvider delayDuration={0}>
         <RenewSubscriptionDialog
           subscription={makeSubscription()}
+          loadingPreview={null}
           open
           today={assertDateOnly("2026-08-12")}
           submitting
@@ -261,6 +305,7 @@ describe("RenewSubscriptionDialog", () => {
       <TooltipProvider delayDuration={0}>
         <RenewSubscriptionDialog
           subscription={makeSubscription()}
+          loadingPreview={null}
           open
           today={assertDateOnly("2026-08-12")}
           submitting={false}

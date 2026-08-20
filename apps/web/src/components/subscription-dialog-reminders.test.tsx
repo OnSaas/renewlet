@@ -95,10 +95,72 @@ function makeSubscription(overrides: SubscriptionFixtureOverrides<Subscription> 
 }
 
 describe("SubscriptionDialog reminders", () => {
+  it("shows repeat reminder controls when enabled for an edited subscription", () => {
+    const subscription = makeSubscription({
+      nextBillingDate: assertDateOnly("2026-05-17"),
+      autoRenew: false,
+      reminderDays: 3,
+      repeatReminderInterval: "3h",
+      repeatReminderWindow: "full",
+    });
+
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          loadingPreview={null}
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          subscription={subscription}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByLabelText("重复提醒")).toBeChecked();
+    expect(screen.getByRole("combobox", { name: "间隔" })).toHaveTextContent("每 3 小时");
+    expect(screen.getByRole("combobox", { name: "重复范围" })).toHaveTextContent("从首次提醒后开始");
+  });
+
+  it("explains repeat reminders from the first reminder when the range covers the lead time", () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          loadingPreview={null}
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          subscription={makeSubscription({ reminderDays: 1 })}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("首次提醒后，每 1 小时重复一次，直到到期日通知时间。")).toBeInTheDocument();
+  });
+
+  it("explains that repeats only run in the final range when the lead time is longer", () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDialog
+          loadingPreview={null}
+          mode="edit"
+          open
+          onOpenChange={vi.fn()}
+          onSubmit={vi.fn()}
+          subscription={makeSubscription({ reminderDays: 30 })}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByText("首次提醒照常发送，重复提醒只在到期前最后 72 小时内发送。")).toBeInTheDocument();
+  });
+
   it("defaults new subscriptions to the inherited reminder setting", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}
@@ -116,6 +178,7 @@ describe("SubscriptionDialog reminders", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}
@@ -147,6 +210,7 @@ describe("SubscriptionDialog reminders", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}
@@ -177,6 +241,7 @@ describe("SubscriptionDialog reminders", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}
@@ -219,6 +284,7 @@ describe("SubscriptionDialog reminders", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="edit"
           open
           onOpenChange={vi.fn()}
@@ -259,6 +325,7 @@ describe("SubscriptionDialog reminders", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="edit"
           open
           onOpenChange={vi.fn()}
@@ -307,6 +374,7 @@ describe("SubscriptionDialog reminders", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={vi.fn()}

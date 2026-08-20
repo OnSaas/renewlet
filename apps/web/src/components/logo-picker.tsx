@@ -138,6 +138,7 @@ export function LogoPicker({
             onClick={() => fileInputRef.current?.click()}
             onFocus={preloadImageCropDialog}
             onPointerEnter={preloadImageCropDialog}
+            onTouchStart={preloadImageCropDialog}
           >
             {displayedLogo ? (
               <div className="relative z-10 h-full w-full p-1">
@@ -185,6 +186,7 @@ export function LogoPicker({
             onClick={() => fileInputRef.current?.click()}
             onFocus={preloadImageCropDialog}
             onPointerEnter={preloadImageCropDialog}
+            onTouchStart={preloadImageCropDialog}
           >
             {uploadStatus === "uploading" ? (
               <Loader2 className="w-4 h-4 animate-spin" />

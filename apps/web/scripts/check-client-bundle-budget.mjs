@@ -34,6 +34,14 @@ const forbiddenStartupModules = [
   ["sql.js", (id) => id.includes("node_modules/sql.js/")],
   ["完整 settings 模型", (id) => id.endsWith("apps/web/src/types/subscription.ts")],
 ];
+const forbiddenLazyDialogShellModules = [
+  ["react-image-crop", (id) => id.includes("node_modules/react-image-crop/")],
+  ["qrcode.react", (id) => id.includes("node_modules/qrcode.react/")],
+  ["AI 草稿编辑器", (id) => id.endsWith("apps/web/src/components/ai-recognition/ai-draft-editor-panel.tsx")],
+  ["ImportPreview", (id) => id.endsWith("apps/web/src/components/import-preview-panel.tsx")],
+  ["JSZip", (id) => id.includes("node_modules/jszip/")],
+  ["sql.js", (id) => id.includes("node_modules/sql.js/")],
+];
 
 const compressedSizeCache = new Map();
 function compressedSizes(file) {
@@ -113,6 +121,17 @@ function assertStartupDependencies(locale, closure) {
   }
 }
 
+function assertLazyDialogShellDependencies(routeKey, files) {
+  const modules = modulesForFiles(files);
+  const forbidden = forbiddenLazyDialogShellModules.filter(([, matches]) => modules.some(matches));
+  if (forbidden.length > 0) {
+    throw new Error(
+      `${routeKey} synchronous route shell includes lazy dialog modules: `
+        + forbidden.map(([label]) => label).join(", "),
+    );
+  }
+}
+
 const manifestEntries = Object.entries(manifest);
 const appEntry = manifestEntries.find(([, entry]) => entry.isEntry && entry.file.endsWith(".js"));
 if (!appEntry) throw new Error("Client bundle manifest has no JavaScript application entry");
@@ -142,6 +161,7 @@ const routeClosures = manifestEntries
   .map(({ key, closure }) => ({ key, files: closure.files, ...sumCompressed(closure.files) }))
   .sort((left, right) => right.gzip - left.gzip || right.brotli - left.brotli);
 if (routeClosures.length === 0) throw new Error("Client bundle manifest has no lazy route entries");
+for (const route of routeClosures) assertLazyDialogShellDependencies(route.key, route.files);
 const largestRoute = routeClosures[0];
 console.log(`largest route files (${largestRoute.key}): ${[...largestRoute.files].sort().join(", ")}`);
 assertBudget(`largest complete route closure (${largestRoute.key})`, largestRoute, budgets.route);

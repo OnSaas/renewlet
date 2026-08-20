@@ -89,6 +89,7 @@ describe("SubscriptionDialog explicit close", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="create"
           open
           onOpenChange={onOpenChange}
@@ -115,6 +116,7 @@ describe("SubscriptionDialog explicit close", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <SubscriptionDialog
+          loadingPreview={null}
           mode="edit"
           open
           onOpenChange={onOpenChange}

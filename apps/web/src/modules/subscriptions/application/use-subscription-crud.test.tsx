@@ -4,7 +4,11 @@ import { act, renderHook } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { assertDateOnly } from "@/lib/time/date-only";
-import type { Subscription, SubscriptionFormSubmission } from "@/types/subscription";
+import type {
+  Subscription,
+  SubscriptionCollectionItem,
+  SubscriptionFormSubmission,
+} from "@/types/subscription";
 import { useSubscriptionCrud } from "./use-subscription-crud";
 
 const mocks = vi.hoisted(() => ({
@@ -115,6 +119,45 @@ describe("useSubscriptionCrud", () => {
     });
 
     expect(mocks.prefetchDetail).toHaveBeenCalledWith(queryClient, "sub-1");
+  });
+
+  it("keeps collection previews with edit, clone, and renew sessions", () => {
+    const { wrapper } = createWrapper();
+    const collectionItem = subscription();
+    const { result } = renderHook(() => useSubscriptionCrud([collectionItem]), { wrapper });
+
+    act(() => {
+      result.current.handleEditSubscription(collectionItem.id);
+      result.current.handleCloneSubscription(collectionItem.id);
+      result.current.handleRenewSubscription(collectionItem.id);
+    });
+
+    expect(result.current.editingCollectionItem).toBe(collectionItem);
+    expect(result.current.cloningCollectionItem).toBe(collectionItem);
+    expect(result.current.renewingCollectionItem).toBe(collectionItem);
+  });
+
+  it("keeps intent previews when the collection changes during open sessions", () => {
+    const { wrapper } = createWrapper();
+    const collectionItem = subscription();
+    const { result, rerender } = renderHook(
+      ({ items }: { items: readonly SubscriptionCollectionItem[] }) => useSubscriptionCrud(items),
+      {
+        initialProps: { items: [collectionItem] },
+        wrapper,
+      },
+    );
+
+    act(() => {
+      result.current.handleEditSubscription(collectionItem.id);
+      result.current.handleCloneSubscription(collectionItem.id);
+      result.current.handleRenewSubscription(collectionItem.id);
+    });
+    rerender({ items: [] });
+
+    expect(result.current.editingCollectionItem).toBe(collectionItem);
+    expect(result.current.cloningCollectionItem).toBe(collectionItem);
+    expect(result.current.renewingCollectionItem).toBe(collectionItem);
   });
 
   it("uses field-level patch mutations for card quick actions", () => {

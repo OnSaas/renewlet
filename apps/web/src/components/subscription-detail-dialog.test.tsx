@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { assertDateOnly } from "@/lib/time/date-only";
 import { subscriptionCycleFixture } from "@/test/subscription-fixtures";
-import type { Subscription } from "@/types/subscription";
+import type { Subscription, SubscriptionCollectionItem } from "@/types/subscription";
 import { SubscriptionDetailDialog } from "./subscription-detail-dialog";
 
 const mocks = vi.hoisted(() => ({
@@ -102,6 +102,8 @@ function renderDetailDialog({
   onEditSubscription,
   onRenewSubscription,
   priceReferenceCurrency = "CNY",
+  loading = false,
+  loadingPreview = subscription,
 }: {
   subscription?: Subscription | null;
   open?: boolean;
@@ -109,6 +111,8 @@ function renderDetailDialog({
   onEditSubscription?: (subscription: Subscription) => void;
   onRenewSubscription?: (id: string) => void;
   priceReferenceCurrency?: string | null;
+  loading?: boolean;
+  loadingPreview?: SubscriptionCollectionItem | null;
 } = {}) {
   return {
     onOpenChange,
@@ -118,10 +122,12 @@ function renderDetailDialog({
           open={open}
           onOpenChange={onOpenChange}
           subscription={subscription}
+          loadingPreview={loadingPreview}
           today={assertDateOnly("2026-05-18")}
           currencyConvert={testCurrencyConvert}
           currencyRatesReady={true}
           priceReferenceCurrency={priceReferenceCurrency}
+          loading={loading}
           {...(onEditSubscription ? { onEditSubscription } : {})}
           {...(onRenewSubscription ? { onRenewSubscription } : {})}
         />
@@ -150,6 +156,43 @@ function mockMobile(matches = true) {
 describe("SubscriptionDetailDialog", () => {
   afterEach(() => {
     Reflect.deleteProperty(window, "matchMedia");
+  });
+
+  it("uses the detail scaffold while the complete detail model is pending", () => {
+    const onOpenChange = vi.fn();
+    const preview = baseSubscription;
+    const { rerender } = renderDetailDialog({
+      subscription: null,
+      loadingPreview: preview,
+      loading: true,
+      onOpenChange,
+      onEditSubscription: vi.fn(),
+    });
+    const dialog = screen.getByRole("dialog", { name: "Fastmail" });
+    const identityRegion = dialog.querySelector('[data-dialog-region="subscription-identity"]');
+    expect(screen.getByTestId("subscription-detail-data-loading")).toBeInTheDocument();
+
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <SubscriptionDetailDialog
+          open
+          onOpenChange={onOpenChange}
+          subscription={baseSubscription}
+          loadingPreview={preview}
+          today={assertDateOnly("2026-05-18")}
+          currencyConvert={testCurrencyConvert}
+          currencyRatesReady
+          priceReferenceCurrency="CNY"
+          onEditSubscription={vi.fn()}
+          loading={false}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("dialog", { name: "Fastmail" })).toBe(dialog);
+    expect(dialog.querySelector('[data-dialog-region="subscription-identity"]')).toBe(identityRegion);
+    expect(screen.queryByTestId("subscription-detail-data-loading")).not.toBeInTheDocument();
+    expect(screen.getByText("团队年度订阅", { exact: false })).toBeInTheDocument();
   });
 
   it("renders website, notes, payment method, tags, and inherited reminder in the read-only detail view", () => {

@@ -3,17 +3,24 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchSubscriptionDetail, useSubscriptionDetail } from "@/hooks/use-subscriptions";
 import { useDeferredDialogCleanup } from "@/hooks/use-deferred-dialog-cleanup";
 import { useDialogSessionSnapshot } from "@/hooks/use-dialog-session-snapshot";
+import {
+  createSubscriptionDialogTarget,
+  type SubscriptionDialogTarget,
+} from "@/hooks/subscription-dialog-target";
+import type { SubscriptionCollectionItem } from "@/types/subscription";
 
-export function useSubscriptionDetailDialog() {
+export function useSubscriptionDetailDialog(subscriptions: readonly SubscriptionCollectionItem[]) {
   const queryClient = useQueryClient();
-  const [detailSubscriptionId, setDetailSubscriptionId] = useState<string | null>(null);
+  const [detailTarget, setDetailTarget] = useState<SubscriptionDialogTarget | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const detailSubscriptionId = detailTarget?.id ?? null;
   const detailQuery = useSubscriptionDetail(detailSubscriptionId, detailDialogOpen);
   const currentDetailDialogSession = useMemo(() => ({
     subscription: detailQuery.data ?? null,
+    collectionItem: detailTarget?.collectionItem ?? null,
     pending: detailQuery.isPending,
     error: detailQuery.error,
-  }), [detailQuery.data, detailQuery.error, detailQuery.isPending]);
+  }), [detailQuery.data, detailQuery.error, detailQuery.isPending, detailTarget?.collectionItem]);
   const detailDialogSession = useDialogSessionSnapshot(
     detailDialogOpen,
     detailSubscriptionId,
@@ -22,7 +29,7 @@ export function useSubscriptionDetailDialog() {
   const { scheduleCleanup: scheduleDetailCleanup, cancelCleanup: cancelDetailCleanup } =
     useDeferredDialogCleanup(() => {
       // 详情关闭动画期间保留 id 与 cache 绑定，避免 Dialog/Drawer fade-out 时标题和内容闪空。
-      setDetailSubscriptionId(null);
+      setDetailTarget(null);
     });
 
   const handlePrefetchDetails = useCallback((id: string) => {
@@ -31,9 +38,9 @@ export function useSubscriptionDetailDialog() {
 
   const handleViewDetails = useCallback((id: string) => {
     cancelDetailCleanup();
-    setDetailSubscriptionId(id);
+    setDetailTarget(createSubscriptionDialogTarget(subscriptions, id));
     setDetailDialogOpen(true);
-  }, [cancelDetailCleanup]);
+  }, [cancelDetailCleanup, subscriptions]);
 
   const handleDetailDialogOpenChange = useCallback((nextOpen: boolean) => {
     setDetailDialogOpen(nextOpen);
@@ -47,6 +54,7 @@ export function useSubscriptionDetailDialog() {
   return {
     detailDialogOpen,
     selectedDetailSubscription: detailDialogSession.subscription,
+    selectedDetailCollectionItem: detailDialogSession.collectionItem,
     detailPending: detailDialogSession.pending,
     detailError: detailDialogSession.error,
     handlePrefetchDetails,

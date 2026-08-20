@@ -9,7 +9,10 @@ import { MediaCandidateViewport } from "@/components/media-candidate-viewport";
 import { MediaThumbnailButton } from "@/components/media-thumbnail-button";
 import { LogoUrlInputPanel } from "@/components/logo-url-input-panel";
 import { SubscriptionLogo } from "@/components/subscription-logo";
-import { DeferredImageCropDialog } from "@/components/image-crop-dialog-loader";
+import {
+  DeferredImageCropDialog,
+  preloadImageCropDialog,
+} from "@/components/image-crop-dialog-loader";
 import { useMediaCandidates } from "@/hooks/use-media-candidates";
 import { useUploadedLogoAssets } from "@/hooks/use-uploaded-logo-assets";
 import { dataUrlToBlob, validateImageFileForUpload } from "@/lib/upload-image";
@@ -171,7 +174,16 @@ export function ImportLogoEditor({ name, website, value, assetPreviewUrl, onChan
 
             <input ref={fileInputRef} type="file" accept={IMAGE_UPLOAD_ACCEPT} className="hidden" onChange={handleFileUpload} />
             <div className="grid gap-2">
-              <Button type="button" variant="outline" size="sm" className="gap-2 border-border" onClick={() => fileInputRef.current?.click()}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2 border-border"
+                onFocus={preloadImageCropDialog}
+                onPointerEnter={preloadImageCropDialog}
+                onTouchStart={preloadImageCropDialog}
+                onClick={() => fileInputRef.current?.click()}
+              >
                 <Upload className="h-4 w-4" />
                 {t("media.uploadLogo")}
               </Button>

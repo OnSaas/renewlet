@@ -41,6 +41,7 @@ function Harness() {
     <>
       <button type="button" onClick={() => setOpen(true)}>打开新增</button>
       <SubscriptionDialog
+        loadingPreview={null}
         mode="create"
         open={open}
         onOpenChange={setOpen}
@@ -51,7 +52,7 @@ function Harness() {
 }
 
 describe("SubscriptionDialog loading shell", () => {
-  it("replaces the skeleton inside the active dialog and reuses the loaded module on reopen", async () => {
+  it("resolves module pending inside the active dialog and reuses the loaded module on reopen", async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
@@ -59,7 +60,8 @@ describe("SubscriptionDialog loading shell", () => {
     const overlay = document.querySelector("[data-dialog-overlay]");
     expect(overlay).toBeInstanceOf(HTMLElement);
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
-    expect(screen.getByTestId("subscription-form-loading")).toBeInTheDocument();
+    expect(screen.getByTestId("dialog-module-pending")).toBeInTheDocument();
+    expect(dialog).toHaveAttribute("aria-busy", "true");
 
     await act(async () => {
       moduleGate.release();
@@ -69,14 +71,15 @@ describe("SubscriptionDialog loading shell", () => {
     expect(await screen.findByTestId("subscription-dialog-real-content")).toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "添加新订阅" })).toBe(dialog);
     expect(document.querySelector("[data-dialog-overlay]")).toBe(overlay);
-    expect(screen.queryByTestId("subscription-form-loading")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("dialog-module-pending")).not.toBeInTheDocument();
+    expect(dialog).not.toHaveAttribute("aria-busy");
     expect(screen.getByLabelText("服务名称")).toHaveFocus();
 
     await user.click(screen.getByRole("button", { name: "关闭" }));
     await user.click(screen.getByRole("button", { name: "打开新增" }));
 
     expect(screen.getByTestId("subscription-dialog-real-content")).toBeInTheDocument();
-    expect(screen.queryByTestId("subscription-form-loading")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("dialog-module-pending")).not.toBeInTheDocument();
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
   });
 });

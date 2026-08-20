@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
-import type { Subscription, SubscriptionFormSubmission } from "@/types/subscription";
+import type {
+  Subscription,
+  SubscriptionCollectionItem,
+  SubscriptionFormSubmission,
+} from "@/types/subscription";
 
 type CreateSubscriptionDialogProps = {
   mode: "create";
@@ -10,6 +14,7 @@ type CreateSubscriptionDialogProps = {
   availableTags?: readonly string[] | undefined;
   trigger?: ReactNode;
   loading?: boolean | undefined;
+  loadingPreview: SubscriptionCollectionItem | null;
 };
 
 type EditSubscriptionDialogProps = {
@@ -20,6 +25,7 @@ type EditSubscriptionDialogProps = {
   onSubmit: (submission: SubscriptionFormSubmission) => void;
   availableTags?: readonly string[] | undefined;
   loading?: boolean | undefined;
+  loadingPreview: SubscriptionCollectionItem | null;
 };
 
 export type SubscriptionDialogProps = CreateSubscriptionDialogProps | EditSubscriptionDialogProps;

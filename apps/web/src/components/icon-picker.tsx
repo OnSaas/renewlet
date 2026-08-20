@@ -110,6 +110,7 @@ export function IconPicker({
             onClick={() => fileInputRef.current?.click()}
             onFocus={preloadImageCropDialog}
             onPointerEnter={preloadImageCropDialog}
+            onTouchStart={preloadImageCropDialog}
           >
             {displayedIcon ? (
               <div className="relative z-10 h-full w-full p-1">
@@ -158,6 +159,7 @@ export function IconPicker({
               onClick={() => fileInputRef.current?.click()}
               onFocus={preloadImageCropDialog}
               onPointerEnter={preloadImageCropDialog}
+              onTouchStart={preloadImageCropDialog}
             >
               {uploadStatus === "uploading" ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
