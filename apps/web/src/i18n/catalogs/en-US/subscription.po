@@ -2224,11 +2224,6 @@ msgid "aiRecognition.imageOptimizing"
 msgstr "Optimizing"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/subscription.ts:23
-msgid "subscription.addToCalendarSubscribeLoading"
-msgstr "Generating..."
-
-#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:403
 msgid "import.loading"
 msgstr "Parsing and building preview..."
@@ -3362,3 +3357,38 @@ msgstr "Default reminder: {days} days before"
 #: src/i18n/descriptors/subscription.ts:261
 msgid "subscriptions.sort.default"
 msgstr "Default order"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:675
+msgid "subscription.addToCalendarFeedStatusLoading"
+msgstr "Loading subscription link status..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:679
+msgid "subscription.addToCalendarOpenSystemLoading"
+msgstr "Opening system calendar..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:23
+msgid "subscription.addToCalendarGenerateFeedLoading"
+msgstr "Generating subscription link..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:678
+msgid "subscription.addToCalendarFeedStatusRetrying"
+msgstr "Reloading..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:680
+msgid "subscription.addToCalendarRegenerateLoading"
+msgstr "Regenerating..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:676
+msgid "subscription.addToCalendarFeedStatusFailed"
+msgstr "Failed to load subscription link status"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:677
+msgid "subscription.addToCalendarFeedStatusRetry"
+msgstr "Reload"

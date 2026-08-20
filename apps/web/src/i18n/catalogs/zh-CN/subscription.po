@@ -2224,11 +2224,6 @@ msgid "aiRecognition.imageOptimizing"
 msgstr "正在优化"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/subscription.ts:23
-msgid "subscription.addToCalendarSubscribeLoading"
-msgstr "正在生成..."
-
-#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:403
 msgid "import.loading"
 msgstr "正在解析和生成预览..."
@@ -3362,3 +3357,38 @@ msgstr "默认提醒：提前 {days} 天"
 #: src/i18n/descriptors/subscription.ts:261
 msgid "subscriptions.sort.default"
 msgstr "默认顺序"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:675
+msgid "subscription.addToCalendarFeedStatusLoading"
+msgstr "正在加载订阅链接状态..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:679
+msgid "subscription.addToCalendarOpenSystemLoading"
+msgstr "正在打开系统日历..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:23
+msgid "subscription.addToCalendarGenerateFeedLoading"
+msgstr "正在生成订阅链接..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:678
+msgid "subscription.addToCalendarFeedStatusRetrying"
+msgstr "正在重新加载..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:680
+msgid "subscription.addToCalendarRegenerateLoading"
+msgstr "正在重新生成..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:676
+msgid "subscription.addToCalendarFeedStatusFailed"
+msgstr "订阅链接状态加载失败"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:677
+msgid "subscription.addToCalendarFeedStatusRetry"
+msgstr "重新加载"

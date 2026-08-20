@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { buildRenewalCalendarEvent, type RenewalCalendarEvent } from "@renewlet/shared/calendar-events";
 import { google, office365, outlook, yahoo, type CalendarEvent } from "calendar-link";
 import { CalendarDays, CalendarPlus, Clipboard, Download, ExternalLink, Loader2, RefreshCw } from "lucide-react";
@@ -16,6 +16,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { MobileBottomDrawerContent, MobileDrawerRoot } from "@/components/ui/mobile-drawer";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   createSubscriptionCalendarLoadingSlots,
   SubscriptionCalendarFactRow,
@@ -63,6 +64,8 @@ interface CalendarProviderLink {
   href: string;
   label: string;
 }
+
+type SystemCalendarActionPhase = "idle" | "creating" | "opening";
 
 export function AddToCalendarDialog({
   open,
@@ -163,16 +166,22 @@ function SubscriptionCalendarDialogContent({
   );
   const createSubscriptionFeed = useCreateSubscriptionCalendarFeed();
   const deleteSubscriptionFeed = useDeleteSubscriptionCalendarFeed();
-  const [feedUrl, setFeedUrl] = useState<string | null>(null);
+  const [localFeed, setLocalFeed] = useState<{
+    subscriptionId: string;
+    feedUrl: string | null;
+  } | null>(null);
   const [confirmRegenerateOpen, setConfirmRegenerateOpen] = useState(false);
   const [isDownloadingCalendar, setIsDownloadingCalendar] = useState(false);
-  const [isOpeningSystemCalendar, setIsOpeningSystemCalendar] = useState(false);
+  const [isRetryingFeedStatus, setIsRetryingFeedStatus] = useState(false);
+  const [systemCalendarActionPhase, setSystemCalendarActionPhase] = useState<SystemCalendarActionPhase>("idle");
+  const [isRegeneratingFeed, setIsRegeneratingFeed] = useState(false);
   const feedUrlInputRef = useRef<HTMLInputElement>(null);
-  const visibleFeedUrl = feedUrl ?? subscriptionFeedStatus.data?.feedUrl ?? null;
-  useEffect(() => {
-    // 切换订阅时清掉刚生成的本地 token，防止上一张卡片的私有 feed URL 短暂展示到新弹窗。
-    setFeedUrl(null);
-  }, [subscriptionId]);
+  const localFeedUrl = localFeed?.subscriptionId === subscriptionId
+    ? localFeed.feedUrl
+    : undefined;
+  const visibleFeedUrl = localFeedUrl !== undefined
+    ? localFeedUrl
+    : subscriptionFeedStatus.data?.feedUrl ?? null;
   const category = subscription
     ? config.categories.find((item) => item.value === subscription.category)
     : undefined;
@@ -264,13 +273,14 @@ function SubscriptionCalendarDialogContent({
   }, [links, renewalEvent, subscription]);
 
   const handleSubscribe = useCallback(async () => {
-    if (!subscription) return;
+    if (!subscription || systemCalendarActionPhase !== "idle" || isRegeneratingFeed) return;
     let createdFeedUrl: string | null = null;
-    setIsOpeningSystemCalendar(true);
+    setSystemCalendarActionPhase("creating");
     try {
       const created = await createSubscriptionFeed.mutateAsync(subscription.id);
       createdFeedUrl = created.feedUrl;
-      setFeedUrl(created.feedUrl);
+      setLocalFeed({ subscriptionId: subscription.id, feedUrl: created.feedUrl });
+      setSystemCalendarActionPhase("opening");
       await openValidatedWebcalUrl(created.feedUrl);
       toast.success(t("subscription.addToCalendarSubscribed"), {
         description: t("subscription.addToCalendarSubscribedDescription"),
@@ -284,13 +294,13 @@ function SubscriptionCalendarDialogContent({
         toast.error(t("subscription.addToCalendarSubscribeFailed"));
       }
     } finally {
-      setIsOpeningSystemCalendar(false);
+      setSystemCalendarActionPhase("idle");
     }
-  }, [createSubscriptionFeed, subscription, t]);
+  }, [createSubscriptionFeed, isRegeneratingFeed, subscription, systemCalendarActionPhase, t]);
 
   const handleOpenExistingFeed = useCallback(async () => {
-    if (!visibleFeedUrl) return;
-    setIsOpeningSystemCalendar(true);
+    if (!visibleFeedUrl || systemCalendarActionPhase !== "idle" || isRegeneratingFeed) return;
+    setSystemCalendarActionPhase("opening");
     try {
       await openValidatedWebcalUrl(visibleFeedUrl);
       toast.success(t("subscription.addToCalendarSubscribed"), {
@@ -301,25 +311,29 @@ function SubscriptionCalendarDialogContent({
         description: t("subscription.addToCalendarOpenSystemFailedDescription"),
       });
     } finally {
-      setIsOpeningSystemCalendar(false);
+      setSystemCalendarActionPhase("idle");
     }
-  }, [visibleFeedUrl, t]);
+  }, [isRegeneratingFeed, systemCalendarActionPhase, visibleFeedUrl, t]);
 
   const handleRegenerate = useCallback(async () => {
-    if (!subscription) return;
+    if (!subscription || isRegeneratingFeed || systemCalendarActionPhase !== "idle") return;
+    setIsRegeneratingFeed(true);
     try {
       // 再生成通过删除旧 token 后重新创建完成，保证误分享的旧公开链接立即失效。
       await deleteSubscriptionFeed.mutateAsync(subscription.id);
+      setLocalFeed({ subscriptionId: subscription.id, feedUrl: null });
       const created = await createSubscriptionFeed.mutateAsync(subscription.id);
-      setFeedUrl(created.feedUrl);
+      setLocalFeed({ subscriptionId: subscription.id, feedUrl: created.feedUrl });
       setConfirmRegenerateOpen(false);
       toast.success(t("subscription.addToCalendarRegenerated"), {
         description: t("subscription.addToCalendarRegeneratedDescription"),
       });
     } catch {
       toast.error(t("subscription.addToCalendarRegenerateFailed"));
+    } finally {
+      setIsRegeneratingFeed(false);
     }
-  }, [createSubscriptionFeed, deleteSubscriptionFeed, subscription, t]);
+  }, [createSubscriptionFeed, deleteSubscriptionFeed, isRegeneratingFeed, subscription, systemCalendarActionPhase, t]);
 
   const handleCopyFeedUrl = useCallback(async (target?: ClipboardCopyTarget | null) => {
     if (!visibleFeedUrl) return;
@@ -347,17 +361,32 @@ function SubscriptionCalendarDialogContent({
     }
   }, [subscription, t]);
 
+  const handleRetryFeedStatus = async () => {
+    if (isRetryingFeedStatus) return;
+    setIsRetryingFeedStatus(true);
+    try {
+      await subscriptionFeedStatus.refetch();
+    } finally {
+      setIsRetryingFeedStatus(false);
+    }
+  };
+
   let scaffoldSlots: SubscriptionCalendarScaffoldSlots;
   if (loading || !subscription || !renewalEvent) {
     scaffoldSlots = createSubscriptionCalendarLoadingSlots(loadingLabel);
   } else {
-    const isSubscribing = isOpeningSystemCalendar
-      || createSubscriptionFeed.isPending
-      || deleteSubscriptionFeed.isPending
-      || subscriptionFeedStatus.isLoading;
+    const hasFeedStatusData = subscriptionFeedStatus.data !== undefined;
+    // 首次 query 只决定动作类型；mutation 才进入按钮 busy，有缓存的后台刷新不能让已知操作退回占位态。
+    const isFeedStatusUnavailable = !hasFeedStatusData
+      && (subscriptionFeedStatus.isError || isRetryingFeedStatus);
+    const isFeedStatusPending = !hasFeedStatusData && !isFeedStatusUnavailable;
+    const isSystemCalendarActionPending = systemCalendarActionPhase !== "idle";
     const subscribeLabel = visibleFeedUrl
       ? t("subscription.addToCalendarSubscribeSystem")
       : t("subscription.addToCalendarGenerateFeed");
+    const pendingSubscribeLabel = systemCalendarActionPhase === "creating"
+      ? t("subscription.addToCalendarGenerateFeedLoading")
+      : t("subscription.addToCalendarOpenSystemLoading");
     scaffoldSlots = {
       facts: (
         <>
@@ -379,7 +408,33 @@ function SubscriptionCalendarDialogContent({
           />
         </>
       ),
-      primaryAction: (
+      primaryAction: isFeedStatusPending ? (
+        <div role="status" data-testid="subscription-calendar-feed-status-loading">
+          <span className="sr-only">{t("subscription.addToCalendarFeedStatusLoading")}</span>
+          <Skeleton aria-hidden="true" className="h-10 w-full" />
+        </div>
+      ) : isFeedStatusUnavailable ? (
+        <div
+          role="alert"
+          className="flex min-h-10 flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>{t("subscription.addToCalendarFeedStatusFailed")}</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0 justify-center border-destructive/30"
+            onClick={() => void handleRetryFeedStatus()}
+            disabled={isRetryingFeedStatus}
+            aria-busy={isRetryingFeedStatus ? true : undefined}
+          >
+            <RefreshCw className={isRetryingFeedStatus ? "animate-spin" : undefined} />
+            {isRetryingFeedStatus
+              ? t("subscription.addToCalendarFeedStatusRetrying")
+              : t("subscription.addToCalendarFeedStatusRetry")}
+          </Button>
+        </div>
+      ) : (
         <Button
           type="button"
           variant="default"
@@ -387,12 +442,13 @@ function SubscriptionCalendarDialogContent({
           onClick={() => {
             void (visibleFeedUrl ? handleOpenExistingFeed() : handleSubscribe());
           }}
-          disabled={isSubscribing}
+          disabled={isSystemCalendarActionPending || isRegeneratingFeed}
+          aria-busy={isSystemCalendarActionPending ? true : undefined}
         >
-          {isSubscribing
+          {isSystemCalendarActionPending
             ? <Loader2 className="h-4 w-4 animate-spin" />
             : <CalendarPlus className="h-4 w-4" />}
-          {isSubscribing ? t("subscription.addToCalendarSubscribeLoading") : subscribeLabel}
+          {isSystemCalendarActionPending ? pendingSubscribeLabel : subscribeLabel}
         </Button>
       ),
       feedActions: visibleFeedUrl ? (
@@ -412,6 +468,7 @@ function SubscriptionCalendarDialogContent({
             onClick={() => {
               void handleCopyFeedUrl(feedUrlInputRef.current);
             }}
+            disabled={isRegeneratingFeed}
           >
             <Clipboard className="h-4 w-4" />
             {t("subscription.addToCalendarCopyFeedUrl")}
@@ -423,6 +480,7 @@ function SubscriptionCalendarDialogContent({
               size="sm"
               className="h-8 justify-center gap-2 px-2 text-xs text-muted-foreground hover:text-destructive"
               onClick={() => setConfirmRegenerateOpen(true)}
+              disabled={isSystemCalendarActionPending || isRegeneratingFeed}
             >
               <RefreshCw className="h-3.5 w-3.5" />
               {t("subscription.addToCalendarRegenerate")}
@@ -497,6 +555,7 @@ function SubscriptionCalendarDialogContent({
           open={confirmRegenerateOpen}
           onOpenChange={setConfirmRegenerateOpen}
           onConfirm={() => void handleRegenerate()}
+          pending={isRegeneratingFeed}
         />
       ) : null}
     </>
@@ -511,23 +570,40 @@ function CalendarFeedRegenerateDialog({
   onConfirm,
   onOpenChange,
   open,
+  pending,
 }: {
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
+  pending: boolean;
 }) {
   const { t } = useI18n();
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!pending) onOpenChange(nextOpen);
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t("subscription.addToCalendarRegenerateTitle")}</AlertDialogTitle>
           <AlertDialogDescription>{t("subscription.addToCalendarRegenerateDescription")}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>
-            {t("subscription.addToCalendarRegenerate")}
+          <AlertDialogCancel disabled={pending}>{t("common.cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
+            disabled={pending}
+            aria-busy={pending ? true : undefined}
+          >
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {pending
+              ? t("subscription.addToCalendarRegenerateLoading")
+              : t("subscription.addToCalendarRegenerate")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
