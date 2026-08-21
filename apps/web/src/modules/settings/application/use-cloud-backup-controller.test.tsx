@@ -10,8 +10,13 @@ import type {
 } from "@/lib/api/schemas/cloud-backup";
 
 // Controller 测试保护 provider 草稿隔离、write-only secret 和快照行级状态，避免 UI mock 掩盖串目标问题。
+type AppToast = (typeof import("@/components/ui/sonner"))["toast"];
+
 const mocks = vi.hoisted(() => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: {
+    success: vi.fn<AppToast["success"]>(),
+    error: vi.fn<AppToast["error"]>(),
+  },
   locale: "zh-CN" as "zh-CN" | "en-US",
   config: null as CloudBackupConfig | null,
   snapshots: [] as CloudBackupSnapshot[],
@@ -264,10 +269,9 @@ describe("useCloudBackupController provider drafts", () => {
 
     expect(mocks.updateConfigMutateAsync).not.toHaveBeenCalled();
     expect(mocks.testMutateAsync).not.toHaveBeenCalled();
-    expect(mocks.toast.error).toHaveBeenCalledWith(
-      "settings.cloudBackupInvalid",
-      expect.objectContaining({ description: expect.any(String) }),
-    );
+    expect(mocks.toast.error).toHaveBeenCalledWith("settings.cloudBackupInvalid", {
+      description: "settings.cloudBackupInvalidDescription",
+    });
   });
 
   it("does not overwrite a dirty provider draft when cloud config refetches", async () => {

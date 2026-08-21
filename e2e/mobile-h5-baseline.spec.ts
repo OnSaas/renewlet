@@ -259,25 +259,31 @@ const H5_CORE_VIEWPORT_MATRIX = [
   { width: 900, height: 700, label: "tablet" },
 ] as const;
 
-test("core authenticated H5 pages do not create horizontal overflow", async ({ page }) => {
-  const routes = [
-    { path: "/", label: "dashboard" },
-    { path: "/subscriptions", label: "subscriptions" },
-    { path: "/calendar", label: "calendar" },
-    { path: "/statistics", label: "statistics" },
-    { path: "/settings", label: "settings" },
-  ] as const;
+const H5_CORE_ROUTES = [
+  { path: "/", label: "dashboard" },
+  { path: "/subscriptions", label: "subscriptions" },
+  { path: "/calendar", label: "calendar" },
+  { path: "/statistics", label: "statistics" },
+  { path: "/settings", label: "settings" },
+] as const;
 
-  for (const viewport of H5_CORE_VIEWPORT_MATRIX) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+// 每个 viewport 独立占用测试预算，避免跨路由导航的累计耗时把 runner 波动误判成布局回归。
+for (const viewport of H5_CORE_VIEWPORT_MATRIX) {
+  test(
+    `core authenticated H5 pages do not overflow at ${viewport.label} ${viewport.width}x${viewport.height}`,
+    async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
-    for (const route of routes) {
-      await page.goto(route.path);
-      await expect(page.getByTestId("app-header")).toBeVisible();
-      await expectNoHorizontalOverflow(page, `${viewport.label} ${route.label}`);
-    }
-  }
-});
+      for (const route of H5_CORE_ROUTES) {
+        await test.step(`${route.label} ${route.path}`, async () => {
+          await page.goto(route.path);
+          await expect(page.getByTestId("app-header")).toBeVisible();
+          await expectNoHorizontalOverflow(page, `${viewport.label} ${route.label}`);
+        });
+      }
+    },
+  );
+}
 
 test("short H5 viewport keeps dialogs and bottom actions operable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 560 });

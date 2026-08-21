@@ -3,8 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BuiltInIconIndexStatus, BuiltInIconRefreshJob, BuiltInIconRefreshJobStatus } from "@/lib/api/schemas/media";
 import { useSettingsBuiltInIconIndexController } from "./use-built-in-icon-index-controller";
 
+type AppToast = (typeof import("@/components/ui/sonner"))["toast"];
+
 const mocks = vi.hoisted(() => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: {
+    success: vi.fn<AppToast["success"]>(),
+    error: vi.fn<AppToast["error"]>(),
+  },
   statusRefetch: vi.fn(),
   checkMutateAsync: vi.fn(),
   refreshMutateAsync: vi.fn(),

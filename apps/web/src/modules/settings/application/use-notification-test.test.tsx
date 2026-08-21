@@ -11,10 +11,14 @@ type ApiFetchMock = (
   responseSchema: unknown,
   init?: RequestInit,
 ) => Promise<unknown>;
+type AppToast = (typeof import("@/components/ui/sonner"))["toast"];
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn<ApiFetchMock>(),
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: {
+    success: vi.fn<AppToast["success"]>(),
+    error: vi.fn<AppToast["error"]>(),
+  },
 }));
 
 vi.mock("@/lib/api-client", async (importOriginal) => {
@@ -91,9 +95,8 @@ describe("useNotificationTest", () => {
       message: "ServerChan 发送失败",
       responseText: "too many requests",
     });
-    expect(mocks.toast.error).toHaveBeenCalledWith(
-      "测试通知发送失败",
-      expect.objectContaining({ description: expect.any(String) }),
-    );
+    expect(mocks.toast.error).toHaveBeenCalledWith("测试通知发送失败", {
+      description: "ServerChan 发送失败",
+    });
   });
 });

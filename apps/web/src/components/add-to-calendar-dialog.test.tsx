@@ -6,6 +6,8 @@ import { assertDateOnly } from "@/lib/time/date-only";
 import type { Subscription } from "@/types/subscription";
 import { AddToCalendarDialog } from "./add-to-calendar-dialog";
 
+type AppToast = (typeof import("@/components/ui/sonner"))["toast"];
+
 const mocks = vi.hoisted(() => ({
   createCalendarFeed: vi.fn(),
   deleteCalendarFeed: vi.fn(),
@@ -13,8 +15,8 @@ const mocks = vi.hoisted(() => ({
   downloadSubscriptionIcs: vi.fn(),
   getCalendarFeed: vi.fn(),
   rotateCalendarFeed: vi.fn(),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
+  toastError: vi.fn<AppToast["error"]>(),
+  toastSuccess: vi.fn<AppToast["success"]>(),
 }));
 const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 const originalExecCommandDescriptor = Object.getOwnPropertyDescriptor(document, "execCommand");

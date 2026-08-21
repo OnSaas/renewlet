@@ -22,6 +22,7 @@ export const BASE_SETTINGS: AppSettings = {
 };
 
 type SettingsMutationCommand = { patch: AppSettings; secretUpdates: SettingsSecretUpdates };
+type AppToast = (typeof import("@/components/ui/sonner"))["toast"];
 
 function providerStatusFixtures(counts: Record<BuiltInIconProvider, number>) {
   return BUILT_IN_ICON_PROVIDERS.map((provider) => ({
@@ -46,7 +47,10 @@ function providerStatusFixtures(counts: Record<BuiltInIconProvider, number>) {
 }
 
 const mocks = vi.hoisted(() => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: {
+    success: vi.fn<AppToast["success"]>(),
+    error: vi.fn<AppToast["error"]>(),
+  },
   updateSettingsMutateAsync: vi.fn<(command: SettingsMutationCommand) => Promise<unknown>>(),
   refreshRates: vi.fn(),
   remoteSettings: undefined as unknown,

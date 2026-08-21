@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { assertDateOnly } from "@/lib/time/date-only";
 import { useCalendarFeedSettingsController } from "./use-calendar-feed-settings-controller";
 
+type AppToast = (typeof import("@/components/ui/sonner"))["toast"];
+
 const mocks = vi.hoisted(() => ({
   copyText: vi.fn(),
   create: { isPending: false, variables: undefined as unknown, mutateAsync: vi.fn() },
@@ -26,7 +28,10 @@ const mocks = vi.hoisted(() => ({
   },
   openSystem: vi.fn(),
   rotate: { isPending: false, variables: undefined as unknown, mutateAsync: vi.fn() },
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: {
+    success: vi.fn<AppToast["success"]>(),
+    error: vi.fn<AppToast["error"]>(),
+  },
 }));
 
 vi.mock("@/hooks/use-calendar-feed", () => ({
@@ -118,10 +123,10 @@ describe("useCalendarFeedSettingsController", () => {
     const { result } = renderHook(() => useCalendarFeedSettingsController());
 
     expect(result.current.global.data).toEqual(globalFeed);
-    expect(result.current.subscriptions.items).toEqual([subscriptionFeed, olderSubscriptionFeed]);
-    expect(result.current.subscriptions.total).toBe(2);
+    expect(result.current.subscriptions.data?.items).toEqual([subscriptionFeed, olderSubscriptionFeed]);
+    expect(result.current.subscriptions.data?.total).toBe(2);
     expect(result.current.subscriptions.hasData).toBe(true);
-    expect(result.current.subscriptions.hasMore).toBe(true);
+    expect(result.current.subscriptions.data?.hasMore).toBe(true);
     expect(mocks.subscriptionFeeds.fetchNextPage).not.toHaveBeenCalled();
 
     await act(async () => result.current.subscriptions.loadMore());
@@ -144,7 +149,7 @@ describe("useCalendarFeedSettingsController", () => {
     expect(result.current.global.error?.message).toBe("global failed");
     expect(result.current.global.hasData).toBe(false);
     expect(result.current.subscriptions.error?.message).toBe("list failed");
-    expect(result.current.subscriptions.items).toHaveLength(2);
+    expect(result.current.subscriptions.data?.items).toHaveLength(2);
   });
 
   it("routes create, rotate, and revoke through the same target contract", async () => {

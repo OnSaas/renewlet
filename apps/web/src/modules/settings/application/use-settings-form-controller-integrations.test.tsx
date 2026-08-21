@@ -22,6 +22,7 @@ const BASE_SETTINGS: AppSettings = {
   recipientEmail: "alice@example.com",
 };
 type SettingsMutationCommand = { patch: AppSettings; secretUpdates: SettingsSecretUpdates };
+type AppToast = (typeof import("@/components/ui/sonner"))["toast"];
 const originalExecCommandDescriptor = Object.getOwnPropertyDescriptor(document, "execCommand");
 
 function providerStatusFixtures(counts: Record<BuiltInIconProvider, number>) {
@@ -47,7 +48,10 @@ function providerStatusFixtures(counts: Record<BuiltInIconProvider, number>) {
 }
 
 const mocks = vi.hoisted(() => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: {
+    success: vi.fn<AppToast["success"]>(),
+    error: vi.fn<AppToast["error"]>(),
+  },
   updateSettingsMutateAsync: vi.fn<(command: SettingsMutationCommand) => Promise<unknown>>(),
   refreshRates: vi.fn(),
   remoteSettings: undefined as unknown,

@@ -566,8 +566,12 @@ export function createControllerState(overrides: {
     setNotificationTestErrorDetailsOpen: fn,
     isSavingSettings: overrides.isSavingSettings ?? false,
     notificationHistory: {
-      overview: createSettingsReadState(undefined),
-      history: createSettingsReadState(undefined),
+      overview: createSettingsReadState<
+        NonNullable<SettingsFormController["notificationHistory"]["overview"]["data"]>
+      >(undefined),
+      history: createSettingsReadState<
+        NonNullable<SettingsFormController["notificationHistory"]["history"]["data"]>
+      >(undefined),
       historyStatus: "all",
       setStatus: fn,
       limit: 20,

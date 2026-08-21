@@ -397,7 +397,7 @@ describe("CloudBackupSection", () => {
     const retry = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
     render(<CloudBackupSection controller={createController({
-      config: readState(undefined, {
+      config: readState<CloudBackupConfig>(undefined, {
         error: new Error("config unavailable"),
         retry,
       }),

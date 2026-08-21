@@ -8,10 +8,15 @@ import type { UploadedAsset, UploadedAssetsPage, UploadKind } from "@/lib/api/sc
 import { uploadedAssetsQueryKeys } from "@/hooks/use-uploaded-assets";
 import { useUploadedAssetsManager } from "./use-uploaded-assets-manager";
 
+type AppToast = (typeof import("@/components/ui/sonner"))["toast"];
+
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   delete: vi.fn(),
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: {
+    success: vi.fn<AppToast["success"]>(),
+    error: vi.fn<AppToast["error"]>(),
+  },
 }));
 
 vi.mock("@/services/asset-service", () => ({
@@ -229,10 +234,9 @@ describe("useUploadedAssetsManager", () => {
       assetId: "asset_logo",
       message: "仍被 2 个订阅使用，请先到订阅里换掉 Logo。",
     });
-    expect(mocks.toast.error).toHaveBeenCalledWith(
-      "删除失败",
-      expect.objectContaining({ description: expect.any(String) }),
-    );
+    expect(mocks.toast.error).toHaveBeenCalledWith("删除失败", {
+      description: "仍被 2 个订阅使用，请先到订阅里换掉 Logo。",
+    });
   });
 
   it("keeps payment-method-referenced assets in place and points users to payment methods", async () => {

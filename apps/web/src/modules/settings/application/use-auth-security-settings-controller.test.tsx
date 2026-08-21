@@ -3,11 +3,16 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthSecuritySettingsController } from "./use-auth-security-settings-controller";
 
+type AppToast = (typeof import("@/components/ui/sonner"))["toast"];
+
 const mocks = vi.hoisted(() => ({
   remote: undefined as unknown,
   mutateAsync: vi.fn(),
   testMutateAsync: vi.fn(),
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: {
+    success: vi.fn<AppToast["success"]>(),
+    error: vi.fn<AppToast["error"]>(),
+  },
 }));
 
 vi.mock("@/hooks/use-auth-security", () => ({
