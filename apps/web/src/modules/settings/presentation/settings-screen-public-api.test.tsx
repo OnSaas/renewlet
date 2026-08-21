@@ -91,7 +91,7 @@ describe("SettingsScreen Public API and Telegram commands", () => {
     await user.click(within(reopenedManagementDialog).getByRole("button", { name: "关闭一次性 API Token" }));
     expect(controller.publicApi.dismissPlainToken).toHaveBeenCalled();
 
-    await user.click(within(reopenedManagementDialog).getByRole("button", { name: "删除" }));
+    await user.click(within(reopenedManagementDialog).getByRole("button", { name: "删除 API Token Telegram Bot" }));
     const deleteDialog = await screen.findByRole("alertdialog", { name: "删除 API Token？" });
     expect(within(deleteDialog).getByText("「Telegram Bot」会被永久删除，外部集成后续请求将返回未授权。")).toBeInTheDocument();
     await user.click(within(deleteDialog).getByRole("button", { name: "删除" }));

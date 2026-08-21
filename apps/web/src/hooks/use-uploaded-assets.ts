@@ -71,7 +71,7 @@ export function useUploadedAssetsByKind(
   }, [enabled, query.data?.pages]);
   const error = query.error instanceof Error ? query.error : query.error ? new Error("Uploaded assets load failed") : null;
   const hasData = enabled && query.data !== undefined;
-  const isInitialLoading = enabled && query.isPending && query.isFetching && !query.isFetchingNextPage && !hasData;
+  const isInitialLoading = enabled && !query.isFetched && query.isPending && query.isFetching && !query.isFetchingNextPage && !hasData;
   // 首次失败后的 refetch 仍无缓存，但必须算刷新以锁定重复重试，不能重新伪装成首次加载。
   const isRefreshing = enabled && query.isFetching && !query.isFetchingNextPage && !isInitialLoading;
   const isLoadingMore = enabled && query.isFetchingNextPage;

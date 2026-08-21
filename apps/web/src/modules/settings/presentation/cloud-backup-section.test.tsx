@@ -763,32 +763,32 @@ describe("CloudBackupSection", () => {
   it("shows raw response details for snapshot list failures", async () => {
     const user = userEvent.setup();
     const writeText = vi.fn(async () => undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     const openSnapshotsErrorDetails = vi.fn();
     const cloudBackupErrorDetails = {
       message: "云端快照列表加载失败",
       responseText: "<Error><Code>AccessDenied</Code></Error>",
     };
+    const staleSnapshots = readState([snapshotFixture({ filename: "renewlet-cached.zip" })], { error: new Error("云端快照列表加载失败") });
     const controller = createController({
+      snapshots: staleSnapshots,
       snapshotsErrorMessage: "云端快照列表加载失败",
       openSnapshotsErrorDetails,
       cloudBackupErrorDetails,
     });
-
     const { rerender } = render(<CloudBackupSection controller={controller} />);
-    expect(screen.getByText("云端快照列表加载失败")).toBeInTheDocument();
+    expect(screen.getByText("未更新")).toBeInTheDocument();
+    expect(screen.getByText("renewlet-cached.zip")).toBeInTheDocument();
+    expect(screen.queryByText("云端快照列表加载失败")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "查看错误详情" }));
     expect(openSnapshotsErrorDetails).toHaveBeenCalled();
 
     rerender(<CloudBackupSection controller={createController({
+      snapshots: staleSnapshots,
       snapshotsErrorMessage: "云端快照列表加载失败",
       cloudBackupErrorDetailsOpen: true,
       cloudBackupErrorDetails,
     })} />);
-
     expect(screen.getByRole("dialog", { name: "云存储错误详情" })).toBeInTheDocument();
     expect(screen.queryByText(/CLOUD_BACKUP_S3_LIST_FAILED/)).not.toBeInTheDocument();
     expect(screen.queryByText(/rawResponseText/)).not.toBeInTheDocument();

@@ -16,6 +16,7 @@ import {
 } from "@/lib/theme-storage";
 import { SETTINGS_INTEGRATION_TEST_MESSAGES } from "./settings-form-controller-test-messages";
 import { useSettingsFormController } from "./use-settings-form-controller";
+import type { SettingsNotificationHistoryController } from "./use-notification-history";
 
 const BASE_SETTINGS: AppSettings = {
   ...DEFAULT_SETTINGS,
@@ -64,7 +65,7 @@ const mocks = vi.hoisted(() => ({
   commitLocale: vi.fn(),
   syncRemoteLocale: vi.fn(),
   testConnection: vi.fn(),
-  refetchNotificationHistory: vi.fn(),
+  refetchNotificationHistory: vi.fn<() => Promise<void>>(),
   publicStatusPageStatus: { data: { enabled: false, pageUrl: undefined as string | undefined, showPrices: false }, isLoading: false },
   createPublicStatusPageMutateAsync: vi.fn(),
   updatePublicStatusPageMutateAsync: vi.fn(),
@@ -280,15 +281,27 @@ vi.mock("@/hooks/use-password-reset-availability", () => ({
 }));
 
 vi.mock("./use-notification-history", () => ({
-  useNotificationHistory: () => ({
-    data: undefined,
-    isLoading: false,
-    isFetching: false,
-    error: null,
+  useNotificationHistory: (): SettingsNotificationHistoryController => ({
+    overview: {
+      data: undefined,
+      hasData: false,
+      error: null,
+      isInitialLoading: false,
+      isRefreshing: false,
+      retry: mocks.refetchNotificationHistory,
+    },
+    history: {
+      data: undefined,
+      hasData: false,
+      error: null,
+      isInitialLoading: false,
+      isRefreshing: false,
+      retry: mocks.refetchNotificationHistory,
+    },
     historyStatus: "all",
     setStatus: vi.fn(),
+    limit: 20,
     loadMore: vi.fn(),
-    refetch: mocks.refetchNotificationHistory,
   }),
 }));
 
@@ -316,7 +329,7 @@ describe("useSettingsFormController integrations", () => {
     mocks.theme = "dark";
     mocks.commitLocale.mockReset();
     mocks.syncRemoteLocale.mockReset();
-    mocks.refetchNotificationHistory.mockReset();
+    mocks.refetchNotificationHistory.mockReset().mockResolvedValue(undefined);
     mocks.createPublicStatusPageMutateAsync.mockReset();
     mocks.updatePublicStatusPageMutateAsync.mockReset();
     mocks.deletePublicStatusPageMutateAsync.mockReset();

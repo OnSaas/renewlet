@@ -112,7 +112,7 @@ describe("SettingsScreen built-in icon index controls", () => {
     const dialog = await screen.findByRole("dialog", { name: "配置图标来源" });
     await user.click(within(dialog).getByRole("button", { name: "查看 TheSVG 图标索引状态：检查失败" }));
 
-    expect(screen.getByText("加载失败")).toBeInTheDocument();
+    expect(within(screen.getByRole("alert")).getByText("加载失败")).toBeInTheDocument();
     expect(screen.queryByText("暂时无法读取索引状态。")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "重试" }));
     expect(retry).toHaveBeenCalledTimes(1);

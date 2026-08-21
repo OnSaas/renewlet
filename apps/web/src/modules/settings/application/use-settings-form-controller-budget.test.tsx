@@ -14,6 +14,7 @@ import {
   SETTINGS_THEME_MODE_STORAGE_KEY,
 } from "@/lib/theme-storage";
 import { useSettingsFormController } from "./use-settings-form-controller";
+import type { SettingsNotificationHistoryController } from "./use-notification-history";
 
 const BASE_SETTINGS: AppSettings = {
   ...DEFAULT_SETTINGS,
@@ -40,7 +41,7 @@ const mocks = vi.hoisted(() => ({
   commitLocale: vi.fn(),
   syncRemoteLocale: vi.fn(),
   testConnection: vi.fn(),
-  refetchNotificationHistory: vi.fn(),
+  refetchNotificationHistory: vi.fn<() => Promise<void>>(),
   publicStatusPageStatus: { data: { enabled: false, pageUrl: undefined as string | undefined, showPrices: false }, isLoading: false },
   createPublicStatusPageMutateAsync: vi.fn(),
   updatePublicStatusPageMutateAsync: vi.fn(),
@@ -200,15 +201,27 @@ vi.mock("./use-password-change", () => ({
 }));
 
 vi.mock("./use-notification-history", () => ({
-  useNotificationHistory: () => ({
-    data: undefined,
-    isLoading: false,
-    isFetching: false,
-    error: null,
+  useNotificationHistory: (): SettingsNotificationHistoryController => ({
+    overview: {
+      data: undefined,
+      hasData: false,
+      error: null,
+      isInitialLoading: false,
+      isRefreshing: false,
+      retry: mocks.refetchNotificationHistory,
+    },
+    history: {
+      data: undefined,
+      hasData: false,
+      error: null,
+      isInitialLoading: false,
+      isRefreshing: false,
+      retry: mocks.refetchNotificationHistory,
+    },
     historyStatus: "all",
     setStatus: vi.fn(),
+    limit: 20,
     loadMore: vi.fn(),
-    refetch: mocks.refetchNotificationHistory,
   }),
 }));
 
@@ -218,6 +231,7 @@ describe("useSettingsFormController monthly budget input", () => {
     mocks.toast.error.mockReset();
     mocks.updateSettingsMutateAsync.mockReset();
     mocks.refreshRates.mockReset();
+    mocks.refetchNotificationHistory.mockReset().mockResolvedValue(undefined);
     mocks.saveConfig.mockReset();
     mocks.createPublicApiTokenMutateAsync.mockReset();
     mocks.deletePublicApiTokenMutateAsync.mockReset();

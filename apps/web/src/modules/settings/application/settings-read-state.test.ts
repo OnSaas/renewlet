@@ -6,6 +6,7 @@ describe("toSettingsReadState", () => {
     const state = toSettingsReadState({
       data: undefined,
       error: null,
+      isFetched: false,
       isPending: true,
       isFetching: true,
       refetch: vi.fn(),
@@ -26,6 +27,7 @@ describe("toSettingsReadState", () => {
     const state = toSettingsReadState({
       data,
       error,
+      isFetched: true,
       isPending: false,
       isFetching: true,
       refetch: vi.fn(),
@@ -45,7 +47,8 @@ describe("toSettingsReadState", () => {
     const state = toSettingsReadState({
       data: undefined,
       error,
-      isPending: false,
+      isFetched: true,
+      isPending: true,
       isFetching: true,
       refetch: vi.fn(),
     });
@@ -64,6 +67,7 @@ describe("toSettingsReadState", () => {
     const state = toSettingsReadState({
       data: undefined,
       error: "failed",
+      isFetched: true,
       isPending: false,
       isFetching: false,
       refetch,

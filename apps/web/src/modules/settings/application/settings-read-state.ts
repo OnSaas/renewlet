@@ -10,6 +10,7 @@ export interface SettingsReadState<T> {
 interface SettingsReadQuery<T> {
   data: T | undefined;
   error: unknown;
+  isFetched: boolean;
   isPending: boolean;
   isFetching: boolean;
   refetch: () => Promise<unknown>;
@@ -17,7 +18,7 @@ interface SettingsReadQuery<T> {
 
 export function toSettingsReadState<T>(query: SettingsReadQuery<T>): SettingsReadState<T> {
   const hasData = query.data !== undefined;
-  const isInitialLoading = query.isPending && query.isFetching && !hasData;
+  const isInitialLoading = !query.isFetched && query.isPending && query.isFetching && !hasData;
   return {
     data: query.data,
     hasData,

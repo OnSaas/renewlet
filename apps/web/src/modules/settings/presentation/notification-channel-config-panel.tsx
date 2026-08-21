@@ -166,17 +166,16 @@ export function NotificationChannelConfigPanel({
   const testChannelLabel = t(NOTIFICATION_TEST_LABEL_KEYS[channel], { channel: channelLabel });
   const commandData = telegramBotCommands?.readState.data;
   const commandStatus = commandData?.status;
+  // 刷新失败由读取边界唯一标记“未更新”；Badge 继续显示缓存命令状态，避免 stale 提示覆盖领域事实。
   const commandStatusLabel = !telegramBotCommands
     ? t("settings.statusUnknown")
     : telegramBotCommands.readState.isInitialLoading
       ? t("common.loading")
       : !telegramBotCommands.readState.hasData && telegramBotCommands.readState.error
         ? t("settings.statusUnknown")
-        : telegramBotCommands.readState.error
-          ? t("settings.notUpdated")
-          : commandStatus
-            ? t(TELEGRAM_BOT_COMMAND_STATUS_LABEL_KEYS[commandStatus])
-            : t("settings.statusUnknown");
+        : commandStatus
+          ? t(TELEGRAM_BOT_COMMAND_STATUS_LABEL_KEYS[commandStatus])
+          : t("settings.statusUnknown");
   const commandBindingPresent = commandStatus === "installed" || commandStatus === "installing";
   const commandInstalling = Boolean(telegramBotCommands?.isInstalling) || commandStatus === "installing";
   const commandInstallDisabled = Boolean(telegramBotCommands?.installDisabledReason) || !telegramBotCommands || !telegramBotCommands.readState.hasData || telegramBotCommands.isDeleting || commandInstalling;

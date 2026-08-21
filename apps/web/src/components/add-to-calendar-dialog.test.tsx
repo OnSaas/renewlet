@@ -1,5 +1,6 @@
 // 添加到日历弹窗测试锁住一次性 ICS 下载不再依赖浏览器端序列化。
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertDateOnly } from "@/lib/time/date-only";
@@ -296,6 +297,7 @@ describe("AddToCalendarDialog", () => {
   });
 
   it("generates a feed without opening the system calendar and keeps one-time actions independent", async () => {
+    const user = userEvent.setup();
     const open = vi.fn();
     const createFeed = createDeferred<typeof createdCalendarFeed>();
     Object.defineProperty(window, "open", { configurable: true, value: open });
@@ -317,9 +319,9 @@ describe("AddToCalendarDialog", () => {
     expect(screen.getByRole("link", { name: "用 Office 365 打开" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "用 Yahoo Calendar 打开" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "生成订阅链接" }));
+    await user.click(screen.getByRole("button", { name: "生成订阅链接" }));
 
-    expect(screen.getByRole("button", { name: "正在生成订阅链接..." })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "正在生成订阅链接..." })).toBeDisabled();
     expect(mocks.createCalendarFeed).toHaveBeenCalledWith({ scope: "subscription", subscriptionId: "sub-1" });
 
     createFeed.resolve(createdCalendarFeed);
@@ -399,6 +401,7 @@ describe("AddToCalendarDialog", () => {
   });
 
   it("keeps regeneration pending in the confirmation dialog and prevents duplicate submission", async () => {
+    const user = userEvent.setup();
     const rotateFeed = createDeferred<typeof createdCalendarFeed>();
     const regeneratedFeed = {
       ...createdCalendarFeed,
@@ -412,11 +415,11 @@ describe("AddToCalendarDialog", () => {
 
     renderDialog();
     const trigger = await screen.findByRole("button", { name: "重新生成订阅链接" });
-    fireEvent.click(trigger);
+    await user.click(trigger);
     const confirmDialog = screen.getByRole("alertdialog", { name: "重新生成这个订阅链接？" });
-    fireEvent.click(within(confirmDialog).getByRole("button", { name: "重新生成订阅链接" }));
+    await user.click(within(confirmDialog).getByRole("button", { name: "重新生成订阅链接" }));
 
-    const pendingAction = within(confirmDialog).getByRole("button", { name: "正在重新生成..." });
+    const pendingAction = await within(confirmDialog).findByRole("button", { name: "正在重新生成..." });
     expect(pendingAction).toBeDisabled();
     expect(within(confirmDialog).getByRole("button", { name: "取消" })).toBeDisabled();
     fireEvent.click(pendingAction);

@@ -28,6 +28,7 @@ import type { SettingsFormController } from "../application/settings-form-contro
 import type { SettingsCalendarFeedController } from "../application/use-calendar-feed-settings-controller";
 import type { CloudBackupController } from "../application/use-cloud-backup-controller";
 import type { SettingsReadState } from "../application/settings-read-state";
+import { MFA_STATUS_QUERY_KEY, PASSKEYS_QUERY_KEY } from "./account-security-query-keys";
 
 const mocks = vi.hoisted(() => ({
   useSettingsFormController: vi.fn(),
@@ -216,6 +217,11 @@ export function setSectionAnchorGeometry(
 vi.mock("@/components/header", () => ({
   Header: () => <header data-testid="header" />,
 }));
+
+vi.mock("@/contexts/CustomConfigContext", async () => {
+  const { DEFAULT_CUSTOM_CONFIG: defaultConfig } = await import("@/types/config");
+  return { useCustomConfigState: () => ({ config: defaultConfig }) };
+});
 
 vi.mock("./settings-advanced-sections-loader", async () => {
   const module = await import("./settings-advanced-sections");
@@ -760,6 +766,10 @@ export function renderSettingsScreen(initialEntries = ["/settings"]) {
       mutations: { retry: false },
     },
   });
+  queryClient.setQueryData(MFA_STATUS_QUERY_KEY, {
+    enabled: false, methods: [], recoveryCodesRemaining: 0, passkeyCount: 0,
+  });
+  queryClient.setQueryData(PASSKEYS_QUERY_KEY, []);
   return render(
     <div id="root">
       <QueryClientProvider client={queryClient}>

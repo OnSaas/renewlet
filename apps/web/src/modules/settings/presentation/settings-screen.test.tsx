@@ -1,5 +1,5 @@
 // SettingsScreen 测试保护设置页分区装配、H5 布局契约和 Cloudflare/Docker 差异入口，不验证普通控件细节样式。
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertDateOnly } from "@/lib/time/date-only";
@@ -171,7 +171,7 @@ describe("SettingsScreen SMTP email settings", () => {
     expect(accessSecuritySection).not.toBeNull();
     expect(within(accountSection as HTMLElement).queryByRole("heading", { name: "Cloudflare Turnstile" })).not.toBeInTheDocument();
     expect(within(accessSecuritySection as HTMLElement).getByRole("heading", { name: "访问安全" })).toBeInTheDocument();
-    expect(within(accessSecuritySection as HTMLElement).getByRole("heading", { name: "Cloudflare Turnstile" })).toBeInTheDocument();
+    expect(within(accessSecuritySection as HTMLElement).getByLabelText("要求邮箱密码登录通过人机验证")).toBeInTheDocument();
   });
 
   it("keeps user management visible for Cloudflare admins while hiding PocketBase admin", () => {
@@ -454,6 +454,7 @@ describe("SettingsScreen SMTP email settings", () => {
     expect(within(regenerateDialog).getByText("旧 URL 会立即失效，已经分享出去的公开页需要使用新链接访问。")).toBeInTheDocument();
     await user.click(within(regenerateDialog).getByRole("button", { name: "重新生成" }));
     expect(controller.publicStatusPage.regenerate).toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole("alertdialog", { name: "重新生成公开展示 URL？" })).not.toBeInTheDocument());
 
     await user.click(screen.getByRole("button", { name: "撤销公开页" }));
     const revokeDialog = await screen.findByRole("alertdialog", { name: "撤销公开展示 URL？" });
