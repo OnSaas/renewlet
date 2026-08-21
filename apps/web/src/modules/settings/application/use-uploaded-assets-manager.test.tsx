@@ -177,12 +177,14 @@ describe("useUploadedAssetsManager", () => {
       resolveRetry(page([logoAsset]));
       await retry;
     });
-    expect(result.current.logo.readState).toMatchObject({
-      data: [logoAsset],
-      hasData: true,
-      error: null,
-      isInitialLoading: false,
-      isRefreshing: false,
+    await waitFor(() => {
+      expect(result.current.logo.readState).toMatchObject({
+        data: [logoAsset],
+        hasData: true,
+        error: null,
+        isInitialLoading: false,
+        isRefreshing: false,
+      });
     });
   });
 

@@ -16,8 +16,9 @@ func TestCalendarFeedManagementListAndOwnerIsolation(t *testing.T) {
 	if err := ensureSchema(app); err != nil {
 		t.Fatal(err)
 	}
+	registerRecordHooks(app)
 	user, token := createRouteTestUser(t, app, "user")
-	otherUser, otherToken := createRouteTestUser(t, app, "user")
+	otherUser, otherToken := createRouteTestUser(t, app, "admin")
 	first := createCalendarFeedTestSubscription(t, app, user.Id, calendarFeedTestSubscription{
 		Name: "Fastmail", BillingCycle: "monthly", Status: "active", NextBillingDate: "2099-06-01",
 	})
@@ -118,6 +119,7 @@ func TestCalendarFeedAtomicRotateAndRevokeLifecycle(t *testing.T) {
 	if err := ensureSchema(app); err != nil {
 		t.Fatal(err)
 	}
+	registerRecordHooks(app)
 	user, token := createRouteTestUser(t, app, "user")
 	subscription := createCalendarFeedTestSubscription(t, app, user.Id, calendarFeedTestSubscription{
 		Name: "Fastmail", BillingCycle: "monthly", Status: "active", NextBillingDate: "2099-06-01",
@@ -172,6 +174,7 @@ func TestSubscriptionDeleteRemovesCalendarFeedAndOrphanRepair(t *testing.T) {
 	if err := ensureSchema(app); err != nil {
 		t.Fatal(err)
 	}
+	registerRecordHooks(app)
 	user, token := createRouteTestUser(t, app, "user")
 	subscription := createCalendarFeedTestSubscription(t, app, user.Id, calendarFeedTestSubscription{
 		Name: "Delete with feed", BillingCycle: "monthly", Status: "active", NextBillingDate: "2099-06-01",

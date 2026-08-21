@@ -127,7 +127,7 @@ export function CloudBackupSnapshotList({
           refreshDisabled={refreshDisabled}
           isRefreshing={state.isRefreshing}
           snapshots={snapshots}
-          snapshotsErrorMessage={null}
+          snapshotsErrorMessage={snapshotsErrorMessage}
           busy={busy}
           disabled={disabled}
           restoringSnapshotKey={restoringSnapshotKey}
@@ -236,9 +236,11 @@ function CloudBackupSnapshotListOverlay({
 }: CloudBackupSnapshotListOverlayProps) {
   const content = (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6" data-testid="cloud-backup-snapshot-full-list-scroll">
-      {snapshotsErrorMessage ? (
-        <SnapshotErrorMessage message={snapshotsErrorMessage} onOpenErrorDetails={onOpenErrorDetails} />
-      ) : (
+      <div className="grid gap-3">
+        {/* Dialog 会把页面背景设为 inert；刷新失败入口必须与缓存行一起留在弹窗内，不能用错误替换旧数据。 */}
+        {snapshotsErrorMessage ? (
+          <SnapshotErrorMessage message={snapshotsErrorMessage} onOpenErrorDetails={onOpenErrorDetails} />
+        ) : null}
         <SnapshotRows
           snapshots={snapshots}
           busy={disabled || busy}
@@ -249,7 +251,7 @@ function CloudBackupSnapshotListOverlay({
           onRestore={onRestore}
           onDelete={onDelete}
         />
-      )}
+      </div>
     </div>
   );
   // 弹窗内刷新复用当前 provider-scoped query，避免完整列表和设置页摘要各自维护一份远端状态。
@@ -348,7 +350,7 @@ function SnapshotErrorMessage({ message, onOpenErrorDetails }: { message: string
   const { t } = useI18n();
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border bg-background p-3 text-sm text-foreground sm:flex-row sm:items-center sm:justify-between">
+    <div role="alert" className="flex flex-col gap-3 rounded-md border border-border bg-background p-3 text-sm text-foreground sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 gap-2">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
         <span className="min-w-0 wrap-break-word">{message}</span>

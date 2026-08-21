@@ -207,10 +207,10 @@ describe("AccountSettingsSection account security dialogs", () => {
 
     renderAccountSettings();
 
-    const title = await screen.findByRole("heading", { name: "身份验证器" });
+    const title = screen.getByRole("heading", { name: "身份验证器" });
     const section = title.closest("div.rounded-md") as HTMLElement;
+    expect(await within(section).findByText("加载失败")).toBeInTheDocument();
     expect(within(section).getByText("状态未知")).toBeInTheDocument();
-    expect(within(section).getByText("加载失败")).toBeInTheDocument();
     expect(within(section).queryByText("未启用")).not.toBeInTheDocument();
 
     await user.click(within(section).getByRole("button", { name: "重试" }));
@@ -267,12 +267,13 @@ describe("AccountSettingsSection account security dialogs", () => {
     await user.click(screen.getByRole("button", { name: "更换身份验证器" }));
 
     const dialog = await screen.findByRole("dialog", { name: "设置身份验证器" });
+    const cancelButton = await within(dialog).findByRole("button", { name: "取消" });
     await user.keyboard("{Escape}");
     expect(screen.getByRole("dialog", { name: "设置身份验证器" })).toBeInTheDocument();
     await user.click(getTopDialogOverlay());
     expect(screen.getByRole("dialog", { name: "设置身份验证器" })).toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "取消" }));
+    await user.click(cancelButton);
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "设置身份验证器" })).not.toBeInTheDocument();
     });
@@ -450,11 +451,10 @@ describe("AccountSettingsSection account security dialogs", () => {
     await waitForAccountSecurityReady();
 
     expect(screen.getByRole("heading", { name: "身份验证器" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "通行密钥" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "通行密钥 · 1 个" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Cloudflare Turnstile" })).not.toBeInTheDocument();
     expect(screen.getAllByText("身份验证器").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("恢复码")).toBeInTheDocument();
-    expect(screen.getByText("通行密钥 · 1 个")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "更换身份验证器" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "管理通行密钥" })).toBeEnabled();
   });

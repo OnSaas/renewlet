@@ -166,7 +166,7 @@ describe("AccessSecuritySection", () => {
     }));
 
     expect(screen.getByRole("heading", { name: "访问安全" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Cloudflare Turnstile" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading")).toHaveLength(1);
     expect(screen.getByText("已启用")).toBeInTheDocument();
     expect(screen.getByText("密钥已配置")).toBeInTheDocument();
     expect(screen.getByText("启用后，Renewlet 会在邮箱密码登录前校验 Turnstile，用于降低爆破和撞库风险；通行密钥、身份验证器二阶段和首次设置不受影响。")).toBeInTheDocument();

@@ -371,7 +371,9 @@ describe("NotificationHistoryPanel", () => {
     await user.click(screen.getByRole("button", { name: "查看调度与历史" }));
 
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveClass("h5-dialog-frame", "flex", "min-h-0", "overflow-hidden");
+    expect(dialog).toHaveClass("flex", "min-h-0", "max-w-3xl", "overflow-hidden");
+    expect(dialog.querySelector("[data-settings-manager-header]")).toHaveClass("shrink-0");
+    expect(dialog.querySelector("[data-settings-manager-footer]")).toHaveClass("shrink-0");
     expect(screen.getByTestId("notification-history-scroll")).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
   });
 

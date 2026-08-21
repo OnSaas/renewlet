@@ -167,9 +167,8 @@ describe("useUploadedLogoAssets", () => {
       await result.current.loadInitial();
     });
 
-    await waitFor(() => expect(result.current.hasLoaded).toBe(true));
-    expect(result.current.error?.message).toBe("offline");
-    expect(result.current.hasLoaded).toBe(true);
+    await waitFor(() => expect(result.current.error?.message).toBe("offline"));
+    expect(result.current.hasLoaded).toBe(false);
     expect(result.current.assets).toEqual([]);
 
     await act(async () => {

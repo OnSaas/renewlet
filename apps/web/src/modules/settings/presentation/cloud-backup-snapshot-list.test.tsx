@@ -347,8 +347,9 @@ describe("CloudBackupSnapshotList", () => {
 
     const dialog = screen.getByRole("dialog", { name: "云端快照" });
     expect(screen.getByText("未更新")).toBeInTheDocument();
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("云端快照列表加载失败");
     expect(within(dialog).getByText("renewlet-3.zip")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "查看错误详情" }));
+    await user.click(within(dialog).getByRole("button", { name: "查看错误详情" }));
     expect(openErrorDetails).toHaveBeenCalledTimes(1);
   });
 

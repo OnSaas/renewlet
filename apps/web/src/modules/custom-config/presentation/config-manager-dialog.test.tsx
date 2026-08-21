@@ -135,9 +135,12 @@ describe("ConfigManagerDialog", () => {
     expect(screen.getByRole("dialog", { name: "分类管理" })).toBeInTheDocument();
 
     fireEvent.focusIn(document.body);
-    expect(screen.getByRole("dialog", { name: "分类管理" })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "分类管理" });
+    const closeButton = dialog.querySelector<HTMLButtonElement>("[data-dialog-close]");
+    expect(closeButton).toHaveAccessibleName("关闭");
+    if (!closeButton) throw new Error("Expected the dialog close button");
 
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(closeButton);
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "分类管理" })).not.toBeInTheDocument();
     });
@@ -248,14 +251,14 @@ describe("ConfigManagerDialog", () => {
     await user.click(screen.getByRole("button", { name: /货币管理/ }));
     const dialog = screen.getByRole("dialog", { name: "货币管理" });
     const header = dialog.querySelector("[data-settings-manager-header]");
-    const searchRow = within(dialog).getByPlaceholderText("搜索货币、代码或符号...").closest("div");
+    const controls = dialog.querySelector("[data-config-manager-controls]");
     const scrollRegion = dialog.querySelector("[data-config-manager-scroll]");
     const list = dialog.querySelector("[data-config-manager-list]");
     const footer = dialog.querySelector("[data-settings-manager-footer]");
 
     expect(dialog).toHaveClass("max-w-3xl", "overflow-hidden", "p-0");
     expect(header).toHaveClass("shrink-0");
-    expect(searchRow).toHaveClass("shrink-0");
+    expect(controls).toHaveClass("shrink-0");
     expect(scrollRegion).toHaveClass("min-h-0", "overflow-y-auto");
     expect(scrollRegion).not.toHaveClass("grid");
     expect(scrollRegion).not.toHaveClass("flex");

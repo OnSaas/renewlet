@@ -148,6 +148,8 @@ export function PublicStatusPageSection({
 }: PublicStatusPageSectionProps) {
   const { t } = useI18n();
   const [confirmation, setConfirmation] = useState<"regenerate" | "revoke" | null>(null);
+  const confirmationTriggerRef = useRef<HTMLButtonElement>(null);
+  const generateButtonRef = useRef<HTMLButtonElement>(null);
   const page = status.data;
   const enabled = page?.enabled === true;
   const pageUrl = page?.pageUrl ?? null;
@@ -175,7 +177,6 @@ export function PublicStatusPageSection({
           visible: visibility.data?.visibleCount ?? 0,
           hidden: visibility.data?.hiddenCount ?? 0,
         });
-
   return (
     <section id={id} className={getSettingsSectionClassName(className)}>
       <SettingsSectionHeader
@@ -252,7 +253,10 @@ export function PublicStatusPageSection({
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setConfirmation("regenerate")}
+                onClick={(event) => {
+                  confirmationTriggerRef.current = event.currentTarget;
+                  setConfirmation("regenerate");
+                }}
                 disabled={busy}
                 aria-busy={isCreating ? true : undefined}
                 className="justify-center gap-2 border-border"
@@ -262,7 +266,18 @@ export function PublicStatusPageSection({
                   {t("settings.publicStatusRegenerate")}
                 </LoadingButtonContent>
               </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmation("revoke")} disabled={busy} aria-busy={isDeleting ? true : undefined} className="justify-center gap-2 text-destructive hover:text-destructive">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={(event) => {
+                  confirmationTriggerRef.current = event.currentTarget;
+                  setConfirmation("revoke");
+                }}
+                disabled={busy}
+                aria-busy={isDeleting ? true : undefined}
+                className="justify-center gap-2 text-destructive hover:text-destructive"
+              >
                 <LoadingButtonContent loading={isDeleting} loadingLabel={t("common.saving")}>
                   <Trash2 className="h-4 w-4" />
                   {t("settings.publicStatusRevoke")}
@@ -274,7 +289,7 @@ export function PublicStatusPageSection({
       ) : (
         <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="min-w-0 text-sm leading-6 text-muted-foreground">{t("settings.publicStatusDisabledHelp")}</p>
-          <Button type="button" size="sm" variant="default" onClick={onCreate} disabled={busy} aria-busy={isCreating ? true : undefined} className="justify-center gap-2 sm:shrink-0">
+          <Button ref={generateButtonRef} type="button" size="sm" variant="default" onClick={onCreate} disabled={busy} aria-busy={isCreating ? true : undefined} className="justify-center gap-2 sm:shrink-0">
             <LoadingButtonContent loading={isCreating} loadingLabel={t("common.saving")}>
               <RefreshCw className="h-4 w-4" />
               {t("settings.publicStatusGenerate")}
@@ -290,7 +305,15 @@ export function PublicStatusPageSection({
           if (!open && !busy) setConfirmation(null);
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            // 受控确认框有两个自定义触发器；关闭后回到实际触发按钮，撤销导致其卸载时回退到新生成操作。
+            const trigger = confirmationTriggerRef.current;
+            (trigger?.isConnected ? trigger : generateButtonRef.current)?.focus();
+            confirmationTriggerRef.current = null;
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirmation === "revoke"

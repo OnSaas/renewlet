@@ -233,7 +233,7 @@ describe("SubscriptionCalendar dialogs", () => {
     fireEvent.click(screen.getByRole("button", { name: "添加到日历" }));
 
     expect(screen.getByRole("dialog", { name: "添加到日历" })).toBeInTheDocument();
-    expect(screen.getByText("为「Fastmail」创建单独日历订阅，只同步这一条续费。")).toBeInTheDocument();
+    expect(screen.getByText("为「Fastmail」选择持续同步，或单次添加到日历。")).toBeInTheDocument();
     const generateButton = screen.getByRole("button", { name: "生成订阅链接" });
     expect(generateButton).toHaveClass("bg-primary");
     expect(screen.queryByRole("link", { name: "打开系统日历" })).not.toBeInTheDocument();

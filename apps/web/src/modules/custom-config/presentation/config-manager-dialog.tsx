@@ -207,7 +207,7 @@ export const ConfigManagerDialog = ({
           </Button>
         )}
       >
-        <div className="grid shrink-0 gap-3">
+        <div data-config-manager-controls="" className="grid shrink-0 gap-3">
           <p className="min-w-0 wrap-break-word text-xs text-muted-foreground">
             {toggleMode
               ? t("customConfig.dragSortEnabled", { enabled: enabledCount, total: items.length })

@@ -1,5 +1,6 @@
 // SettingsScreen 测试保护设置页分区装配、H5 布局契约和 Cloudflare/Docker 差异入口，不验证普通控件细节样式。
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
+import { render, screen, waitFor, waitForElementToBeRemoved, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertDateOnly } from "@/lib/time/date-only";
@@ -18,6 +19,18 @@ import {
   StatefulEmailNotificationPanel,
   useStatefulMonthlyBudgetController,
 } from "./settings-screen.test-utils";
+
+function useStatefulPublicStatusController() {
+  const [pageUrl, setPageUrl] = useState<string | null>("https://example.com/status/secret");
+  const controller = createControllerState({
+    publicStatusPage: { enabled: pageUrl !== null, pageUrl, showPrices: true, visibleCount: 3, hiddenCount: 1 },
+  });
+  controller.publicStatusPage.revoke = vi.fn(async () => {
+    setPageUrl(null);
+    return true;
+  });
+  return controller;
+}
 
 describe("SettingsScreen SMTP email settings", () => {
   beforeEach(() => {
@@ -449,16 +462,22 @@ describe("SettingsScreen SMTP email settings", () => {
 
     expect(controller.updateSetting).toHaveBeenLastCalledWith("publicStatusCurrency", "CNY");
 
-    await user.click(screen.getByRole("button", { name: "重新生成" }));
+    const regenerateTrigger = screen.getByRole("button", { name: "重新生成" });
+    await user.click(regenerateTrigger);
     const regenerateDialog = await screen.findByRole("alertdialog", { name: "重新生成公开展示 URL？" });
     expect(within(regenerateDialog).getByText("旧 URL 会立即失效，已经分享出去的公开页需要使用新链接访问。")).toBeInTheDocument();
+    const regenerateDialogClosed = waitForElementToBeRemoved(regenerateDialog);
     await user.click(within(regenerateDialog).getByRole("button", { name: "重新生成" }));
     expect(controller.publicStatusPage.regenerate).toHaveBeenCalled();
-    await waitFor(() => expect(screen.queryByRole("alertdialog", { name: "重新生成公开展示 URL？" })).not.toBeInTheDocument());
+    await regenerateDialogClosed;
+    await waitFor(() => {
+      expect(regenerateTrigger).toHaveFocus();
+      expect(document.body).not.toHaveAttribute("data-scroll-locked");
+    });
 
     await user.click(screen.getByRole("button", { name: "撤销公开页" }));
-    const revokeDialog = await screen.findByRole("alertdialog", { name: "撤销公开展示 URL？" });
-    expect(within(revokeDialog).getByText("撤销后当前 URL 会立即失效，已分享的公开页将无法继续访问。")).toBeInTheDocument();
+    const revokeDialog = await screen.findByRole("alertdialog", { name: "撤销公开展示？" });
+    expect(within(revokeDialog).getByText("公开链接会立即失效，后续访问将返回 404。")).toBeInTheDocument();
     await user.click(within(revokeDialog).getByRole("button", { name: "撤销公开页" }));
     expect(controller.publicStatusPage.revoke).toHaveBeenCalled();
   });
@@ -481,6 +500,21 @@ describe("SettingsScreen SMTP email settings", () => {
     const currencySelect = screen.getByRole("combobox", { name: "公开页统计货币" });
     expect(currencySelect).toHaveTextContent("¥ 人民币 (CNY)");
     expect(currencySelect).not.toHaveTextContent("¥ 人民币 (¥)");
+  });
+
+  it("returns focus to public status generation after revocation removes its trigger", async () => {
+    const user = userEvent.setup();
+    mocks.useSettingsFormController.mockImplementation(useStatefulPublicStatusController);
+    renderSettingsScreen();
+
+    await user.click(screen.getByRole("button", { name: "撤销公开页" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "撤销公开展示？" });
+    await user.click(within(dialog).getByRole("button", { name: "撤销公开页" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog", { name: "撤销公开展示？" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "生成公开链接" })).toHaveFocus();
+    });
   });
 
   it("keeps the public status setup compact before URL generation", async () => {

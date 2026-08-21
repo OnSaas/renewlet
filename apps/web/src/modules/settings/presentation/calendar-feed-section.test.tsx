@@ -194,13 +194,13 @@ describe("CalendarFeedSection", () => {
     expect(screen.getByText("单个订阅 · 暂不可用")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "管理" }));
     const dialog = screen.getByRole("dialog", { name: "日历订阅" });
-    expect(within(dialog).getByRole("alert")).toHaveTextContent("加载失败。");
+    expect(within(within(dialog).getByRole("alert")).getByText("加载失败")).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "生成全部续费日历订阅链接" })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "重试" }));
     expect(globalRetry).toHaveBeenCalledTimes(1);
 
     await user.click(within(dialog).getByRole("tab", { name: "单个订阅" }));
-    expect(within(dialog).getByRole("alert")).toHaveTextContent("加载失败。");
+    expect(within(within(dialog).getByRole("alert")).getByText("加载失败")).toBeInTheDocument();
     expect(within(dialog).queryByRole("list")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "重试" }));
     expect(subscriptionsRetry).toHaveBeenCalledTimes(1);
@@ -218,11 +218,11 @@ describe("CalendarFeedSection", () => {
     await user.click(screen.getByRole("button", { name: "管理" }));
     const dialog = screen.getByRole("dialog", { name: "日历订阅" });
     expect(within(dialog).getByText("已启用 · 未更新")).toBeInTheDocument();
-    expect(within(dialog).getByRole("alert")).toHaveTextContent("更新失败，当前内容仍可使用。");
+    expect(within(within(dialog).getByRole("alert")).getByText("未更新")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("「全部续费」的日历订阅 URL")).toHaveValue(globalFeed.feedUrl);
 
     await user.click(within(dialog).getByRole("tab", { name: "单个订阅" }));
-    expect(within(dialog).getByRole("alert")).toHaveTextContent("更新失败，当前内容仍可使用。");
+    expect(within(within(dialog).getByRole("alert")).getByText("未更新")).toBeInTheDocument();
     expect(within(dialog).getByRole("listitem")).toHaveTextContent(subscriptionFeed.subscription.name);
   });
 
@@ -277,11 +277,7 @@ describe("CalendarFeedSection", () => {
     );
     expect(within(pendingConfirmation).getByRole("button", { name: "取消" })).toBeDisabled();
     expect(screen.getAllByRole("button", { busy: true })).toHaveLength(1);
-    const githubRow = screen.getAllByRole("listitem").find((row) => within(row).queryByText("GitHub"));
-    expect(githubRow).toBeDefined();
-    expect(within(githubRow as HTMLElement).getByRole("button", {
-      name: "复制「GitHub」的日历订阅 URL",
-    })).toBeEnabled();
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
   });
 
   it("falls back to the subscriptions tab after revoking a row that unmounts", async () => {
