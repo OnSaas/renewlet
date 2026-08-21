@@ -383,6 +383,7 @@ export function createCloudBackupControllerState(): CloudBackupController {
       updatedAt: null,
     }),
     snapshots: createSettingsReadState([]),
+    isInitialLayoutReady: true,
     form: {
       provider: "webdav" as const,
       webdavUrl: "",

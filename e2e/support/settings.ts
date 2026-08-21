@@ -1,4 +1,46 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page, type Route } from "@playwright/test";
+
+const ADVANCED_SETTINGS_MODULE_ROUTE = "**/settings-advanced-sections.tsx*";
+
+export async function expectSettingsSectionAtScrollAnchor(section: Locator) {
+  await expect.poll(() => section.evaluate((element) => {
+    const root = document.getElementById("root");
+    if (!root) return Number.POSITIVE_INFINITY;
+    const scrollMarginTop = Number.parseFloat(window.getComputedStyle(element).scrollMarginTop) || 0;
+    return Math.abs(element.getBoundingClientRect().top - root.getBoundingClientRect().top - scrollMarginTop);
+  }), { message: "settings section should settle at its scroll-margin anchor" }).toBeLessThanOrEqual(2);
+}
+
+export async function deferAdvancedSettingsModule(page: Page) {
+  let releaseRequest!: () => void;
+  let reportRequest!: () => void;
+  let released = false;
+  const requestReleased = new Promise<void>((resolve) => {
+    releaseRequest = resolve;
+  });
+  const requestObserved = new Promise<void>((resolve) => {
+    reportRequest = resolve;
+  });
+  const holdModuleRequest = async (route: Route) => {
+    reportRequest();
+    await requestReleased;
+    if (page.isClosed()) return;
+    await route.continue();
+  };
+  const release = () => {
+    if (released) return;
+    released = true;
+    releaseRequest();
+  };
+
+  await page.route(ADVANCED_SETTINGS_MODULE_ROUTE, holdModuleRequest);
+  page.once("close", release);
+
+  return {
+    waitForRequest: () => requestObserved,
+    release,
+  };
+}
 
 function extractRemoteTestPhone(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
@@ -20,13 +62,23 @@ function extractRemoteTestPhone(payload: unknown): string | null {
 
 type SettingsSectionId = "settings-calendar-feed" | "settings-data-config" | "settings-display" | "settings-notifications";
 
-export async function gotoSettingsSectionAfterHydration(page: Page, sectionId: SettingsSectionId) {
-  // 设置页会先渲染默认值再被远端设置覆盖；E2E 必须等 GET 返回后再断言表单，避免首帧默认值造成 flaky。
-  const settingsRead = page.waitForResponse((response) => (
+function waitForSettingsRead(page: Page) {
+  return page.waitForResponse((response) => (
     response.request().method() === "GET"
     && response.status() === 200
     && response.url().includes("/api/app/settings")
   ));
+}
+
+export async function gotoSettingsAfterHydration(page: Page) {
+  const settingsRead = waitForSettingsRead(page);
+  await page.goto("/settings");
+  await settingsRead;
+}
+
+export async function gotoSettingsSectionAfterHydration(page: Page, sectionId: SettingsSectionId) {
+  // 设置页会先渲染默认值再被远端设置覆盖；E2E 必须等 GET 返回后再断言表单，避免首帧默认值造成 flaky。
+  const settingsRead = waitForSettingsRead(page);
 
   await page.goto(`/settings#${sectionId}`);
   const settingsResponse = await settingsRead;

@@ -51,9 +51,17 @@ export function createSettingsSections({
     : SETTINGS_SECTIONS.filter((section) => section.id !== "settings-access-security");
 }
 
+/**
+ * 延迟区块的目录导航必须跨过两个独立生命周期：waitingForContent 已锁定 hash/active，
+ * 但 fallback 几何不可用于定位；scrolling 才允许消费真实区块位置和 scrollend。
+ */
 type ProgrammaticNavigation = {
   targetId: SettingsSectionId;
   idleTimer: number | null;
+  phase: "waitingForContent" | "scrolling";
+};
+type SettingsSectionNavigationOptions = {
+  deferredSectionIds?: readonly SettingsSectionId[] | undefined;
 };
 type SettingsSectionNavigationProps = {
   sections: SettingsSectionList;
@@ -178,11 +186,20 @@ function isAnchorStillWithinSection(root: HTMLElement, id: SettingsSectionId, se
   return nextSection.getBoundingClientRect().top > getAnchorLinePx(root, sections);
 }
 
-export function useSettingsSectionNavigation(sections: SettingsSectionList = SETTINGS_SECTIONS) {
+export function useSettingsSectionNavigation(
+  sections: SettingsSectionList = SETTINGS_SECTIONS,
+  options: SettingsSectionNavigationOptions = {},
+) {
   const firstSectionId = sections[0]?.id ?? SETTINGS_SECTIONS[0].id;
   const [activeSectionId, setActiveSectionId] = useState<SettingsSectionId>(firstSectionId);
   const programmaticNavigationRef = useRef<ProgrammaticNavigation | null>(null);
+  const deferredSectionsReadyRef = useRef(options.deferredSectionIds?.length ? false : true);
+  const deferredScrollFrameRef = useRef<number | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
+
+  const isDeferredSection = useCallback((id: SettingsSectionId) => (
+    options.deferredSectionIds?.some((candidate) => candidate === id) ?? false
+  ), [options.deferredSectionIds]);
 
   const applyAnchorActiveSection = useCallback(() => {
     const root = getAppScrollRoot();
@@ -202,16 +219,39 @@ export function useSettingsSectionNavigation(sections: SettingsSectionList = SET
     if (navigation && navigation.idleTimer !== null) {
       window.clearTimeout(navigation.idleTimer);
     }
+    if (deferredScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(deferredScrollFrameRef.current);
+      deferredScrollFrameRef.current = null;
+    }
     programmaticNavigationRef.current = null;
     if (options.applyAnchorSection) applyAnchorActiveSection();
   }, [applyAnchorActiveSection]);
 
   const beginProgrammaticNavigation = useCallback((id: SettingsSectionId) => {
     endProgrammaticNavigation();
-    programmaticNavigationRef.current = { targetId: id, idleTimer: null };
+    const waitingForContent = isDeferredSection(id) && !deferredSectionsReadyRef.current;
+    programmaticNavigationRef.current = {
+      targetId: id,
+      idleTimer: null,
+      phase: waitingForContent ? "waitingForContent" : "scrolling",
+    };
     setActiveSectionId(id);
-    scrollToSettingsSection(id);
-  }, [endProgrammaticNavigation]);
+    if (!waitingForContent) scrollToSettingsSection(id);
+  }, [endProgrammaticNavigation, isDeferredSection]);
+
+  const markDeferredSectionsReady = useCallback(() => {
+    // layout effect 的 ready 早于浏览器派发布局替换事件；下一渲染帧再切到 scrolling，避免旧 scrollend 提前结束新导航。
+    deferredSectionsReadyRef.current = true;
+    const navigation = programmaticNavigationRef.current;
+    if (!navigation || navigation.phase !== "waitingForContent") return;
+    if (deferredScrollFrameRef.current !== null) return;
+    deferredScrollFrameRef.current = window.requestAnimationFrame(() => {
+      deferredScrollFrameRef.current = null;
+      if (programmaticNavigationRef.current !== navigation || navigation.phase !== "waitingForContent") return;
+      navigation.phase = "scrolling";
+      scrollToSettingsSection(navigation.targetId);
+    });
+  }, []);
 
   useEffect(() => {
     const syncActiveSectionFromHash = () => {
@@ -241,7 +281,7 @@ export function useSettingsSectionNavigation(sections: SettingsSectionList = SET
     };
     const handleScrollEnd = () => {
       const navigation = programmaticNavigationRef.current;
-      if (!navigation) return;
+      if (!navigation || navigation.phase === "waitingForContent") return;
       endProgrammaticNavigation({
         applyAnchorSection: !isAnchorStillWithinSection(root, navigation.targetId, sections),
       });
@@ -252,6 +292,8 @@ export function useSettingsSectionNavigation(sections: SettingsSectionList = SET
         scheduleAnchorActiveSection();
         return;
       }
+      // fallback 会被真实高级区块整体替换；等待 commit 时忽略布局滚动，但 wheel/touch/pointer/key 仍可取消用户意图。
+      if (navigation.phase === "waitingForContent") return;
       if (navigation.idleTimer !== null) window.clearTimeout(navigation.idleTimer);
       navigation.idleTimer = window.setTimeout(
         () => {
@@ -306,7 +348,7 @@ export function useSettingsSectionNavigation(sections: SettingsSectionList = SET
     beginProgrammaticNavigation(id);
   }, [beginProgrammaticNavigation]);
 
-  return { activeSectionId, handleSectionClick };
+  return { activeSectionId, handleSectionClick, markDeferredSectionsReady };
 }
 
 function SettingsSectionNavLink({

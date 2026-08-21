@@ -26,7 +26,7 @@ import {
   DeferredSettingsAdvancedSections,
   preloadSettingsAdvancedSections,
 } from "./settings-advanced-sections-loader";
-import { isAdvancedSettingsSection } from "./settings-section-groups";
+import { ADVANCED_SETTINGS_SECTION_IDS, isAdvancedSettingsSection } from "./settings-section-groups";
 import {
   DesktopSettingsSectionNav,
   MobileSettingsSectionDrawer,
@@ -84,7 +84,13 @@ export function SettingsScreen() {
     () => createSettingsSections({ canManageAccessSecurity: authSecurity.canManage }),
     [authSecurity.canManage],
   );
-  const { activeSectionId, handleSectionClick } = useSettingsSectionNavigation(settingsSections);
+  const {
+    activeSectionId,
+    handleSectionClick,
+    markDeferredSectionsReady,
+  } = useSettingsSectionNavigation(settingsSections, {
+    deferredSectionIds: ADVANCED_SETTINGS_SECTION_IDS,
+  });
   const unsavedChangesGuard = useUnsavedChangesGuard(hasUnsavedChanges, handleDiscardChanges);
   const handleLocaleChange = (value: string) => {
     const nextLocale = value as Locale;
@@ -195,7 +201,11 @@ export function SettingsScreen() {
                 </div>
               </section>
 
-              <DeferredSettingsAdvancedSections controller={controller} activeSectionId={activeSectionId} />
+              <DeferredSettingsAdvancedSections
+                controller={controller}
+                activeSectionId={activeSectionId}
+                onReady={markDeferredSectionsReady}
+              />
             </div>
           </div>
         </div>

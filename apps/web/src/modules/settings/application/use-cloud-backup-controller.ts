@@ -55,6 +55,7 @@ export interface CloudBackupFormState {
 export interface CloudBackupController {
   config: SettingsReadState<CloudBackupConfig>;
   snapshots: SettingsReadState<CloudBackupSnapshot[]>;
+  isInitialLayoutReady: boolean;
   form: CloudBackupFormState;
   credentialSet: boolean;
   canCreateSnapshot: boolean;
@@ -197,6 +198,10 @@ export function useCloudBackupController(onRestoreFile: (file: File) => void): C
       : [],
     hasData: !canQuerySnapshots || snapshotsQuery.data !== undefined,
   } satisfies SettingsReadState<CloudBackupSnapshot[]>;
+  // config success 早于草稿同步，快照查询又可能在 provider 就绪后才启动；三者都稳定后完整表单几何才可用于目录定位。
+  const isInitialLayoutReady = !configReadState.isInitialLoading
+    && (!configReadState.hasData || draftState.initializedFromConfig)
+    && !snapshotsReadState.isInitialLoading;
 
   const openCloudBackupErrorDetails = useCallback((error: unknown, fallbackMessage: string) => {
     const extracted = extractCloudBackupErrorDetails(error);
@@ -328,6 +333,7 @@ export function useCloudBackupController(onRestoreFile: (file: File) => void): C
   return {
     config: configReadState,
     snapshots: snapshotsReadState,
+    isInitialLayoutReady,
     form,
     credentialSet,
     canCreateSnapshot,

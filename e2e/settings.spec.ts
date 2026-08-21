@@ -6,11 +6,38 @@ import {
   expectStableLayout,
 } from "./support/layout";
 import {
+  deferAdvancedSettingsModule,
+  expectSettingsSectionAtScrollAnchor,
   fillChangedTestPhone,
   getSettingsDiscardButton,
   getSettingsSaveButton,
+  gotoSettingsAfterHydration,
   gotoSettingsSectionAfterHydration,
 } from "./support/settings";
+
+test("settings directory waits for deferred content before scrolling to calendar feed", async ({ page }) => {
+  const advancedModule = await deferAdvancedSettingsModule(page);
+  await gotoSettingsAfterHydration(page);
+  const desktopNav = page.getByTestId("settings-section-nav-desktop");
+  const calendarLink = desktopNav.getByRole("link", { name: "日历订阅" });
+  const calendarSection = page.locator("#settings-calendar-feed");
+
+  await calendarLink.click();
+  await advancedModule.waitForRequest();
+
+  await expect(page).toHaveURL(/#settings-calendar-feed$/);
+  await expect(calendarLink).toHaveAttribute("aria-current", "location");
+  await expect(calendarSection).toHaveAttribute("aria-busy", "true");
+  await expect(calendarSection).not.toBeInViewport();
+
+  advancedModule.release();
+
+  await expect(calendarSection).not.toHaveAttribute("aria-busy", "true");
+  await expect(calendarSection).toBeInViewport();
+  await expectSettingsSectionAtScrollAnchor(calendarSection);
+  await expect(page).toHaveURL(/#settings-calendar-feed$/);
+  await expect(calendarLink).toHaveAttribute("aria-current", "location");
+});
 
 test("settings save, language switch, and floating layer layout stability", async ({ page }) => {
   await gotoSettingsSectionAfterHydration(page, "settings-notifications");

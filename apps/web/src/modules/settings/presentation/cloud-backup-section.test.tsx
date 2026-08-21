@@ -202,6 +202,7 @@ function createController(overrides: Partial<CloudBackupController> = {}): Cloud
   return {
     config: readState(defaultConfigData()),
     snapshots: readState([]),
+    isInitialLayoutReady: true,
     form: defaultForm,
     credentialSet: true,
     canCreateSnapshot: true,
@@ -227,7 +228,6 @@ function createController(overrides: Partial<CloudBackupController> = {}): Cloud
     ...overrides,
   };
 }
-
 type TestDraftByProvider = Record<CloudBackupFormState["provider"], CloudBackupFormState>;
 
 function createTestDraft(provider: CloudBackupFormState["provider"], policy: CloudBackupPolicy = defaultPolicy): CloudBackupFormState {

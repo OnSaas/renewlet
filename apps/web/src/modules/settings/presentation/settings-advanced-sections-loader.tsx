@@ -45,9 +45,11 @@ function hashTargetsAdvancedSection(): boolean {
 export function DeferredSettingsAdvancedSections({
   controller,
   activeSectionId,
+  onReady,
 }: {
   controller: SettingsFormController;
   activeSectionId: SettingsSectionId;
+  onReady: () => void;
 }) {
   const [activated, setActivated] = useState(hashTargetsAdvancedSection);
 
@@ -62,7 +64,7 @@ export function DeferredSettingsAdvancedSections({
 
   return (
     <Suspense fallback={<SettingsAdvancedSectionsLoading />}>
-      <LazySettingsAdvancedSections controller={controller} />
+      <LazySettingsAdvancedSections controller={controller} onReady={onReady} />
     </Suspense>
   );
 }
