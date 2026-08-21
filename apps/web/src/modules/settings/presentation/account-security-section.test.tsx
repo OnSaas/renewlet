@@ -47,13 +47,17 @@ const translations: Record<string, string> = {
   "common.enabled": "已启用",
   "common.loading": "加载中",
   "common.saving": "保存中",
+  "settings.managerLoadFailed": "加载失败",
+  "settings.managerRefreshFailed": "未更新",
+  "settings.managerRetry": "重试",
+  "settings.notUpdated": "未更新",
+  "settings.statusUnknown": "状态未知",
   "passwordReset.confirmPassword": "确认新密码",
   "passwordReset.newPassword": "新密码",
   "settings.account": "账号",
   "settings.accountSecurityDemoDisabled": "演示模式仅供浏览，不能修改身份验证器或通行密钥。",
   "settings.addPasskey": "添加通行密钥",
   "settings.addPasskeyDescription": "输入当前密码后，浏览器会引导你使用设备或安全密钥创建通行密钥。",
-  "settings.addPasskeyTitle": "添加通行密钥",
   "settings.changePassword": "修改密码",
   "settings.confirmPasswordPlaceholder": "再输入一次",
   "settings.currentPassword": "当前密码",
@@ -89,15 +93,15 @@ const translations: Record<string, string> = {
   "settings.newPasswordPlaceholder": "至少 8 位",
   "settings.noPasskeys": "尚未添加通行密钥。",
   "settings.passkeyCount": "{count} 个",
-  "settings.passkeyCountLabel": "已添加",
+  "settings.passkeyCountStale": "{count} 个 · 未更新",
   "settings.passkeyCreatedAt": "添加于 {time}",
   "settings.passkeyHelp": "使用浏览器、设备生物识别或安全密钥直接登录；通行密钥和身份验证器分开管理。",
   "settings.passkeyName": "通行密钥名称",
   "settings.passkeyNamePlaceholder": "例如：MacBook Touch ID",
   "settings.passkeys": "通行密钥",
+  "settings.passkeysSummary": "通行密钥 · {summary}",
   "settings.passkeysManage": "管理通行密钥",
   "settings.passkeysManageDescription": "添加、查看和删除可用于登录的通行密钥。",
-  "settings.passkeysManageHint": "删除后，该通行密钥不能再用于登录；身份验证器设置不会改变。",
   "settings.passkeysManageTitle": "管理通行密钥",
   "settings.passwordDialogDescription": "更新账号密码。",
   "settings.passwordDialogTitle": "修改密码",
@@ -161,7 +165,7 @@ function renderAccountSettings(overrides: Partial<AccountSettingsSectionProps> =
 
 async function waitForAccountSecurityReady() {
   expect(await screen.findByText("剩余恢复码：10 个")).toBeInTheDocument();
-  expect(await screen.findByText("已添加：1 个")).toBeInTheDocument();
+  expect(await screen.findByText("通行密钥 · 1 个")).toBeInTheDocument();
 }
 
 function getTopDialogOverlay() {
@@ -195,6 +199,39 @@ describe("AccountSettingsSection account security dialogs", () => {
     mocks.passkeyService.delete.mockReset().mockResolvedValue(undefined);
     mocks.toast.success.mockReset();
     mocks.toast.error.mockReset();
+  });
+
+  it("does not report MFA as disabled when the first status read fails", async () => {
+    const user = userEvent.setup();
+    mocks.mfaService.status.mockRejectedValue(new Error("MFA unavailable"));
+
+    renderAccountSettings();
+
+    const title = await screen.findByRole("heading", { name: "身份验证器" });
+    const section = title.closest("div.rounded-md") as HTMLElement;
+    expect(within(section).getByText("状态未知")).toBeInTheDocument();
+    expect(within(section).getByText("加载失败")).toBeInTheDocument();
+    expect(within(section).queryByText("未启用")).not.toBeInTheDocument();
+
+    await user.click(within(section).getByRole("button", { name: "重试" }));
+    await waitFor(() => expect(mocks.mfaService.status).toHaveBeenCalledTimes(2));
+  });
+
+  it("does not report zero passkeys when the first list read fails", async () => {
+    const user = userEvent.setup();
+    mocks.passkeyService.list.mockRejectedValue(new Error("Passkeys unavailable"));
+
+    renderAccountSettings();
+
+    expect(await screen.findByRole("heading", { name: "通行密钥 · 状态未知" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "通行密钥 · 0 个" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "管理通行密钥" }));
+
+    const dialog = screen.getByRole("dialog", { name: "管理通行密钥" });
+    expect(within(dialog).getByText("加载失败")).toBeInTheDocument();
+    expect(within(dialog).queryByText("尚未添加通行密钥。")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "重试" }));
+    await waitFor(() => expect(mocks.passkeyService.list).toHaveBeenCalledTimes(2));
   });
 
   it("keeps the passkey list out of the settings page and opens the manager dialog", async () => {
@@ -397,7 +434,7 @@ describe("AccountSettingsSection account security dialogs", () => {
     ]);
     const user = userEvent.setup();
     renderAccountSettings();
-    expect(await screen.findByText("已添加：3 个")).toBeInTheDocument();
+    expect(await screen.findByText("通行密钥 · 3 个")).toBeInTheDocument();
 
     expect(screen.queryByText("iPhone Face ID")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "管理通行密钥" }));
@@ -417,7 +454,7 @@ describe("AccountSettingsSection account security dialogs", () => {
     expect(screen.queryByRole("heading", { name: "Cloudflare Turnstile" })).not.toBeInTheDocument();
     expect(screen.getAllByText("身份验证器").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("恢复码")).toBeInTheDocument();
-    expect(screen.getByText("已添加：1 个")).toBeInTheDocument();
+    expect(screen.getByText("通行密钥 · 1 个")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "更换身份验证器" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "管理通行密钥" })).toBeEnabled();
   });

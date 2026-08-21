@@ -17,7 +17,7 @@ import type { ReactNode } from 'react';
 import type { SubscriptionFormSubmission } from '@/types/subscription';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/lib/theme-provider';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { RenewletBrandMark } from '@/components/brand/renewlet-brand-mark';
 import { getHeaderDesktopNavLinkClass, getHeaderMobileNavLinkClass, headerLayout } from '@/components/header-layout';
 import { authClient } from '@/lib/auth-client';
@@ -67,7 +67,6 @@ function renderNavIcon(icon: NavIconKey, className: string) {
 export function Header({ onAddSubscription, availableTags, subscriptionActions }: HeaderProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { toast } = useToast();
   const { t } = useI18n();
   const { data: sessionData } = authClient.useSession();
   const [systemDialogOpen, setSystemDialogOpen] = useState(false);
@@ -86,17 +85,10 @@ export function Header({ onAddSubscription, availableTags, subscriptionActions }
   const handleLogout = async () => {
     try {
       await authClient.signOut();
-      toast({
-        title: t("header.logoutSuccessTitle"),
-        description: t("header.logoutSuccessDescription"),
-      });
+      toast.success(t("header.logoutSuccessTitle"));
       router.replace('/login');
     } catch {
-      toast({
-        title: t("header.logoutFailedTitle"),
-        description: t("error.generic"),
-        variant: "destructive",
-      });
+      toast.error(t("header.logoutFailedTitle"), { description: t("error.generic") });
     }
   };
 
@@ -128,7 +120,7 @@ export function Header({ onAddSubscription, availableTags, subscriptionActions }
                   canManageUpdates={sessionData?.user.role === "admin"}
                   contentAlign="start"
                   triggerClassName="w-fit"
-                  badgeClassName="h-6 max-w-[5.75rem] px-2 min-[380px]:max-w-32 sm:h-7 sm:max-w-none sm:px-2.5"
+                  badgeClassName="h-6 max-w-23 px-2 min-[380px]:max-w-32 sm:h-7 sm:max-w-none sm:px-2.5"
                 />
               ) : null}
             </div>

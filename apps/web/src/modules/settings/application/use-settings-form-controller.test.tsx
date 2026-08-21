@@ -288,10 +288,7 @@ describe("useSettingsFormController", () => {
     expect(mocks.refreshRates).toHaveBeenCalledWith("exchange-api");
     expect(result.current.settings.exchangeRateProvider).toBe("exchange-api");
     expect(result.current.hasUnsavedChanges).toBe(false);
-    expect(mocks.toast).toHaveBeenCalledWith({
-      title: "设置已保存",
-      description: "所有更改已同步。",
-    });
+    expect(mocks.toast.success).toHaveBeenCalledWith("设置已保存");
   });
 
   it("saves settings appearance changes and clears the dedicated pending draft", async () => {
@@ -358,10 +355,8 @@ describe("useSettingsFormController", () => {
     expect(mocks.refreshRates).not.toHaveBeenCalled();
     expect(result.current.settings.exchangeRateProvider).toBe("exchange-api");
     expect(result.current.hasUnsavedChanges).toBe(true);
-    expect(mocks.toast).toHaveBeenCalledWith({
-      title: "保存失败",
+    expect(mocks.toast.error).toHaveBeenCalledWith("保存失败", {
       description: "无法保存汇率来源。服务端可能还没更新或重启，请重启后端服务后再试。",
-      variant: "destructive",
     });
   });
 
@@ -437,10 +432,8 @@ describe("useSettingsFormController", () => {
       await result.current.handleSaveChanges();
     });
 
-    expect(mocks.toast).toHaveBeenCalledWith({
-      title: "保存失败",
+    expect(mocks.toast.error).toHaveBeenCalledWith("保存失败", {
       description: "请至少启用一个内置图标来源",
-      variant: "destructive",
     });
   });
 

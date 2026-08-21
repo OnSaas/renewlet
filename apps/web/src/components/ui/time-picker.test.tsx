@@ -260,12 +260,12 @@ describe("TimePicker", () => {
         density="compact"
         ariaLabel="执行时间"
         disabled
-        className="w-full sm:max-w-[9rem]"
+        className="w-full sm:max-w-36"
       />,
     );
 
     expect(screen.getByRole("button", { name: /执行时间/ })).toHaveTextContent("04:30");
-    expect(screen.getByRole("button", { name: /执行时间/ })).toHaveClass("h-9", "bg-background", "sm:max-w-[9rem]");
+    expect(screen.getByRole("button", { name: /执行时间/ })).toHaveClass("h-9", "bg-background", "sm:max-w-36");
     expect(screen.getByRole("button", { name: /执行时间/ })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: /执行时间/ }));
@@ -277,7 +277,7 @@ describe("TimePicker", () => {
         onChange={onChange}
         density="compact"
         ariaLabel="执行时间"
-        className="w-full sm:max-w-[9rem]"
+        className="w-full sm:max-w-36"
       />,
     );
 

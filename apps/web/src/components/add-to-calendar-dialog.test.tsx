@@ -1,37 +1,21 @@
 // 添加到日历弹窗测试锁住一次性 ICS 下载不再依赖浏览器端序列化。
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertDateOnly } from "@/lib/time/date-only";
 import type { Subscription } from "@/types/subscription";
 import { AddToCalendarDialog } from "./add-to-calendar-dialog";
 
-interface SubscriptionCalendarFeedStatusMock {
-  data: { enabled: boolean; feedUrl?: string | undefined } | undefined;
-  isError: boolean;
-  isFetching: boolean;
-  isPending: boolean;
-  refetch: ReturnType<typeof vi.fn>;
-}
-
-const mocks = vi.hoisted(() => {
-  const refetchSubscriptionCalendarFeedStatus = vi.fn();
-  return {
-    createSubscriptionCalendarFeed: vi.fn(),
-    deleteSubscriptionCalendarFeed: vi.fn(),
-    downloadFile: vi.fn(),
-    downloadSubscriptionIcs: vi.fn(),
-    refetchSubscriptionCalendarFeedStatus,
-    subscriptionCalendarFeedStatus: {
-      data: { enabled: false, feedUrl: undefined },
-      isError: false,
-      isFetching: false,
-      isPending: false,
-      refetch: refetchSubscriptionCalendarFeedStatus,
-    } as SubscriptionCalendarFeedStatusMock,
-    toastError: vi.fn(),
-    toastSuccess: vi.fn(),
-  };
-});
+const mocks = vi.hoisted(() => ({
+  createCalendarFeed: vi.fn(),
+  deleteCalendarFeed: vi.fn(),
+  downloadFile: vi.fn(),
+  downloadSubscriptionIcs: vi.fn(),
+  getCalendarFeed: vi.fn(),
+  rotateCalendarFeed: vi.fn(),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+}));
 const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 const originalExecCommandDescriptor = Object.getOwnPropertyDescriptor(document, "execCommand");
 const originalWindowOpen = window.open;
@@ -67,23 +51,20 @@ vi.mock("@/hooks/use-settings", () => ({
   }),
 }));
 
-vi.mock("@/hooks/use-calendar-feed", () => ({
-  useCreateSubscriptionCalendarFeed: () => ({
-    isPending: false,
-    mutateAsync: mocks.createSubscriptionCalendarFeed,
-  }),
-  useDeleteSubscriptionCalendarFeed: () => ({
-    isPending: false,
-    mutateAsync: mocks.deleteSubscriptionCalendarFeed,
-  }),
-  useSubscriptionCalendarFeedStatus: () => mocks.subscriptionCalendarFeedStatus,
-}));
-
-vi.mock("@/services/calendar-feed-service", () => ({
-  calendarFeedService: {
-    downloadSubscriptionIcs: mocks.downloadSubscriptionIcs,
-  },
-}));
+vi.mock("@/services/calendar-feed-service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/calendar-feed-service")>();
+  return {
+    ...actual,
+    calendarFeedService: {
+      create: mocks.createCalendarFeed,
+      delete: mocks.deleteCalendarFeed,
+      downloadSubscriptionIcs: mocks.downloadSubscriptionIcs,
+      get: mocks.getCalendarFeed,
+      list: vi.fn(),
+      rotate: mocks.rotateCalendarFeed,
+    },
+  };
+});
 
 vi.mock("@/shared/browser/download-file", () => ({
   downloadFile: mocks.downloadFile,
@@ -128,27 +109,35 @@ const subscription: Subscription = {
 };
 
 function renderDialog(value: Subscription = subscription) {
-  return render(
-    <AddToCalendarDialog
-      open
-      onOpenChange={vi.fn()}
-      subscription={value}
-      loadingPreview={value}
-    />,
-  );
+  return renderCalendarDialog({ subscription: value, loadingPreview: value });
 }
 
-function createFeedStatus(
-  overrides: Partial<SubscriptionCalendarFeedStatusMock> = {},
-): SubscriptionCalendarFeedStatusMock {
-  return {
-    data: { enabled: false, feedUrl: undefined },
-    isError: false,
-    isFetching: false,
-    isPending: false,
-    refetch: mocks.refetchSubscriptionCalendarFeedStatus,
-    ...overrides,
-  };
+function renderCalendarDialog({
+  subscription: value,
+  loadingPreview,
+  loading = false,
+}: {
+  subscription: Subscription | null;
+  loadingPreview: Subscription | null;
+  loading?: boolean;
+}) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      mutations: { retry: false },
+      queries: { retry: false },
+    },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <AddToCalendarDialog
+        open
+        onOpenChange={vi.fn()}
+        subscription={value}
+        loadingPreview={loadingPreview}
+        loading={loading}
+      />
+    </QueryClientProvider>,
+  );
 }
 
 function createDeferred<T>() {
@@ -187,16 +176,18 @@ function withoutRandomUUID(callback: () => void) {
 
 describe("AddToCalendarDialog", () => {
   beforeEach(() => {
-    mocks.createSubscriptionCalendarFeed.mockReset();
-    mocks.deleteSubscriptionCalendarFeed.mockReset();
+    mocks.createCalendarFeed.mockReset();
+    mocks.deleteCalendarFeed.mockReset();
     mocks.downloadFile.mockReset();
     mocks.downloadSubscriptionIcs.mockReset();
-    mocks.refetchSubscriptionCalendarFeedStatus.mockReset();
-    mocks.refetchSubscriptionCalendarFeedStatus.mockResolvedValue(undefined);
-    mocks.subscriptionCalendarFeedStatus = createFeedStatus();
+    mocks.getCalendarFeed.mockReset();
+    mocks.rotateCalendarFeed.mockReset();
     mocks.toastError.mockReset();
     mocks.toastSuccess.mockReset();
-    mocks.createSubscriptionCalendarFeed.mockResolvedValue(createdCalendarFeed);
+    mocks.createCalendarFeed.mockResolvedValue(createdCalendarFeed);
+    mocks.deleteCalendarFeed.mockResolvedValue(undefined);
+    mocks.getCalendarFeed.mockResolvedValue({ enabled: false });
+    mocks.rotateCalendarFeed.mockResolvedValue(createdCalendarFeed);
     mocks.downloadSubscriptionIcs.mockResolvedValue(new Blob(["BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n"], { type: "text/calendar;charset=utf-8" }));
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", {
       headers: { "content-type": "text/calendar; charset=utf-8" },
@@ -229,27 +220,32 @@ describe("AddToCalendarDialog", () => {
 
   it("keeps one dialog shell while detail data replaces the loading state", () => {
     const onOpenChange = vi.fn();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { rerender } = render(
-      <AddToCalendarDialog
-        open
-        onOpenChange={onOpenChange}
-        subscription={null}
-        loadingPreview={subscription}
-        loading
-      />,
+      <QueryClientProvider client={queryClient}>
+        <AddToCalendarDialog
+          open
+          onOpenChange={onOpenChange}
+          subscription={null}
+          loadingPreview={subscription}
+          loading
+        />
+      </QueryClientProvider>,
     );
     const loadingDialog = screen.getByRole("dialog", { name: "添加到日历" });
     const factsRegion = loadingDialog.querySelector('[data-dialog-region="calendar-facts"]');
     expect(screen.getByTestId("subscription-calendar-data-loading")).toBeInTheDocument();
 
     rerender(
-      <AddToCalendarDialog
-        open
-        onOpenChange={onOpenChange}
-        subscription={subscription}
-        loadingPreview={subscription}
-        loading={false}
-      />,
+      <QueryClientProvider client={queryClient}>
+        <AddToCalendarDialog
+          open
+          onOpenChange={onOpenChange}
+          subscription={subscription}
+          loadingPreview={subscription}
+          loading={false}
+        />
+      </QueryClientProvider>,
     );
 
     expect(screen.getByRole("dialog", { name: "添加到日历" })).toBe(loadingDialog);
@@ -259,13 +255,10 @@ describe("AddToCalendarDialog", () => {
     expect(screen.getByRole("button", { name: "下载 ICS 文件" })).toBeInTheDocument();
   });
 
-  it("keeps independent calendar actions available while the feed status is loading", () => {
-    mocks.subscriptionCalendarFeedStatus = createFeedStatus({
-      data: undefined,
-      isFetching: true,
-      isPending: true,
-    });
-    const { rerender } = renderDialog();
+  it("keeps independent calendar actions available while the feed status is loading", async () => {
+    const feedStatus = createDeferred<{ enabled: false }>();
+    mocks.getCalendarFeed.mockReturnValueOnce(feedStatus.promise);
+    renderDialog();
 
     expect(screen.getByTestId("subscription-calendar-feed-status-loading")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "生成订阅链接" })).not.toBeInTheDocument();
@@ -274,55 +267,46 @@ describe("AddToCalendarDialog", () => {
     expect(screen.getByRole("button", { name: "下载 ICS 文件" })).toBeEnabled();
     expect(screen.getByRole("link", { name: "用 Google Calendar 打开" })).toBeInTheDocument();
 
-    mocks.subscriptionCalendarFeedStatus = createFeedStatus();
-    rerender(
-      <AddToCalendarDialog
-        open
-        onOpenChange={vi.fn()}
-        subscription={subscription}
-        loadingPreview={subscription}
-      />,
-    );
+    feedStatus.resolve({ enabled: false });
 
-    expect(screen.queryByTestId("subscription-calendar-feed-status-loading")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("subscription-calendar-feed-status-loading")).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "生成订阅链接" })).toBeEnabled();
   });
 
   it("offers an explicit retry when the feed status fails without cached data", async () => {
     const retryFeedStatus = createDeferred<void>();
-    mocks.refetchSubscriptionCalendarFeedStatus.mockReturnValueOnce(retryFeedStatus.promise);
-    mocks.subscriptionCalendarFeedStatus = createFeedStatus({
-      data: undefined,
-      isError: true,
-    });
+    mocks.getCalendarFeed
+      .mockRejectedValueOnce(new Error("status failed"))
+      .mockReturnValueOnce(retryFeedStatus.promise.then(() => ({ enabled: false })));
 
     renderDialog();
 
-    expect(screen.getByRole("alert")).toHaveTextContent("订阅链接状态加载失败");
+    expect(await screen.findByRole("alert")).toHaveTextContent("订阅链接状态加载失败");
     fireEvent.click(screen.getByRole("button", { name: "重新加载" }));
 
-    expect(mocks.refetchSubscriptionCalendarFeedStatus).toHaveBeenCalledTimes(1);
+    expect(mocks.getCalendarFeed).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("button", { name: "正在重新加载..." })).toBeDisabled();
-    expect(mocks.createSubscriptionCalendarFeed).not.toHaveBeenCalled();
+    expect(mocks.createCalendarFeed).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "生成订阅链接" })).not.toBeInTheDocument();
 
     retryFeedStatus.resolve();
-    await waitFor(() => expect(screen.getByRole("button", { name: "重新加载" })).toBeEnabled());
+    expect(await screen.findByRole("button", { name: "生成订阅链接" })).toBeEnabled();
   });
 
-  it("renders the full calendar workflow and activates a newly generated feed", async () => {
+  it("generates a feed without opening the system calendar and keeps one-time actions independent", async () => {
     const open = vi.fn();
     const createFeed = createDeferred<typeof createdCalendarFeed>();
-    const validateFeed = createDeferred<Response>();
     Object.defineProperty(window, "open", { configurable: true, value: open });
-    mocks.createSubscriptionCalendarFeed.mockReturnValueOnce(createFeed.promise);
-    vi.stubGlobal("fetch", vi.fn().mockReturnValue(validateFeed.promise));
+    mocks.createCalendarFeed.mockReturnValueOnce(createFeed.promise);
 
     renderDialog();
 
-    expect(screen.getByText("为「Fastmail」创建单独日历订阅，只同步这一条续费。")).toBeInTheDocument();
+    await screen.findByRole("button", { name: "生成订阅链接" });
+    expect(screen.getByText("为「Fastmail」选择持续同步，或单次添加到日历。")).toBeInTheDocument();
     expect(screen.getByText("2026年6月15日")).toBeInTheDocument();
-    expect(screen.getByText("持续同步此订阅")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "持续同步" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "单次添加" })).toBeInTheDocument();
+    expect(screen.getByText("下载 ICS 和在线日历服务是独立的一次性添加，无需生成订阅链接。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "用 Google Calendar 打开" })).toHaveAttribute(
       "href",
       expect.stringContaining("calendar.google.com"),
@@ -334,20 +318,28 @@ describe("AddToCalendarDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "生成订阅链接" }));
 
     expect(screen.getByRole("button", { name: "正在生成订阅链接..." })).toBeDisabled();
-    expect(mocks.createSubscriptionCalendarFeed).toHaveBeenCalledWith("sub-1");
+    expect(mocks.createCalendarFeed).toHaveBeenCalledWith({ scope: "subscription", subscriptionId: "sub-1" });
 
     createFeed.resolve(createdCalendarFeed);
-    await waitFor(() => expect(screen.getByRole("button", { name: "正在打开系统日历..." })).toBeDisabled());
-    validateFeed.resolve(new Response("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", {
-      headers: { "content-type": "text/calendar; charset=utf-8" },
-    }));
-
-    await waitFor(() => expect(open).toHaveBeenCalledWith(
-      "webcal://example.com/calendar/renewals.ics?token=secret",
-      "_self",
-    ));
-    expect(screen.getByLabelText("本次订阅 URL")).toHaveValue("https://example.com/calendar/renewals.ics?token=secret");
+    await waitFor(() => expect(screen.getByLabelText("本次订阅 URL")).toHaveValue(createdCalendarFeed.feedUrl));
+    expect(open).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "重新生成订阅链接" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "下载 ICS 文件" })).toBeEnabled();
+  });
+
+  it("keeps feed generation failure recoverable without disabling one-time actions", async () => {
+    mocks.createCalendarFeed.mockRejectedValueOnce(new Error("create failed"));
+    renderDialog();
+
+    const generateButton = await screen.findByRole("button", { name: "生成订阅链接" });
+    fireEvent.click(generateButton);
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("订阅链接生成失败"));
+    expect(generateButton).toBeEnabled();
+    expect(screen.queryByLabelText("本次订阅 URL")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "下载 ICS 文件" })).toBeEnabled();
+    expect(screen.getByRole("link", { name: "用 Google Calendar 打开" })).toBeInTheDocument();
   });
 
   it("uses an existing feed without generating another token", async () => {
@@ -355,13 +347,13 @@ describe("AddToCalendarDialog", () => {
     const validateFeed = createDeferred<Response>();
     Object.defineProperty(window, "open", { configurable: true, value: open });
     vi.stubGlobal("fetch", vi.fn().mockReturnValue(validateFeed.promise));
-    mocks.subscriptionCalendarFeedStatus = createFeedStatus({
-      data: { enabled: true, feedUrl: "https://example.com/calendar/renewals.ics?token=existing" },
-      isFetching: true,
+    mocks.getCalendarFeed.mockResolvedValueOnce({
+      enabled: true,
+      feedUrl: "https://example.com/calendar/renewals.ics?token=existing",
     });
 
     renderDialog();
-    fireEvent.click(screen.getByRole("button", { name: "在系统日历中订阅" }));
+    fireEvent.click(await screen.findByRole("button", { name: "在系统日历中订阅" }));
 
     expect(screen.getByRole("button", { name: "正在打开系统日历..." })).toBeDisabled();
     expect(screen.queryByText("正在生成订阅链接...")).not.toBeInTheDocument();
@@ -375,7 +367,7 @@ describe("AddToCalendarDialog", () => {
     ));
     expect(screen.getByLabelText("本次订阅 URL")).toHaveValue("https://example.com/calendar/renewals.ics?token=existing");
     expect(screen.queryByRole("button", { name: "生成订阅链接" })).not.toBeInTheDocument();
-    expect(mocks.createSubscriptionCalendarFeed).not.toHaveBeenCalled();
+    expect(mocks.createCalendarFeed).not.toHaveBeenCalled();
   });
 
   it("does not open the system calendar when feed preflight returns HTML", async () => {
@@ -385,12 +377,13 @@ describe("AddToCalendarDialog", () => {
       headers: { "content-type": "text/html" },
     }));
     vi.stubGlobal("fetch", fetchMock);
-    mocks.subscriptionCalendarFeedStatus = createFeedStatus({
-      data: { enabled: true, feedUrl: "http://localhost:5173/calendar/renewals.ics?token=existing" },
+    mocks.getCalendarFeed.mockResolvedValueOnce({
+      enabled: true,
+      feedUrl: "http://localhost:5173/calendar/renewals.ics?token=existing",
     });
 
     renderDialog();
-    fireEvent.click(screen.getByRole("button", { name: "在系统日历中订阅" }));
+    fireEvent.click(await screen.findByRole("button", { name: "在系统日历中订阅" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:5173/calendar/renewals.ics?token=existing",
@@ -404,20 +397,20 @@ describe("AddToCalendarDialog", () => {
   });
 
   it("keeps regeneration pending in the confirmation dialog and prevents duplicate submission", async () => {
-    const deleteFeed = createDeferred<void>();
-    const createFeed = createDeferred<typeof createdCalendarFeed>();
+    const rotateFeed = createDeferred<typeof createdCalendarFeed>();
     const regeneratedFeed = {
       ...createdCalendarFeed,
       feedUrl: "https://example.com/calendar/renewals.ics?token=regenerated",
     };
-    mocks.subscriptionCalendarFeedStatus = createFeedStatus({
-      data: { enabled: true, feedUrl: "https://example.com/calendar/renewals.ics?token=existing" },
+    mocks.getCalendarFeed.mockResolvedValueOnce({
+      enabled: true,
+      feedUrl: "https://example.com/calendar/renewals.ics?token=existing",
     });
-    mocks.deleteSubscriptionCalendarFeed.mockReturnValueOnce(deleteFeed.promise);
-    mocks.createSubscriptionCalendarFeed.mockReturnValueOnce(createFeed.promise);
+    mocks.rotateCalendarFeed.mockReturnValueOnce(rotateFeed.promise);
 
     renderDialog();
-    fireEvent.click(screen.getByRole("button", { name: "重新生成订阅链接" }));
+    const trigger = await screen.findByRole("button", { name: "重新生成订阅链接" });
+    fireEvent.click(trigger);
     const confirmDialog = screen.getByRole("alertdialog", { name: "重新生成这个订阅链接？" });
     fireEvent.click(within(confirmDialog).getByRole("button", { name: "重新生成订阅链接" }));
 
@@ -425,27 +418,28 @@ describe("AddToCalendarDialog", () => {
     expect(pendingAction).toBeDisabled();
     expect(within(confirmDialog).getByRole("button", { name: "取消" })).toBeDisabled();
     fireEvent.click(pendingAction);
-    expect(mocks.deleteSubscriptionCalendarFeed).toHaveBeenCalledTimes(1);
-
-    deleteFeed.resolve();
-    await waitFor(() => expect(mocks.createSubscriptionCalendarFeed).toHaveBeenCalledWith("sub-1"));
+    expect(mocks.rotateCalendarFeed).toHaveBeenCalledTimes(1);
+    expect(mocks.rotateCalendarFeed).toHaveBeenCalledWith({ scope: "subscription", subscriptionId: "sub-1" });
     expect(screen.getByRole("alertdialog", { name: "重新生成这个订阅链接？" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("本次订阅 URL")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("本次订阅 URL")).toHaveValue("https://example.com/calendar/renewals.ics?token=existing");
 
-    createFeed.resolve(regeneratedFeed);
+    rotateFeed.resolve(regeneratedFeed);
     await waitFor(() => expect(screen.queryByRole("alertdialog", { name: "重新生成这个订阅链接？" })).not.toBeInTheDocument());
     expect(screen.getByLabelText("本次订阅 URL")).toHaveValue(regeneratedFeed.feedUrl);
+    expect(trigger).toHaveFocus();
   });
 
   it("keeps a failed regeneration recoverable in the confirmation dialog", async () => {
-    mocks.subscriptionCalendarFeedStatus = createFeedStatus({
-      data: { enabled: true, feedUrl: "https://example.com/calendar/renewals.ics?token=existing" },
+    mocks.getCalendarFeed.mockResolvedValueOnce({
+      enabled: true,
+      feedUrl: "https://example.com/calendar/renewals.ics?token=existing",
     });
-    mocks.deleteSubscriptionCalendarFeed.mockResolvedValueOnce(undefined);
-    mocks.createSubscriptionCalendarFeed.mockRejectedValueOnce(new Error("create failed"));
+    mocks.rotateCalendarFeed
+      .mockRejectedValueOnce(new Error("rotate failed"))
+      .mockResolvedValueOnce(createdCalendarFeed);
 
     renderDialog();
-    fireEvent.click(screen.getByRole("button", { name: "重新生成订阅链接" }));
+    fireEvent.click(await screen.findByRole("button", { name: "重新生成订阅链接" }));
     const confirmDialog = screen.getByRole("alertdialog", { name: "重新生成这个订阅链接？" });
     fireEvent.click(within(confirmDialog).getByRole("button", { name: "重新生成订阅链接" }));
 
@@ -457,8 +451,29 @@ describe("AddToCalendarDialog", () => {
     fireEvent.click(within(confirmDialog).getByRole("button", { name: "重新生成订阅链接" }));
 
     await waitFor(() => expect(screen.queryByRole("alertdialog", { name: "重新生成这个订阅链接？" })).not.toBeInTheDocument());
-    expect(mocks.createSubscriptionCalendarFeed).toHaveBeenCalledTimes(2);
+    expect(mocks.rotateCalendarFeed).toHaveBeenCalledTimes(2);
     expect(screen.getByLabelText("本次订阅 URL")).toHaveValue(createdCalendarFeed.feedUrl);
+  });
+
+  it("revokes an existing feed while preserving all one-time actions", async () => {
+    mocks.getCalendarFeed.mockResolvedValueOnce({
+      enabled: true,
+      feedUrl: "https://example.com/calendar/renewals.ics?token=existing",
+    });
+
+    renderDialog();
+    fireEvent.click(await screen.findByRole("button", { name: "撤销订阅链接" }));
+    const confirmDialog = screen.getByRole("alertdialog", { name: "撤销这个订阅链接？" });
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "撤销订阅链接" }));
+
+    await waitFor(() => expect(mocks.deleteCalendarFeed).toHaveBeenCalledWith({
+      scope: "subscription",
+      subscriptionId: "sub-1",
+    }));
+    const generateButton = await screen.findByRole("button", { name: "生成订阅链接" });
+    await waitFor(() => expect(generateButton).toHaveFocus());
+    expect(screen.getByRole("button", { name: "下载 ICS 文件" })).toBeEnabled();
+    expect(screen.getByRole("link", { name: "用 Google Calendar 打开" })).toBeInTheDocument();
   });
 
   it("uses an Android insert intent for the one-off calendar event", () => {
@@ -493,7 +508,7 @@ describe("AddToCalendarDialog", () => {
     renderDialog(fixedTerm);
 
     expect(screen.getByRole("dialog", { name: "添加到期日历" })).toBeInTheDocument();
-    expect(screen.getByText("为「Fastmail」创建单独日历订阅，只同步这次服务到期。")).toBeInTheDocument();
+    expect(screen.getByText("为「Fastmail」选择持续同步，或单次添加这次服务到期。")).toBeInTheDocument();
     expect(screen.getByText("2026年6月15日")).toBeInTheDocument();
   });
 
@@ -521,11 +536,9 @@ describe("AddToCalendarDialog", () => {
   });
 
   it("shows a localized copy failure instead of leaking missing Clipboard API errors", async () => {
-    mocks.subscriptionCalendarFeedStatus = createFeedStatus({
-      data: {
-        enabled: true,
-        feedUrl: "https://example.com/calendar/renewals.ics?token=secret",
-      },
+    mocks.getCalendarFeed.mockResolvedValueOnce({
+      enabled: true,
+      feedUrl: "https://example.com/calendar/renewals.ics?token=secret",
     });
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -537,7 +550,7 @@ describe("AddToCalendarDialog", () => {
     });
 
     renderDialog();
-    fireEvent.click(screen.getByRole("button", { name: "复制 URL" }));
+    fireEvent.click(await screen.findByRole("button", { name: "复制 URL" }));
 
     await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("订阅 URL 复制失败", {
       description: "当前一键复制不可用，请手动选择并复制本次 URL。",

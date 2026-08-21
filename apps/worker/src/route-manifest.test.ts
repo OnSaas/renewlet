@@ -19,8 +19,10 @@ describe("Worker product route manifest", () => {
     expect(manifest).toEqual(expect.arrayContaining([
       { path: "/api/app/notifications/history", methods: ["GET"] },
       { path: "/api/app/notifications/overview", methods: ["GET"] },
+      { path: "/api/app/subscriptions/calendar-feeds", methods: ["GET"] },
       ...subscriptionCollectionContractFixture.manifestRoutes,
     ]));
+    expect(manifest).not.toContainEqual({ path: "/api/app/calendar-feeds", methods: ["GET"] });
 
     const outputPath = process.env["RENEWLET_WORKER_ROUTE_MANIFEST_OUTPUT"];
     if (outputPath) {

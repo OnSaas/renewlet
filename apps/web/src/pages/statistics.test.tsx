@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   handleAddSubscription: vi.fn(),
   handleRenewSubscription: vi.fn(),
   handleSaveSubscription: vi.fn(),
+  ratesLastUpdated: null as string | null,
   refreshRates: vi.fn(),
   rechartsBarChartProps: [] as Array<Record<string, unknown>>,
   rechartsBarProps: [] as Array<Record<string, unknown>>,
@@ -170,7 +171,7 @@ vi.mock("@/hooks/use-report-exchange-rates", () => ({
     convert: (amount: number | string) => moneyToNumber(amount),
     error: null,
     getCurrencySymbol: () => "¥",
-    lastUpdated: null,
+    lastUpdated: mocks.ratesLastUpdated,
     loading: false,
     sourceDate: "2026-08-01",
     reportBasisStatus: { month: "2026-08", locked: true, sourceDate: "2026-08-01", capturedAt: "2026-08-06T00:00:00Z" },
@@ -268,6 +269,7 @@ describe("Statistics page", () => {
     mocks.handleEditSubscription.mockReset();
     mocks.handleRenewSubscription.mockReset();
     mocks.handleSaveSubscription.mockReset();
+    mocks.ratesLastUpdated = null;
     mocks.rechartsBarChartProps.length = 0;
     mocks.rechartsBarProps.length = 0;
     mocks.rechartsCellProps.length = 0;
@@ -348,6 +350,28 @@ describe("Statistics page", () => {
     expect(screen.queryByText("总体统计")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "重试" }));
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps only dynamic exchange-rate context below the page title", () => {
+    mocks.ratesLastUpdated = "2026-08-20T08:00:00.000Z";
+
+    renderStatistics();
+
+    expect(screen.getByRole("heading", { name: "统计分析" })).toBeInTheDocument();
+    expect(screen.getByText(/汇率更新于/)).toBeInTheDocument();
+    expect(screen.queryByText("查看详细分析和数据洞察")).not.toBeInTheDocument();
+  });
+
+  it("uses compact placeholders for empty breakdown charts", () => {
+    mocks.useSubscriptionAnalytics.mockReturnValue({ data: [], isPending: false });
+
+    renderStatistics();
+
+    const emptyCharts = screen.getAllByText("暂无数据");
+    expect(emptyCharts).not.toHaveLength(0);
+    for (const emptyChart of emptyCharts) {
+      expect(emptyChart).toHaveStyle({ height: "128px" });
+    }
   });
 
   it("shows the inactive savings explanation on hover", async () => {

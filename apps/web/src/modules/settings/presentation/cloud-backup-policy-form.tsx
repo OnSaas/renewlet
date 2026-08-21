@@ -116,7 +116,7 @@ export function CloudBackupPolicyForm({
             onChange={onScheduleTimeChange}
             ariaLabel={t("settings.cloudBackupScheduleTime")}
             density="compact"
-            className="w-full sm:max-w-[9rem]"
+            className="w-full sm:max-w-36"
           />
         </FieldRow>
         <FieldRow label={t("settings.cloudBackupRetention")} htmlFor="cloudBackupRetention">

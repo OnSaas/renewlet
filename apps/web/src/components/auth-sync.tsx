@@ -24,6 +24,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { sanitizeNextPath } from "@/lib/redirect";
 import { SETTINGS_QUERY_KEY } from "@/hooks/settings-query-key";
+import { clearCalendarFeedQueries } from "@/hooks/calendar-feed-query-cache";
 import { clearSubscriptionQueries } from "@/hooks/subscription-query-cache";
 
 /** 监听 Auth 状态变化，并主动刷新相关 Query 缓存。 */
@@ -58,8 +59,9 @@ export function AuthSync() {
     if (previousSessionKeyRef.current === sessionKey) return;
     previousSessionKeyRef.current = sessionKey;
 
-    // 会话身份变化必须删除而非仅失效，避免新用户在 refetch 前看到旧用户 detail 快照。
+    // 会话身份变化必须删除而非仅失效，避免新用户在 refetch 前看到旧用户详情或 bearer URL。
     clearSubscriptionQueries(queryClient);
+    clearCalendarFeedQueries(queryClient);
     queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEY });
     queryClient.invalidateQueries({ queryKey: ["custom-config"] });
   }, [isPending, queryClient, sessionData]);

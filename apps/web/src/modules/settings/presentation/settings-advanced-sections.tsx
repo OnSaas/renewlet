@@ -23,6 +23,7 @@ import {
   type SubscriptionPriceReferenceCurrency,
 } from "@/types/subscription";
 import { useCloudBackupController } from "../application/use-cloud-backup-controller";
+import { useCalendarFeedSettingsController } from "../application/use-calendar-feed-settings-controller";
 import type { SettingsFormController } from "../application/use-settings-form-controller";
 import { useUploadedAssetsManager } from "../application/use-uploaded-assets-manager";
 import { getLocalSubscriptionPriceReferenceCurrencyPreference } from "../domain/subscription-price-reference-currency-local-preference";
@@ -46,7 +47,7 @@ export function SettingsAdvancedSections({ controller }: { controller: SettingsF
     secretStatus,
     clearSecret,
     customConfig,
-    subscriptionFacetsQuery,
+    subscriptionFacets,
     categoryUsageCount,
     rates,
     activeRateProvider,
@@ -75,7 +76,6 @@ export function SettingsAdvancedSections({ controller }: { controller: SettingsF
     notificationTestErrorDetailsOpen,
     setNotificationTestErrorDetailsOpen,
     notificationHistory,
-    calendarFeed,
     builtInIconIndex,
     publicStatusPage,
     publicApi,
@@ -91,6 +91,8 @@ export function SettingsAdvancedSections({ controller }: { controller: SettingsF
     setCloudBackupImportOpen(true);
   });
   const uploadedAssets = useUploadedAssetsManager();
+  // 高级设置挂载时并行读取全局状态与单订阅首屏；后续单订阅页只响应“加载更多”。
+  const calendarFeed = useCalendarFeedSettingsController();
   const timezoneOptions = createTimeZoneSelectOptions(getSupportedTimeZones());
   const defaultCurrencyOptions = useManagedCurrencyOptions({
     currencies: customConfig.currencies,
@@ -241,8 +243,8 @@ export function SettingsAdvancedSections({ controller }: { controller: SettingsF
             getDeleteBlockReason={(item) => {
               if (customConfig.categories.length <= 1) return t("settings.categoryKeepOne");
               // 删除校验依赖订阅数据；在加载/失败时先阻止删除，避免误判。
-              if (subscriptionFacetsQuery.isPending) return t("settings.categoryChecking");
-              if (subscriptionFacetsQuery.status === "error") return t("settings.categoryCheckFailed");
+              if (subscriptionFacets.isInitialLoading) return t("settings.categoryChecking");
+              if (subscriptionFacets.error && !subscriptionFacets.hasData) return t("settings.categoryCheckFailed");
               const usedCount = categoryUsageCount.get(item.value) ?? 0;
               return usedCount > 0 ? t("settings.categoryUsed", { count: usedCount }) : null;
             }}
@@ -314,30 +316,17 @@ export function SettingsAdvancedSections({ controller }: { controller: SettingsF
       <CalendarFeedSection
         id="settings-calendar-feed"
         className={SETTINGS_SECTION_SCROLL_CLASS}
-        enabled={calendarFeed.data?.enabled ?? false}
-        feedUrl={calendarFeed.feedUrl}
-        isLoading={calendarFeed.isLoading}
-        isCreating={calendarFeed.isCreating}
-        isDeleting={calendarFeed.isDeleting}
-        onCreate={calendarFeed.createOrRotate}
-        onCopy={calendarFeed.copyUrl}
-        onDelete={calendarFeed.revoke}
-        onOpenSystem={calendarFeed.openSystem}
-        onRegenerate={calendarFeed.regenerate}
+        controller={calendarFeed}
       />
 
       <PublicStatusPageSection
         id="settings-public-status"
         className={SETTINGS_SECTION_SCROLL_CLASS}
-        enabled={publicStatusPage.enabled}
-        pageUrl={publicStatusPage.pageUrl}
-        showPrices={publicStatusPage.showPrices}
+        status={publicStatusPage.status}
+        visibility={publicStatusPage.visibility}
         publicStatusCurrency={settings.publicStatusCurrency}
         effectivePublicStatusCurrency={effectivePublicStatusCurrency}
         publicStatusCurrencyOptions={publicStatusCurrencyOptions}
-        visibleCount={publicStatusPage.visibleCount}
-        hiddenCount={publicStatusPage.hiddenCount}
-        isLoading={publicStatusPage.isLoading}
         isCreating={publicStatusPage.isCreating}
         isDeleting={publicStatusPage.isDeleting}
         isUpdating={publicStatusPage.isUpdating}
@@ -449,16 +438,7 @@ export function SettingsAdvancedSections({ controller }: { controller: SettingsF
             <p className="text-xs text-muted-foreground">{t("settings.testPhoneHelp")}</p>
           </div>
 
-          <NotificationHistoryPanel
-            data={notificationHistory.data}
-            isLoading={notificationHistory.isLoading}
-            isFetching={notificationHistory.isFetching}
-            error={notificationHistory.error}
-            status={notificationHistory.historyStatus}
-            setStatus={notificationHistory.setStatus}
-            loadMore={notificationHistory.loadMore}
-            refetch={notificationHistory.refetch}
-          />
+          <NotificationHistoryPanel controller={notificationHistory} />
         </div>
       </section>
 

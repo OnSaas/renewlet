@@ -307,6 +307,30 @@ describe("Subscriptions page sorting", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
+  it("offers adding the first subscription when the collection is empty", () => {
+    mocks.useInfiniteSubscriptions.mockReturnValue({
+      subscriptions: [],
+      isPending: false,
+    });
+
+    renderSubscriptionsPage();
+
+    expect(screen.getByRole("heading", { name: "还没有订阅" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "添加第一个订阅" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "清除筛选" })).not.toBeInTheDocument();
+  });
+
+  it("offers clearing filters instead of adding when no subscriptions match", async () => {
+    const user = userEvent.setup();
+    renderSubscriptionsPage();
+
+    await user.type(screen.getByRole("searchbox"), "no-match");
+
+    expect(await screen.findByRole("heading", { name: "没有匹配结果" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "清除筛选" })).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "添加第一个订阅" })).not.toBeInTheDocument();
+  });
+
   it("preserves the structured collection-limit error when index search fails", async () => {
     const user = userEvent.setup();
     const refetch = vi.fn();

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import { AlertTriangle, Archive, Download, RefreshCw, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,55 +10,58 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import { LoadingButtonContent } from "./settings-shared-controls";
 import type { CloudBackupSnapshot } from "@/lib/api/schemas/cloud-backup";
+import type { SettingsReadState } from "../application/settings-read-state";
+import { ManagerDataBoundary } from "./manager-data-boundary";
 
 const SUMMARY_SNAPSHOT_LIMIT = 2;
 
 interface CloudBackupSnapshotListProps {
-  snapshots: CloudBackupSnapshot[];
-  isLoading: boolean;
+  state: SettingsReadState<CloudBackupSnapshot[]>;
   busy: boolean;
   disabled?: boolean;
   restoringSnapshotKey: string | null;
   deletingSnapshotKey: string | null;
   canRefreshSnapshots: boolean;
-  isRefreshingSnapshots: boolean;
   snapshotsErrorMessage: string | null;
-  onRefresh: () => void | Promise<void>;
+  focusFallbackRef?: RefObject<HTMLHeadingElement | null>;
   onOpenErrorDetails: () => void;
   onRestore: (snapshot: CloudBackupSnapshot) => void | Promise<void>;
   onDelete: (snapshot: CloudBackupSnapshot) => void;
 }
 
 export function CloudBackupSnapshotList({
-  snapshots,
-  isLoading,
+  state,
   busy,
   disabled = false,
   restoringSnapshotKey,
   deletingSnapshotKey,
   canRefreshSnapshots,
-  isRefreshingSnapshots,
   snapshotsErrorMessage,
-  onRefresh,
+  focusFallbackRef,
   onOpenErrorDetails,
   onRestore,
   onDelete,
 }: CloudBackupSnapshotListProps) {
   const { t, formatDateTime } = useI18n();
   const [fullListOpen, setFullListOpen] = useState(false);
+  const snapshots = state.data ?? [];
   const isMobile = useMediaQuery("(max-width: 767px)");
   const summarySnapshots = snapshots.slice(0, SUMMARY_SNAPSHOT_LIMIT);
   const hasMoreSnapshots = snapshots.length > SUMMARY_SNAPSHOT_LIMIT;
   const title = t("settings.cloudBackupSnapshots");
   const description = t("settings.cloudBackupSnapshotsHelp");
   const refreshLabel = t("settings.cloudBackupRefresh");
-  const refreshDisabled = disabled || busy || isRefreshingSnapshots || !canRefreshSnapshots;
-  const shouldRenderFullListOverlay = fullListOpen && !isLoading && (snapshots.length > 0 || snapshotsErrorMessage);
+  const refreshDisabled = disabled || busy || state.isRefreshing || !canRefreshSnapshots;
+  const shouldRenderFullListOverlay = fullListOpen && !state.isInitialLoading && snapshots.length > 0;
   const rowLabels = {
     restore: t("settings.cloudBackupRestore"),
     restoring: t("settings.cloudBackupRestoring"),
     delete: t("common.delete"),
     deleting: t("settings.cloudBackupDeleting"),
+    restoreNamed: (name: string) => t("settings.cloudBackupRestoreNamed", { name }),
+    restoringNamed: (name: string) => t("settings.cloudBackupRestoringNamed", { name }),
+    deleteNamed: (name: string) => t("settings.cloudBackupDeleteNamed", { name }),
+    deletingNamed: (name: string) => t("settings.cloudBackupDeletingNamed", { name }),
     webdavProvider: t("settings.cloudBackupProviderWebdav"),
     s3Provider: t("settings.cloudBackupProviderS3"),
   };
@@ -69,23 +72,20 @@ export function CloudBackupSnapshotList({
     <div className="grid gap-3 border-t border-border pt-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <h3 ref={focusFallbackRef} tabIndex={-1} className="text-sm font-semibold text-foreground">{title}</h3>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
         </div>
         <SnapshotRefreshButton
           disabled={refreshDisabled}
-          isRefreshing={isRefreshingSnapshots}
+          isRefreshing={state.isRefreshing}
           label={refreshLabel}
-          onRefresh={onRefresh}
+          onRefresh={state.retry}
           className="sm:shrink-0"
         />
       </div>
 
-      {snapshotsErrorMessage ? (
-        <SnapshotErrorMessage message={snapshotsErrorMessage} onOpenErrorDetails={onOpenErrorDetails} />
-      ) : isLoading ? (
-        <div className="rounded-md border border-dashed border-border bg-background px-3 py-4 text-sm text-muted-foreground">{t("common.loading")}</div>
-      ) : snapshots.length === 0 ? (
+      <ManagerDataBoundary state={state}>
+      {snapshots.length === 0 ? (
         <div className="rounded-md border border-dashed border-border bg-background px-3 py-4 text-sm text-muted-foreground">{t("settings.cloudBackupSnapshotsEmpty")}</div>
       ) : (
         <>
@@ -109,6 +109,12 @@ export function CloudBackupSnapshotList({
           ) : null}
         </>
       )}
+      </ManagerDataBoundary>
+      {snapshotsErrorMessage ? (
+        <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={onOpenErrorDetails}>
+          {t("settings.cloudBackupUpstreamOpen")}
+        </Button>
+      ) : null}
       {shouldRenderFullListOverlay ? (
         <CloudBackupSnapshotListOverlay
           open={fullListOpen}
@@ -119,16 +125,16 @@ export function CloudBackupSnapshotList({
           closeLabel={t("common.close")}
           refreshLabel={refreshLabel}
           refreshDisabled={refreshDisabled}
-          isRefreshing={isRefreshingSnapshots}
+          isRefreshing={state.isRefreshing}
           snapshots={snapshots}
-          snapshotsErrorMessage={snapshotsErrorMessage}
+          snapshotsErrorMessage={null}
           busy={busy}
           disabled={disabled}
           restoringSnapshotKey={restoringSnapshotKey}
           deletingSnapshotKey={deletingSnapshotKey}
           rowLabels={rowLabels}
           formatSnapshotDate={formatSnapshotDate}
-          onRefresh={onRefresh}
+          onRefresh={state.retry}
           onOpenErrorDetails={onOpenErrorDetails}
           onRestore={onRestore}
           onDelete={onDelete}
@@ -172,6 +178,10 @@ function SnapshotRows({
           restoringLabel={rowLabels.restoring}
           deleteLabel={rowLabels.delete}
           deletingLabel={rowLabels.deleting}
+          restoreAriaLabel={rowLabels.restoreNamed(snapshot.filename)}
+          restoringAriaLabel={rowLabels.restoringNamed(snapshot.filename)}
+          deleteAriaLabel={rowLabels.deleteNamed(snapshot.filename)}
+          deletingAriaLabel={rowLabels.deletingNamed(snapshot.filename)}
           providerLabel={providerLabelFor(snapshot.provider, {
             webdav: rowLabels.webdavProvider,
             s3: rowLabels.s3Provider,
@@ -297,6 +307,10 @@ interface SnapshotRowLabels {
   restoring: string;
   delete: string;
   deleting: string;
+  restoreNamed: (name: string) => string;
+  restoringNamed: (name: string) => string;
+  deleteNamed: (name: string) => string;
+  deletingNamed: (name: string) => string;
   webdavProvider: string;
   s3Provider: string;
 }
@@ -355,6 +369,10 @@ interface SnapshotRowProps {
   restoringLabel: string;
   deleteLabel: string;
   deletingLabel: string;
+  restoreAriaLabel: string;
+  restoringAriaLabel: string;
+  deleteAriaLabel: string;
+  deletingAriaLabel: string;
   providerLabel: string;
   formattedDate: string;
   onRestore: (snapshot: CloudBackupSnapshot) => void | Promise<void>;
@@ -370,6 +388,10 @@ function SnapshotRow({
   restoringLabel,
   deleteLabel,
   deletingLabel,
+  restoreAriaLabel,
+  restoringAriaLabel,
+  deleteAriaLabel,
+  deletingAriaLabel,
   providerLabel,
   formattedDate,
   onRestore,
@@ -390,13 +412,13 @@ function SnapshotRow({
       <div className="whitespace-nowrap text-xs font-medium text-muted-foreground md:text-right">{formatBytes(snapshot.sizeBytes)}</div>
       <div className="grid grid-cols-2 gap-2 md:flex md:flex-nowrap md:items-center md:justify-end">
         {/* 云备份远端操作是全局单操作；只有 provider:id 命中的当前行显示 loading，其它行只禁用。 */}
-        <Button type="button" variant="outline" size="sm" onClick={() => void onRestore(snapshot)} onFocus={preloadImportDataDialog} onPointerEnter={preloadImportDataDialog} onTouchStart={preloadImportDataDialog} disabled={busy} aria-busy={isRestoring ? true : undefined} className="inline-flex h-8 min-w-[5.25rem] shrink-0 justify-center gap-1.5 whitespace-nowrap border-border px-2.5">
+        <Button type="button" variant="outline" size="sm" onClick={() => void onRestore(snapshot)} onFocus={preloadImportDataDialog} onPointerEnter={preloadImportDataDialog} onTouchStart={preloadImportDataDialog} disabled={busy} aria-label={isRestoring ? restoringAriaLabel : restoreAriaLabel} aria-busy={isRestoring ? true : undefined} className="inline-flex h-8 min-w-21 shrink-0 justify-center gap-1.5 whitespace-nowrap border-border px-2.5">
           <LoadingButtonContent loading={isRestoring} loadingLabel={restoringLabel}>
             <Download className="h-4 w-4 shrink-0" />
             {restoreLabel}
           </LoadingButtonContent>
         </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={() => onDelete(snapshot)} disabled={busy} aria-busy={isDeleting ? true : undefined} className="inline-flex h-8 min-w-[5.25rem] shrink-0 justify-center gap-1.5 whitespace-nowrap px-2.5 text-destructive hover:text-destructive">
+        <Button type="button" variant="ghost" size="sm" onClick={() => onDelete(snapshot)} disabled={busy} aria-label={isDeleting ? deletingAriaLabel : deleteAriaLabel} aria-busy={isDeleting ? true : undefined} className="inline-flex h-8 min-w-21 shrink-0 justify-center gap-1.5 whitespace-nowrap px-2.5 text-destructive hover:text-destructive">
           <LoadingButtonContent loading={isDeleting} loadingLabel={deletingLabel}>
             <Trash2 className="h-4 w-4 shrink-0" />
             {deleteLabel}

@@ -44,17 +44,24 @@ vi.mock("@/hooks/use-settings", () => ({
 }));
 
 vi.mock("@/hooks/use-calendar-feed", () => ({
-  useCreateSubscriptionCalendarFeed: () => ({
-    isPending: false,
-    mutateAsync: vi.fn(),
-  }),
-  useDeleteSubscriptionCalendarFeed: () => ({
-    isPending: false,
-    mutateAsync: vi.fn(),
-  }),
-  useSubscriptionCalendarFeedStatus: () => ({
+  useCalendarFeedStatus: () => ({
     data: { enabled: false, feedUrl: undefined },
-    isLoading: false,
+    isError: false,
+    isFetching: false,
+    isPending: false,
+    refetch: vi.fn(),
+  }),
+  useCreateCalendarFeed: () => ({
+    isPending: false,
+    mutateAsync: vi.fn(),
+  }),
+  useDeleteCalendarFeed: () => ({
+    isPending: false,
+    mutateAsync: vi.fn(),
+  }),
+  useRotateCalendarFeed: () => ({
+    isPending: false,
+    mutateAsync: vi.fn(),
   }),
 }));
 

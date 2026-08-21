@@ -26,7 +26,7 @@ function HeaderSkeleton({ showAddAction = false }: { showAddAction?: boolean }) 
             <SkeletonBox className="h-10 w-10 shrink-0 rounded-xl" />
             <div className={headerLayout.brandTextGroup}>
               <SkeletonBox className="h-6 w-28" />
-              <SkeletonBox className="h-6 w-[5.75rem] rounded-lg min-[380px]:w-32 sm:h-7" />
+              <SkeletonBox className="h-6 w-23 rounded-lg min-[380px]:w-32 sm:h-7" />
             </div>
           </div>
           <nav className={headerLayout.desktopNav} data-testid="app-header-desktop-nav-skeleton">

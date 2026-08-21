@@ -25,9 +25,13 @@ import type { UploadedAssetsManagerController } from "../application/use-uploade
 import type { SettingsAuthSecurityController } from "../application/use-auth-security-settings-controller";
 import type { SettingsTelegramBotCommandsController } from "../application/use-telegram-bot-commands-controller";
 import type { SettingsFormController } from "../application/settings-form-controller-types";
+import type { SettingsCalendarFeedController } from "../application/use-calendar-feed-settings-controller";
+import type { CloudBackupController } from "../application/use-cloud-backup-controller";
+import type { SettingsReadState } from "../application/settings-read-state";
 
 const mocks = vi.hoisted(() => ({
   useSettingsFormController: vi.fn(),
+  useCalendarFeedSettingsController: vi.fn(),
   useCloudBackupController: vi.fn(),
   useUploadedAssetsManager: vi.fn(),
 }));
@@ -289,6 +293,10 @@ vi.mock("../application/use-settings-form-controller", () => ({
   useSettingsFormController: mocks.useSettingsFormController,
 }));
 
+vi.mock("../application/use-calendar-feed-settings-controller", () => ({
+  useCalendarFeedSettingsController: mocks.useCalendarFeedSettingsController,
+}));
+
 vi.mock("../application/use-cloud-backup-controller", () => ({
   useCloudBackupController: mocks.useCloudBackupController,
 }));
@@ -297,32 +305,54 @@ vi.mock("../application/use-uploaded-assets-manager", () => ({
   useUploadedAssetsManager: mocks.useUploadedAssetsManager,
 }));
 
-export function createUploadedAssetsManagerState(
-  overrides: Partial<UploadedAssetsManagerController> = {},
-): UploadedAssetsManagerController {
-  const refresh = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-  const loadMore = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-  const emptyKind = {
-    assets: [],
-    error: null,
-    hasLoaded: true,
-    hasMore: false,
-    isLoading: false,
-    isLoadingMore: false,
-    refresh,
-    loadMore,
-  };
+type UploadedAssetKindFixture = Partial<Omit<UploadedAssetsManagerController["logo"], "readState">> & {
+  readState?: SettingsReadState<NonNullable<UploadedAssetsManagerController["logo"]["readState"]["data"]>>;
+};
+
+type UploadedAssetsManagerFixture = Partial<Omit<UploadedAssetsManagerController, "logo" | "icon">> & {
+  logo?: UploadedAssetKindFixture;
+  icon?: UploadedAssetKindFixture;
+};
+
+export function createSettingsReadState<T>(
+  data: T | undefined,
+  overrides: Partial<SettingsReadState<T>> = {},
+): SettingsReadState<T> {
   return {
-    logo: emptyKind,
-    icon: emptyKind,
-    deleteError: null,
-    deletingAssetId: null,
-    deleteAsset: vi.fn<UploadedAssetsManagerController["deleteAsset"]>().mockResolvedValue(true),
+    data,
+    hasData: data !== undefined,
+    error: null,
+    isInitialLoading: false,
+    isRefreshing: false,
+    retry: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     ...overrides,
   };
 }
 
-export function createCloudBackupControllerState() {
+export function createUploadedAssetsManagerState(
+  overrides: UploadedAssetsManagerFixture = {},
+): UploadedAssetsManagerController {
+  const loadMore = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+  const kindState = (fixture: UploadedAssetKindFixture | undefined) => {
+    return {
+      readState: fixture?.readState ?? createSettingsReadState([]),
+      hasMore: fixture?.hasMore ?? false,
+      isLoadingMore: fixture?.isLoadingMore ?? false,
+      loadMore: fixture?.loadMore ?? loadMore,
+    };
+  };
+  const { logo, icon, ...controllerOverrides } = overrides;
+  return {
+    logo: kindState(logo),
+    icon: kindState(icon),
+    deleteError: null,
+    deletingAssetId: null,
+    deleteAsset: vi.fn<UploadedAssetsManagerController["deleteAsset"]>().mockResolvedValue(true),
+    ...controllerOverrides,
+  };
+}
+
+export function createCloudBackupControllerState(): CloudBackupController {
   const fn = vi.fn();
   const defaultPolicy = {
     scheduleEnabled: false,
@@ -338,15 +368,15 @@ export function createCloudBackupControllerState() {
     updatedAt: null,
   };
   return {
-    config: {
+    config: createSettingsReadState({
       provider: "webdav" as const,
       credentialSet: false,
       credentialSetByProvider: { webdav: false, s3: false },
       policyByProvider: { webdav: defaultPolicy, s3: defaultPolicy },
       statusByProvider: { webdav: defaultStatus, s3: defaultStatus },
       updatedAt: null,
-    },
-    snapshots: [],
+    }),
+    snapshots: createSettingsReadState([]),
     form: {
       provider: "webdav" as const,
       webdavUrl: "",
@@ -367,13 +397,11 @@ export function createCloudBackupControllerState() {
     },
     credentialSet: false,
     canCreateSnapshot: false,
-    isLoading: false,
     isSaving: false,
     isTesting: false,
     isCreating: false,
     isDownloading: false,
     isDeleting: false,
-    isRefreshingSnapshots: false,
     restoringSnapshotKey: null,
     deletingSnapshotKey: null,
     hasUnsavedChanges: false,
@@ -388,7 +416,6 @@ export function createCloudBackupControllerState() {
     createSnapshot: fn,
     restoreSnapshot: fn,
     deleteSnapshot: fn,
-    refreshSnapshots: fn,
   };
 }
 
@@ -400,10 +427,6 @@ export function createControllerState(overrides: {
   testingChannel?: NotificationChannel | null;
   isSavingSettings?: boolean;
   hasUnsavedChanges?: boolean;
-  calendarFeed?: {
-    enabled?: boolean;
-    feedUrl?: string | null;
-  };
   builtInIconIndex?: {
     canManage?: boolean;
     status?: BuiltInIconIndexStatus;
@@ -433,7 +456,12 @@ export function createControllerState(overrides: {
     createdPlainToken?: string | null;
   };
   authSecurity?: Partial<SettingsAuthSecurityController>;
-  telegramBotCommands?: Partial<SettingsTelegramBotCommandsController>;
+  telegramBotCommands?: Omit<Partial<SettingsTelegramBotCommandsController>, "readState"> & {
+    data?: SettingsTelegramBotCommandsController["readState"]["data"];
+    error?: Error | null;
+    isLoading?: boolean;
+    readState?: Partial<SettingsTelegramBotCommandsController["readState"]>;
+  };
   rates?: ExchangeRates;
   activeRateProvider?: ExchangeRateSource;
   ratesWarning?: ExchangeRateCoverageWarning | null;
@@ -447,6 +475,21 @@ export function createControllerState(overrides: {
   const checkAllProviders = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const checkProvider = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>().mockResolvedValue(undefined);
   const refreshProvider = vi.fn<(provider: BuiltInIconProvider) => Promise<void>>().mockResolvedValue(undefined);
+  const telegramOverrides = overrides.telegramBotCommands;
+  const {
+    data: telegramData = {
+      configComplete: false,
+      installed: false,
+      status: "not_configured" as const,
+      chatId: null,
+      installedAt: null,
+      lastUsedAt: null,
+    },
+    error: telegramError,
+    isLoading: telegramIsLoading,
+    readState: telegramReadState,
+    ...telegramControllerOverrides
+  } = telegramOverrides ?? {};
   const currencySymbols: Record<string, string> = {
     CNY: "¥",
     EUR: "€",
@@ -475,7 +518,13 @@ export function createControllerState(overrides: {
     canManageUsers: overrides.canManageUsers ?? true,
     canAccessPocketBaseAdmin: overrides.canAccessPocketBaseAdmin ?? true,
     customConfig: overrides.customConfig ?? DEFAULT_CUSTOM_CONFIG,
-    subscriptionFacetsQuery: { data: undefined, isPending: false, status: "success" },
+    subscriptionFacets: createSettingsReadState({
+      total: 0,
+      categoryCounts: {},
+      tags: [],
+      visibleCount: 0,
+      hiddenCount: 0,
+    }),
     categoryUsageCount: new Map(),
     rates: overrides.rates ?? {},
     activeRateProvider: overrides.activeRateProvider ?? "frankfurter",
@@ -517,30 +566,16 @@ export function createControllerState(overrides: {
     setNotificationTestErrorDetailsOpen: fn,
     isSavingSettings: overrides.isSavingSettings ?? false,
     notificationHistory: {
-      data: undefined,
-      isLoading: false,
-      isFetching: false,
-      error: null,
+      overview: createSettingsReadState(undefined),
+      history: createSettingsReadState(undefined),
       historyStatus: "all",
       setStatus: fn,
+      limit: 20,
       loadMore: fn,
-      refetch: fn,
-    },
-    calendarFeed: {
-      data: { enabled: overrides.calendarFeed?.enabled ?? false },
-      feedUrl: overrides.calendarFeed?.feedUrl ?? null,
-      isLoading: false,
-      isCreating: false,
-      isDeleting: false,
-      createOrRotate: fn,
-      copyUrl: fn,
-      openSystem: fn,
-      regenerate: fn,
-      revoke: fn,
     },
     builtInIconIndex: {
       canManage: overrides.builtInIconIndex?.canManage ?? true,
-      status: overrides.builtInIconIndex?.status ?? {
+      status: createSettingsReadState(overrides.builtInIconIndex?.status ?? {
         source: "embedded",
         hash: "embedded-hash",
         iconCount: 10249,
@@ -559,8 +594,9 @@ export function createControllerState(overrides: {
           refreshing: false,
           updateAvailable: false,
         })),
-      },
-      isLoading: overrides.builtInIconIndex?.isLoading ?? false,
+      }, {
+        isInitialLoading: overrides.builtInIconIndex?.isLoading ?? false,
+      }),
       checkingProviders: overrides.builtInIconIndex?.checkingProviders ?? [],
       refreshingProvider: overrides.builtInIconIndex?.refreshingProvider ?? null,
       errorDetails: null,
@@ -571,12 +607,15 @@ export function createControllerState(overrides: {
       refreshProvider: overrides.builtInIconIndex?.refreshProvider ?? refreshProvider,
     },
     publicStatusPage: {
-      enabled: overrides.publicStatusPage?.enabled ?? false,
-      pageUrl: overrides.publicStatusPage?.pageUrl ?? null,
-      showPrices: overrides.publicStatusPage?.showPrices ?? false,
-      visibleCount: overrides.publicStatusPage?.visibleCount ?? 0,
-      hiddenCount: overrides.publicStatusPage?.hiddenCount ?? 0,
-      isLoading: false,
+      status: createSettingsReadState({
+        enabled: overrides.publicStatusPage?.enabled ?? Boolean(overrides.publicStatusPage?.pageUrl),
+        pageUrl: overrides.publicStatusPage?.pageUrl ?? undefined,
+        showPrices: overrides.publicStatusPage?.showPrices ?? false,
+      }),
+      visibility: createSettingsReadState({
+        visibleCount: overrides.publicStatusPage?.visibleCount ?? 0,
+        hiddenCount: overrides.publicStatusPage?.hiddenCount ?? 0,
+      }),
       isCreating: false,
       isDeleting: false,
       isUpdating: false,
@@ -588,9 +627,8 @@ export function createControllerState(overrides: {
       updateShowPrices: fn,
     },
     publicApi: {
-      tokens: overrides.publicApi?.tokens ?? [],
+      tokens: createSettingsReadState(overrides.publicApi?.tokens ?? []),
       createdPlainToken: overrides.publicApi?.createdPlainToken ?? null,
-      isLoading: false,
       isCreating: false,
       deletingTokenId: null,
       createToken: fn,
@@ -599,8 +637,11 @@ export function createControllerState(overrides: {
       deleteToken: fn,
     },
     telegramBotCommands: {
-      data: undefined,
-      isLoading: false,
+      readState: createSettingsReadState(telegramData, {
+        error: telegramError ?? null,
+        isInitialLoading: telegramIsLoading ?? false,
+        ...telegramReadState,
+      }),
       isInstalling: false,
       isDeleting: false,
       installDisabledReason: "请先填写并保存 Bot Token 和 Chat ID。",
@@ -608,12 +649,14 @@ export function createControllerState(overrides: {
       install: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       deleteCommands: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       refetch: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-      ...overrides.telegramBotCommands,
+      ...telegramControllerOverrides,
     },
     authSecurity: {
       canManage: true,
       disabled: false,
-      isLoading: false,
+      readState: createSettingsReadState({
+        turnstile: { enabled: false, siteKey: "", secretConfigured: false },
+      }),
       isSaving: false,
       isClearingSecret: false,
       isTesting: false,
@@ -655,6 +698,45 @@ export function createControllerState(overrides: {
   } satisfies SettingsFormController;
 }
 
+export function createCalendarFeedControllerState(
+  overrides: Partial<Omit<SettingsCalendarFeedController, "global" | "subscriptions">> & {
+    global?: Partial<SettingsCalendarFeedController["global"]>;
+    subscriptions?: Partial<SettingsCalendarFeedController["subscriptions"]>;
+  } = {},
+): SettingsCalendarFeedController {
+  const { global, subscriptions, ...controllerOverrides } = overrides;
+  return {
+    global: {
+      data: { enabled: false },
+      error: null,
+      hasData: true,
+      isInitialLoading: false,
+      isRefreshing: false,
+      retry: vi.fn<SettingsCalendarFeedController["global"]["retry"]>().mockResolvedValue(undefined),
+      ...global,
+    },
+    subscriptions: {
+      data: { items: [], total: 0, hasMore: false },
+      error: null,
+      hasData: true,
+      isInitialLoading: false,
+      isRefreshing: false,
+      isLoadingMore: false,
+      retry: vi.fn<SettingsCalendarFeedController["subscriptions"]["retry"]>().mockResolvedValue(undefined),
+      loadMore: vi.fn<SettingsCalendarFeedController["subscriptions"]["loadMore"]>().mockResolvedValue(undefined),
+      ...subscriptions,
+    },
+    pendingTargetKey: null,
+    pendingKind: null,
+    create: vi.fn<SettingsCalendarFeedController["create"]>().mockResolvedValue(true),
+    rotate: vi.fn<SettingsCalendarFeedController["rotate"]>().mockResolvedValue(true),
+    revoke: vi.fn<SettingsCalendarFeedController["revoke"]>().mockResolvedValue(true),
+    copyUrl: vi.fn<SettingsCalendarFeedController["copyUrl"]>().mockResolvedValue(undefined),
+    openSystem: vi.fn<SettingsCalendarFeedController["openSystem"]>().mockResolvedValue(undefined),
+    ...controllerOverrides,
+  };
+}
+
 function RouteProbe() {
   const location = useLocation();
   return <div data-testid="route-path">{location.pathname}</div>;
@@ -662,6 +744,9 @@ function RouteProbe() {
 
 export function renderSettingsScreen(initialEntries = ["/settings"]) {
   mocks.useCloudBackupController.mockReturnValue(createCloudBackupControllerState());
+  if (mocks.useCalendarFeedSettingsController.getMockImplementation() === undefined) {
+    mocks.useCalendarFeedSettingsController.mockReturnValue(createCalendarFeedControllerState());
+  }
   if (mocks.useUploadedAssetsManager.getMockImplementation() === undefined) {
     mocks.useUploadedAssetsManager.mockReturnValue(createUploadedAssetsManagerState());
   }

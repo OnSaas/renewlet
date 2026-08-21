@@ -9,6 +9,12 @@ const translations: Record<string, string> = {
   "common.close": "关闭",
   "common.disabled": "未启用",
   "common.enabled": "已启用",
+  "common.loading": "加载中",
+  "settings.managerLoadFailed": "加载失败",
+  "settings.managerRefreshFailed": "未更新",
+  "settings.managerRetry": "重试",
+  "settings.notUpdated": "未更新",
+  "settings.statusUnknown": "状态未知",
   "settings.accessSecurity": "访问安全",
   "settings.turnstileClearSecret": "清除密钥",
   "settings.turnstileClearing": "清除中...",
@@ -71,11 +77,28 @@ vi.mock("@/lib/theme-provider", () => ({
   }),
 }));
 
+function readState(
+  data: SettingsAuthSecurityController["readState"]["data"],
+  overrides: Partial<SettingsAuthSecurityController["readState"]> = {},
+): SettingsAuthSecurityController["readState"] {
+  return {
+    data,
+    hasData: data !== undefined,
+    error: null,
+    isInitialLoading: false,
+    isRefreshing: false,
+    retry: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
 function createController(overrides: Partial<SettingsAuthSecurityController> = {}): SettingsAuthSecurityController {
   return {
     canManage: true,
     disabled: false,
-    isLoading: false,
+    readState: readState({
+      turnstile: { enabled: false, siteKey: "", secretConfigured: false },
+    }),
     isSaving: false,
     isClearingSecret: false,
     isTesting: false,
@@ -114,6 +137,26 @@ describe("AccessSecuritySection", () => {
     const { container } = renderAccessSecuritySection(createController({ canManage: false }));
 
     expect(container.firstChild).toBeNull();
+  });
+
+  it("does not report Turnstile as disabled when the first read fails", async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    renderAccessSecuritySection(createController({
+      readState: readState(undefined, {
+        error: new Error("Turnstile unavailable"),
+        retry,
+      }),
+    }));
+
+    expect(screen.getByText("状态未知")).toBeInTheDocument();
+    expect(screen.getByText("加载失败")).toBeInTheDocument();
+    expect(screen.queryByText("未启用")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Site key")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Secret key")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "重试" }));
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 
   it("renders Turnstile human verification as a top-level access security section", () => {

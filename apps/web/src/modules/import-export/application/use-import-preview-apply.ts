@@ -5,7 +5,7 @@ import {
   recomputePreviewForConflictMode,
   type PreviewFilter,
 } from "@/components/import-preview-list";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/sonner";
 import { SETTINGS_QUERY_KEY } from "@/hooks/settings-query-key";
 import { invalidateSubscriptionCollections, removeSubscriptionDetails } from "@/hooks/subscription-query-cache";
 import { invalidateUploadedAssetsQueries } from "@/hooks/use-uploaded-assets";
@@ -150,21 +150,18 @@ export function useImportPreviewApply({ onApplied }: UseImportPreviewApplyOption
         ...assetInvalidations,
         ...iconAssetInvalidations,
       ]);
-      toast({
-        title: t("import.successTitle"),
-        description: t("import.successDescription", {
+      toast.success(t("import.successResult", {
           creates: result.summary.creates,
           replaces: result.summary.replaces,
           skips: result.summary.skips,
-        }),
-      });
+        }));
       onApplied();
     } catch (err) {
       const message = err instanceof ImportAssetUploadError
         ? t("import.assetUploadFailed")
         : getDisplayErrorMessage(err, t("import.applyFailed"));
       setError(message);
-      toast({ title: message, variant: "destructive" });
+      toast.error(message);
     } finally {
       setApplying(false);
     }

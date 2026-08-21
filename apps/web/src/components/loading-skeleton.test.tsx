@@ -34,7 +34,7 @@ describe("DashboardPageSkeleton", () => {
     const trials = screen.getByTestId("dashboard-skeleton-stat-trials");
 
     expect(grid).toHaveClass("grid", "gap-3", "sm:gap-5", "sm:grid-cols-2", "lg:grid-cols-4");
-    expect(grid.className).toContain("[grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr))]");
+    expect(grid.className).toContain("grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))]");
     expect(monthlySpend).toHaveClass("p-4", "lg:p-6", "col-span-full", "sm:col-span-1");
     expect(trials).toHaveClass("p-4", "lg:p-6", "col-span-full", "sm:col-span-1");
   });
@@ -82,7 +82,7 @@ describe("SettingsPageSkeleton", () => {
       "bg-card",
       "p-4",
       "sm:p-6",
-      "scroll-mt-[var(--settings-section-scroll-offset)]",
+      "scroll-mt-(--settings-section-scroll-offset)",
     );
     expect(firstSection).not.toHaveClass("lg:scroll-mt-24");
     expect(firstSection).not.toHaveClass("p-6");

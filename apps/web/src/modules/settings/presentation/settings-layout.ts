@@ -19,7 +19,7 @@ export const settingsLayout = {
   sectionCard: "min-w-0 w-full rounded-xl border border-border bg-card p-4 sm:p-6",
 } as const;
 
-export const SETTINGS_SECTION_SCROLL_CLASS = "scroll-mt-[var(--settings-section-scroll-offset)]";
+export const SETTINGS_SECTION_SCROLL_CLASS = "scroll-mt-(--settings-section-scroll-offset)";
 export const SETTINGS_SECTION_FRAME_CLASS = cn(settingsLayout.sectionCard, SETTINGS_SECTION_SCROLL_CLASS);
 
 export function getSettingsSectionClassName(className?: string | undefined) {

@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   remote: undefined as unknown,
   mutateAsync: vi.fn(),
   testMutateAsync: vi.fn(),
-  toast: vi.fn(),
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock("@/hooks/use-auth-security", () => ({
@@ -25,8 +25,8 @@ vi.mock("@/hooks/use-auth-security", () => ({
   }),
 }));
 
-vi.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ toast: mocks.toast }),
+vi.mock("@/components/ui/sonner", () => ({
+  toast: mocks.toast,
 }));
 
 vi.mock("@/i18n/I18nProvider", () => ({
@@ -44,7 +44,8 @@ describe("useAuthSecuritySettingsController", () => {
       turnstile: { enabled: true, siteKey: "site-key", secretConfigured: true },
     });
     mocks.testMutateAsync.mockReset().mockResolvedValue({ verified: true });
-    mocks.toast.mockReset();
+    mocks.toast.success.mockReset();
+    mocks.toast.error.mockReset();
   });
 
   it("saves a new Turnstile secret only when the draft contains one", async () => {
@@ -121,10 +122,7 @@ describe("useAuthSecuritySettingsController", () => {
     }));
     await waitFor(() => expect(result.current.testDialogOpen).toBe(false));
     expect(mocks.mutateAsync).not.toHaveBeenCalled();
-    expect(mocks.toast).toHaveBeenCalledWith({
-      title: "settings.turnstileTestPassed",
-      description: "settings.turnstileTestPassedDescription",
-    });
+    expect(mocks.toast.success).toHaveBeenCalledWith("settings.turnstileTestPassed");
   });
 
   it("omits the Turnstile test secret to let the server use the stored value", async () => {
@@ -156,10 +154,8 @@ describe("useAuthSecuritySettingsController", () => {
 
     expect(result.current.testDialogOpen).toBe(false);
     expect(mocks.testMutateAsync).not.toHaveBeenCalled();
-    expect(mocks.toast).toHaveBeenCalledWith({
-      title: "settings.turnstileTestFailed",
+    expect(mocks.toast.error).toHaveBeenCalledWith("settings.turnstileTestFailed", {
       description: "settings.turnstileIncomplete",
-      variant: "destructive",
     });
   });
 
@@ -182,10 +178,8 @@ describe("useAuthSecuritySettingsController", () => {
     await waitFor(() => expect(result.current.testError).toBe("test failed"));
     expect(result.current.testDialogOpen).toBe(true);
     expect(result.current.testResetSignal).toBeGreaterThan(resetSignal);
-    expect(mocks.toast).toHaveBeenCalledWith({
-      title: "settings.turnstileTestFailed",
+    expect(mocks.toast.error).toHaveBeenCalledWith("settings.turnstileTestFailed", {
       description: "test failed",
-      variant: "destructive",
     });
   });
 
@@ -221,10 +215,8 @@ describe("useAuthSecuritySettingsController", () => {
 
     expect(result.current.testDialogOpen).toBe(false);
     expect(result.current.testError).toBeUndefined();
-    expect(mocks.toast).not.toHaveBeenCalledWith({
-      title: "settings.turnstileTestFailed",
+    expect(mocks.toast.error).not.toHaveBeenCalledWith("settings.turnstileTestFailed", {
       description: "late failure",
-      variant: "destructive",
     });
   });
 });

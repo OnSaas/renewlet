@@ -357,7 +357,7 @@ function SubscriptionCardComponent({
               />
             </div>
 
-            <div className="min-w-0 max-w-[8.75rem] shrink-0 text-right sm:max-w-40">
+            <div className="min-w-0 max-w-35 shrink-0 text-right sm:max-w-40">
               <p className="truncate text-xl font-bold text-foreground">
                 {formatCurrency(subscription.price, subscription.currency)}
               </p>

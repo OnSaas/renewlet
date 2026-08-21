@@ -12,11 +12,11 @@ import { AIRecognitionSettingsSection } from "./ai-recognition-settings-section"
 const mocks = vi.hoisted(() => ({
   listModels: vi.fn(),
   testConnection: vi.fn(),
-  toast: vi.fn(),
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ toast: mocks.toast }),
+vi.mock("@/components/ui/sonner", () => ({
+  toast: mocks.toast,
 }));
 
 vi.mock("@/services/ai-recognition-service", () => ({
@@ -133,7 +133,8 @@ describe("AIRecognitionSettingsSection provider model layout", () => {
   beforeEach(() => {
     mocks.listModels.mockReset();
     mocks.testConnection.mockReset();
-    mocks.toast.mockReset();
+    mocks.toast.success.mockReset();
+    mocks.toast.error.mockReset();
     Element.prototype.hasPointerCapture ??= vi.fn(() => false);
     Element.prototype.releasePointerCapture ??= vi.fn();
   });
@@ -281,6 +282,7 @@ describe("AIRecognitionSettingsSection provider model layout", () => {
     expect(screen.getByText(/forbidden/)).toBeInTheDocument();
     expect(screen.queryByText(/AI_RECOGNITION_TEST_FAILED/)).not.toBeInTheDocument();
     expect(screen.queryByText(/rawResponseText/)).not.toBeInTheDocument();
-    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(mocks.toast.success).not.toHaveBeenCalled();
+    expect(mocks.toast.error).not.toHaveBeenCalled();
   });
 });

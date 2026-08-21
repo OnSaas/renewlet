@@ -151,7 +151,7 @@ export function StatisticsCharts({
   const renderEmptyChart = () => (
     <div
       className="flex min-w-0 items-center justify-center text-muted-foreground"
-      style={{ height: STATISTICS_DONUT_CHART_HEIGHT }}
+      style={{ height: 128 }}
     >
       {t("common.noData")}
     </div>

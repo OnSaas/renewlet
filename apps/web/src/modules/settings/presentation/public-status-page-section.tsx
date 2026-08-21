@@ -20,27 +20,27 @@ import { useI18n } from "@/i18n/I18nProvider";
 import type { ClipboardCopyTarget } from "@/shared/browser/clipboard";
 import { LoadingButtonContent } from "./settings-shared-controls";
 import { getSettingsSectionClassName } from "./settings-layout";
+import type { PublicStatusPage } from "@/lib/api/schemas/public-status";
+import type { SettingsReadState } from "../application/settings-read-state";
+import { ManagerDataBoundary } from "./manager-data-boundary";
+import { SettingsSectionHeader } from "./settings-section-header";
 
 interface PublicStatusPageSectionProps {
   id?: string;
   className?: string;
-  enabled: boolean;
-  pageUrl: string | null;
-  showPrices: boolean;
+  status: SettingsReadState<PublicStatusPage>;
+  visibility: SettingsReadState<{ visibleCount: number; hiddenCount: number }>;
   publicStatusCurrency: string;
   effectivePublicStatusCurrency: string;
   publicStatusCurrencyOptions: SearchableSelectOption[];
-  visibleCount: number;
-  hiddenCount: number;
-  isLoading: boolean;
   isCreating: boolean;
   isDeleting: boolean;
   isUpdating: boolean;
   onCreate: () => void | Promise<void>;
   onCopy: (target?: ClipboardCopyTarget | null) => void | Promise<void>;
-  onDelete: () => void | Promise<void>;
+  onDelete: () => void | Promise<boolean>;
   onOpenPage: () => void | Promise<void>;
-  onRegenerate: () => void | Promise<void>;
+  onRegenerate: () => void | Promise<boolean>;
   onShowPricesChange: (checked: boolean) => void | Promise<void>;
   onPublicStatusCurrencyChange: (value: string) => void | Promise<void>;
 }
@@ -130,15 +130,11 @@ function PublicStatusSettingRow({
 export function PublicStatusPageSection({
   id,
   className,
-  enabled,
-  pageUrl,
-  showPrices,
+  status,
+  visibility,
   publicStatusCurrency,
   effectivePublicStatusCurrency,
   publicStatusCurrencyOptions,
-  visibleCount,
-  hiddenCount,
-  isLoading,
   isCreating,
   isDeleting,
   isUpdating,
@@ -151,24 +147,51 @@ export function PublicStatusPageSection({
   onPublicStatusCurrencyChange,
 }: PublicStatusPageSectionProps) {
   const { t } = useI18n();
-  const [confirmRegenerateOpen, setConfirmRegenerateOpen] = useState(false);
-  const busy = isLoading || isCreating || isDeleting || isUpdating;
+  const [confirmation, setConfirmation] = useState<"regenerate" | "revoke" | null>(null);
+  const page = status.data;
+  const enabled = page?.enabled === true;
+  const pageUrl = page?.pageUrl ?? null;
+  const showPrices = page?.showPrices === true;
+  const busy = isCreating || isDeleting || isUpdating;
+  const headerStatus = status.isInitialLoading
+    ? t("common.loading")
+    : !status.hasData && status.error
+      ? t("settings.publicStatusUnknown")
+      : status.error
+        ? t("settings.publicStatusNotUpdated")
+        : enabled
+          ? t("settings.publicStatusEnabled")
+          : t("settings.publicStatusDisabled");
+  const visibilitySummary = visibility.isInitialLoading
+    ? t("settings.categoryChecking")
+    : !visibility.hasData && visibility.error
+      ? t("settings.publicStatusVisibilityUnknown")
+      : visibility.error
+        ? t("settings.publicStatusVisibilityStale", {
+          visible: visibility.data?.visibleCount ?? 0,
+          hidden: visibility.data?.hiddenCount ?? 0,
+        })
+        : t("settings.publicStatusSummary", {
+          visible: visibility.data?.visibleCount ?? 0,
+          hidden: visibility.data?.hiddenCount ?? 0,
+        });
 
   return (
     <section id={id} className={getSettingsSectionClassName(className)}>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <Globe2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-foreground">{t("settings.publicStatus")}</h2>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("settings.publicStatusHelp")}</p>
-          </div>
-        </div>
+      <SettingsSectionHeader
+        className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        icon={<Globe2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />}
+        title={t("settings.publicStatus")}
+        help={t("settings.publicStatusHelp")}
+        summary={visibilitySummary}
+        status={(
         <Badge variant={enabled ? "default" : "secondary"} className="w-fit shrink-0">
-          {enabled ? t("settings.publicStatusEnabled") : t("settings.publicStatusDisabled")}
+          {headerStatus}
         </Badge>
-      </div>
+        )}
+      />
 
+      <ManagerDataBoundary state={status}>
       {pageUrl ? (
         <div className="grid gap-4">
           <PublicStatusLinkRow
@@ -224,15 +247,12 @@ export function PublicStatusPageSection({
           </div>
 
           <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-muted-foreground">
-              {t("settings.publicStatusSummary", { visible: visibleCount, hidden: hiddenCount })}
-            </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setConfirmRegenerateOpen(true)}
+                onClick={() => setConfirmation("regenerate")}
                 disabled={busy}
                 aria-busy={isCreating ? true : undefined}
                 className="justify-center gap-2 border-border"
@@ -242,7 +262,7 @@ export function PublicStatusPageSection({
                   {t("settings.publicStatusRegenerate")}
                 </LoadingButtonContent>
               </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={onDelete} disabled={busy} aria-busy={isDeleting ? true : undefined} className="justify-center gap-2 text-destructive hover:text-destructive">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmation("revoke")} disabled={busy} aria-busy={isDeleting ? true : undefined} className="justify-center gap-2 text-destructive hover:text-destructive">
                 <LoadingButtonContent loading={isDeleting} loadingLabel={t("common.saving")}>
                   <Trash2 className="h-4 w-4" />
                   {t("settings.publicStatusRevoke")}
@@ -253,43 +273,54 @@ export function PublicStatusPageSection({
         </div>
       ) : (
         <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm leading-6 text-muted-foreground">{t("settings.publicStatusDisabledHelp")}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t("settings.publicStatusSummary", { visible: visibleCount, hidden: hiddenCount })}
-            </p>
-          </div>
+          <p className="min-w-0 text-sm leading-6 text-muted-foreground">{t("settings.publicStatusDisabledHelp")}</p>
           <Button type="button" size="sm" variant="default" onClick={onCreate} disabled={busy} aria-busy={isCreating ? true : undefined} className="justify-center gap-2 sm:shrink-0">
             <LoadingButtonContent loading={isCreating} loadingLabel={t("common.saving")}>
               <RefreshCw className="h-4 w-4" />
               {t("settings.publicStatusGenerate")}
             </LoadingButtonContent>
           </Button>
-          {enabled ? (
-            <Button type="button" variant="ghost" size="sm" onClick={onDelete} disabled={busy} aria-busy={isDeleting ? true : undefined} className="justify-center gap-2 text-destructive hover:text-destructive">
-              <LoadingButtonContent loading={isDeleting} loadingLabel={t("common.saving")}>
-                <Trash2 className="h-4 w-4" />
-                {t("settings.publicStatusRevoke")}
-              </LoadingButtonContent>
-            </Button>
-          ) : null}
         </div>
       )}
+      </ManagerDataBoundary>
 
-      <AlertDialog open={confirmRegenerateOpen} onOpenChange={setConfirmRegenerateOpen}>
+      <AlertDialog
+        open={confirmation !== null}
+        onOpenChange={(open) => {
+          if (!open && !busy) setConfirmation(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("settings.publicStatusRegenerateTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("settings.publicStatusRegenerateDescription")}</AlertDialogDescription>
+            <AlertDialogTitle>
+              {confirmation === "revoke"
+                ? t("settings.publicStatusRevokeTitle")
+                : t("settings.publicStatusRegenerateTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmation === "revoke"
+                ? t("settings.publicStatusRevokeDescription")
+                : t("settings.publicStatusRegenerateDescription")}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                void onRegenerate();
+              disabled={busy}
+              aria-busy={busy ? true : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                const operation = confirmation === "revoke" ? onDelete : onRegenerate;
+                void Promise.resolve(operation()).then((succeeded) => {
+                  if (succeeded !== false) setConfirmation(null);
+                });
               }}
             >
-              {t("settings.publicStatusRegenerate")}
+              <LoadingButtonContent loading={busy} loadingLabel={t("common.saving")}>
+                {confirmation === "revoke"
+                  ? t("settings.publicStatusRevoke")
+                  : t("settings.publicStatusRegenerate")}
+              </LoadingButtonContent>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

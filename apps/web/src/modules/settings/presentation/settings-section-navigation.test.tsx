@@ -130,7 +130,7 @@ describe("SettingsScreen section navigation", () => {
         "bg-card",
         "p-4",
         "sm:p-6",
-        "scroll-mt-[var(--settings-section-scroll-offset)]",
+        "scroll-mt-(--settings-section-scroll-offset)",
       );
       expect(container.querySelector(`section#${id}`)).not.toHaveClass("lg:scroll-mt-24");
       const links = sectionNav.getAllByRole("link", { name: label });

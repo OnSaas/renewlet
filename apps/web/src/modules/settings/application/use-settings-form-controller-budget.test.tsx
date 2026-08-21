@@ -23,7 +23,7 @@ const BASE_SETTINGS: AppSettings = {
 type SettingsMutationCommand = { patch: AppSettings; secretUpdates: SettingsSecretUpdates };
 
 const mocks = vi.hoisted(() => ({
-  toast: vi.fn(),
+  toast: { success: vi.fn(), error: vi.fn() },
   updateSettingsMutateAsync: vi.fn<(command: SettingsMutationCommand) => Promise<unknown>>(),
   refreshRates: vi.fn(),
   remoteSettings: undefined as unknown,
@@ -37,9 +37,6 @@ const mocks = vi.hoisted(() => ({
   syncRemoteLocale: vi.fn(),
   testConnection: vi.fn(),
   refetchNotificationHistory: vi.fn(),
-  calendarFeedStatus: { data: { enabled: false, feedUrl: undefined as string | undefined }, isLoading: false },
-  createCalendarFeedMutateAsync: vi.fn(),
-  deleteCalendarFeedMutateAsync: vi.fn(),
   publicStatusPageStatus: { data: { enabled: false, pageUrl: undefined as string | undefined, showPrices: false }, isLoading: false },
   createPublicStatusPageMutateAsync: vi.fn(),
   updatePublicStatusPageMutateAsync: vi.fn(),
@@ -65,8 +62,8 @@ function settingsMutationResult(command: SettingsMutationCommand) {
   return { settings: command.patch, secretStatus };
 }
 
-vi.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ toast: mocks.toast }),
+vi.mock("@/components/ui/sonner", () => ({
+  toast: mocks.toast,
 }));
 
 vi.mock("@/hooks/use-settings", () => ({
@@ -107,12 +104,6 @@ vi.mock("@/hooks/use-subscriptions", () => ({
 
 vi.mock("@/hooks/use-password-reset-availability", () => ({
   usePasswordResetAvailability: () => true,
-}));
-
-vi.mock("@/hooks/use-calendar-feed", () => ({
-  useCalendarFeedStatus: () => mocks.calendarFeedStatus,
-  useCreateCalendarFeed: () => ({ mutateAsync: mocks.createCalendarFeedMutateAsync, isPending: false }),
-  useDeleteCalendarFeed: () => ({ mutateAsync: mocks.deleteCalendarFeedMutateAsync, isPending: false }),
 }));
 
 vi.mock("@/hooks/use-built-in-icon-index", () => ({
@@ -165,7 +156,6 @@ vi.mock("@/services/runtime", () => ({
 vi.mock("@/i18n/I18nProvider", () => {
   const messages: Record<string, string> = {
     "settings.saved": "设置已保存",
-    "settings.savedDescription": "所有更改已同步。",
     "settings.saveFailed": "保存失败",
     "settings.budgetInvalid": "预算金额无效",
     "settings.telegramBotCommandsConfigMissing": "请先填写并保存 Bot Token 和 Chat ID。",
@@ -220,7 +210,8 @@ vi.mock("./use-notification-history", () => ({
 
 describe("useSettingsFormController monthly budget input", () => {
   beforeEach(() => {
-    mocks.toast.mockReset();
+    mocks.toast.success.mockReset();
+    mocks.toast.error.mockReset();
     mocks.updateSettingsMutateAsync.mockReset();
     mocks.refreshRates.mockReset();
     mocks.saveConfig.mockReset();
@@ -273,11 +264,9 @@ describe("useSettingsFormController monthly budget input", () => {
     });
 
     expect(mocks.updateSettingsMutateAsync).not.toHaveBeenCalled();
-    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
-      title: "保存失败",
+    expect(mocks.toast.error).toHaveBeenCalledWith("保存失败", {
       description: "预算金额无效",
-      variant: "destructive",
-    }));
+    });
   });
 
   it("updates the monthly budget only when the numeric input is valid", () => {

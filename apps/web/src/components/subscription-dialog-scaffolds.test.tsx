@@ -188,12 +188,14 @@ describe("subscription dialog scaffolds", () => {
   });
 
   it("keeps calendar loading and resolved regions in the same order", () => {
-    const expected = ["calendar-facts", "calendar-feed-actions", "calendar-providers"];
+    const expected = ["calendar-facts", "calendar-feed-actions", "calendar-one-time-actions", "calendar-providers"];
     const resolved = render(
       <SubscriptionCalendarScaffold
         facts="facts"
-        primaryAction="primary"
-        secondaryActions="secondary"
+        syncHeading="sync heading"
+        syncContent="sync content"
+        oneTimeHeading="one-time heading"
+        oneTimeActions="one-time actions"
         notice="notice"
         providerHeading="providers"
         providers="links"

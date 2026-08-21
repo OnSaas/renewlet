@@ -28,6 +28,7 @@ func runSchemaDataMigrations(app core.App) error {
 		{Name: "cost_sharing_collection_reminder_inherited_cycle_v3", Run: migrateCostSharingCollectionReminderInheritedCycle},
 		{Name: "subscription_cycle_fields_v1", Run: migrateSubscriptionCycleFields},
 		{Name: "invalid_subscription_logos_v1", Run: cleanupInvalidSubscriptionLogos},
+		{Name: "orphan_subscription_calendar_feeds_v1", Run: deleteOrphanSubscriptionCalendarFeeds},
 	}
 	for _, migration := range migrations {
 		if err := runSchemaDataMigration(app, migration.Name, migration.Run); err != nil {

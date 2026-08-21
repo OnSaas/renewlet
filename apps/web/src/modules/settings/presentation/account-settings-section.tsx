@@ -21,6 +21,8 @@ import { DeferredAccountSecurityDialogs } from "./account-security-dialogs-loade
 import { PASSKEYS_QUERY_KEY } from "./account-security-query-keys";
 import type { AccountSecurityDialogState, MfaPasswordAction } from "./account-security-dialog-state";
 import { getSettingsSectionClassName } from './settings-layout';
+import type { Passkey } from "@/lib/api/schemas/auth";
+import { toSettingsReadState } from "../application/settings-read-state";
 
 export interface AccountSettingsSectionProps {
   id?: string;
@@ -72,7 +74,7 @@ export function AccountSettingsSection({
     queryFn: ({ signal }) => passkeyService.list(signal),
     staleTime: 30_000,
   });
-  const passkeys = passkeysQuery.data ?? [];
+  const passkeys = toSettingsReadState<Passkey[]>(passkeysQuery);
 
   const openAccountSecurityDialog = (nextState: AccountSecurityDialogState) => {
     if (passwordDisabled && nextState.type !== "none") return;
@@ -169,8 +171,7 @@ export function AccountSettingsSection({
           />
           <AccountPasskeysSection
             disabled={passwordDisabled}
-            count={passkeys.length}
-            isLoading={passkeysQuery.isLoading}
+            state={passkeys}
             onManagePasskeys={() => openAccountSecurityDialog({ type: "passkeys_manager" })}
           />
         </div>
@@ -195,7 +196,6 @@ export function AccountSettingsSection({
         accountEmail={accountEmail}
         disabled={passwordDisabled}
         passkeys={passkeys}
-        isLoading={passkeysQuery.isLoading}
       />
     </>
   );

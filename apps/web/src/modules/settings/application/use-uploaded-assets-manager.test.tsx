@@ -11,7 +11,7 @@ import { useUploadedAssetsManager } from "./use-uploaded-assets-manager";
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   delete: vi.fn(),
-  toast: vi.fn(),
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock("@/services/asset-service", () => ({
@@ -21,8 +21,8 @@ vi.mock("@/services/asset-service", () => ({
   },
 }));
 
-vi.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ toast: mocks.toast }),
+vi.mock("@/components/ui/sonner", () => ({
+  toast: mocks.toast,
 }));
 
 vi.mock("@/i18n/I18nProvider", () => ({
@@ -37,13 +37,12 @@ vi.mock("@/i18n/I18nProvider", () => ({
       if (key === "settings.uploadedIconsDeleteBlockedByBoth") {
         return `仍被 ${String(params?.["subscriptionCount"])} 个订阅和 ${String(params?.["paymentMethodCount"])} 个支付方式使用，请先分别换掉 Logo 和支付方式图标。`;
       }
-      if (key === "settings.uploadedIconsDeleteSuccessDescription") {
+      if (key === "settings.uploadedIconsDeleted") {
         return `已删除 ${String(params?.["name"])}。`;
       }
       const messages: Record<string, string> = {
         "settings.uploadedIconsDeleteFailed": "删除失败",
         "settings.uploadedIconsDeleteFailedDescription": "无法删除上传图标。",
-        "settings.uploadedIconsDeleteSuccess": "上传图标已删除",
         "settings.uploadedIconsUnnamedAsset": "未命名资产",
       };
       return messages[key] ?? key;
@@ -95,7 +94,8 @@ describe("useUploadedAssetsManager", () => {
   beforeEach(() => {
     mocks.list.mockReset();
     mocks.delete.mockReset();
-    mocks.toast.mockReset();
+    mocks.toast.success.mockReset();
+    mocks.toast.error.mockReset();
     mockListOnce(page([]), page([]));
   });
 
@@ -108,8 +108,8 @@ describe("useUploadedAssetsManager", () => {
     const { result } = renderHook(() => useUploadedAssetsManager(), { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(result.current.logo.assets.map((item) => item.id)).toEqual(["asset_logo"]);
-      expect(result.current.icon.assets.map((item) => item.id)).toEqual(["asset_icon"]);
+      expect(result.current.logo.readState.data?.map((item) => item.id)).toEqual(["asset_logo"]);
+      expect(result.current.icon.readState.data?.map((item) => item.id)).toEqual(["asset_icon"]);
     });
     expect(mocks.list).toHaveBeenCalledWith("logo", 1, expect.any(AbortSignal));
     expect(mocks.list).toHaveBeenCalledWith("icon", 1, expect.any(AbortSignal));
@@ -126,14 +126,59 @@ describe("useUploadedAssetsManager", () => {
     const { Wrapper, queryClient } = createWrapper();
     const { result } = renderHook(() => useUploadedAssetsManager(), { wrapper: Wrapper });
 
-    await waitFor(() => expect(result.current.icon.hasLoaded).toBe(true));
-    expect(result.current.icon.assets).toEqual([]);
+    await waitFor(() => expect(result.current.icon.readState.hasData).toBe(true));
+    expect(result.current.icon.readState.data).toEqual([]);
 
     await act(async () => {
       await queryClient.invalidateQueries({ queryKey: uploadedAssetsQueryKeys.byKind("icon") });
     });
 
-    await waitFor(() => expect(result.current.icon.assets.map((item) => item.id)).toEqual(["asset_payment"]));
+    await waitFor(() => expect(result.current.icon.readState.data?.map((item) => item.id)).toEqual(["asset_payment"]));
+  });
+
+  it("treats a retry after the first failure as refreshing without inventing cached assets", async () => {
+    const logoAsset = asset();
+    let logoRequestCount = 0;
+    let resolveRetry!: (value: UploadedAssetsPage) => void;
+    const retryResponse = new Promise<UploadedAssetsPage>((resolve) => {
+      resolveRetry = resolve;
+    });
+    mocks.list.mockImplementation(async (kind: UploadKind) => {
+      if (kind === "icon") return page([]);
+      logoRequestCount += 1;
+      if (logoRequestCount === 1) throw new Error("network unavailable");
+      return retryResponse;
+    });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUploadedAssetsManager(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.logo.readState.error?.message).toBe("network unavailable"));
+
+    let retry!: Promise<void>;
+    act(() => {
+      retry = result.current.logo.readState.retry();
+    });
+
+    await waitFor(() => {
+      expect(result.current.logo.readState).toMatchObject({
+        data: undefined,
+        hasData: false,
+        isInitialLoading: false,
+        isRefreshing: true,
+      });
+    });
+
+    await act(async () => {
+      resolveRetry(page([logoAsset]));
+      await retry;
+    });
+    expect(result.current.logo.readState).toMatchObject({
+      data: [logoAsset],
+      hasData: true,
+      error: null,
+      isInitialLoading: false,
+      isRefreshing: false,
+    });
   });
 
   it("removes a deleted asset from the matching kind list", async () => {
@@ -146,7 +191,7 @@ describe("useUploadedAssetsManager", () => {
     const { Wrapper, invalidateSpy } = createWrapper();
     const { result } = renderHook(() => useUploadedAssetsManager(), { wrapper: Wrapper });
 
-    await waitFor(() => expect(result.current.logo.assets).toHaveLength(1));
+    await waitFor(() => expect(result.current.logo.readState.data).toHaveLength(1));
     let deleted = false;
     await act(async () => {
       deleted = await result.current.deleteAsset(logoAsset);
@@ -155,10 +200,8 @@ describe("useUploadedAssetsManager", () => {
     expect(deleted).toBe(true);
     expect(mocks.delete).toHaveBeenCalledWith("asset_logo");
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: uploadedAssetsQueryKeys.byKind("logo") });
-    await waitFor(() => expect(result.current.logo.assets).toEqual([]));
-    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
-      title: "上传图标已删除",
-    }));
+    await waitFor(() => expect(result.current.logo.readState.data).toEqual([]));
+    expect(mocks.toast.success).toHaveBeenCalledWith("已删除 logo.png。");
   });
 
   it("keeps subscription-referenced assets in place and points users to subscriptions", async () => {
@@ -173,7 +216,7 @@ describe("useUploadedAssetsManager", () => {
     const { Wrapper, invalidateSpy } = createWrapper();
     const { result } = renderHook(() => useUploadedAssetsManager(), { wrapper: Wrapper });
 
-    await waitFor(() => expect(result.current.logo.assets).toHaveLength(1));
+    await waitFor(() => expect(result.current.logo.readState.data).toHaveLength(1));
     let deleted = true;
     await act(async () => {
       deleted = await result.current.deleteAsset(logoAsset);
@@ -181,15 +224,15 @@ describe("useUploadedAssetsManager", () => {
 
     expect(deleted).toBe(false);
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: uploadedAssetsQueryKeys.byKind("logo") });
-    expect(result.current.logo.assets.map((item) => item.id)).toEqual(["asset_logo"]);
+    expect(result.current.logo.readState.data?.map((item) => item.id)).toEqual(["asset_logo"]);
     expect(result.current.deleteError).toEqual({
       assetId: "asset_logo",
       message: "仍被 2 个订阅使用，请先到订阅里换掉 Logo。",
     });
-    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
-      title: "删除失败",
-      variant: "destructive",
-    }));
+    expect(mocks.toast.error).toHaveBeenCalledWith(
+      "删除失败",
+      expect.objectContaining({ description: expect.any(String) }),
+    );
   });
 
   it("keeps payment-method-referenced assets in place and points users to payment methods", async () => {
@@ -204,7 +247,7 @@ describe("useUploadedAssetsManager", () => {
     const { Wrapper, invalidateSpy } = createWrapper();
     const { result } = renderHook(() => useUploadedAssetsManager(), { wrapper: Wrapper });
 
-    await waitFor(() => expect(result.current.icon.assets).toHaveLength(1));
+    await waitFor(() => expect(result.current.icon.readState.data).toHaveLength(1));
     let deleted = true;
     await act(async () => {
       deleted = await result.current.deleteAsset(paymentIcon);
@@ -212,7 +255,7 @@ describe("useUploadedAssetsManager", () => {
 
     expect(deleted).toBe(false);
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: uploadedAssetsQueryKeys.byKind("icon") });
-    expect(result.current.icon.assets.map((item) => item.id)).toEqual(["asset_logo"]);
+    expect(result.current.icon.readState.data?.map((item) => item.id)).toEqual(["asset_logo"]);
     expect(result.current.deleteError).toEqual({
       assetId: "asset_logo",
       message: "仍被 1 个支付方式使用，请先到支付方式管理里换掉图标。",
@@ -231,7 +274,7 @@ describe("useUploadedAssetsManager", () => {
     const { Wrapper } = createWrapper();
     const { result } = renderHook(() => useUploadedAssetsManager(), { wrapper: Wrapper });
 
-    await waitFor(() => expect(result.current.logo.assets).toHaveLength(1));
+    await waitFor(() => expect(result.current.logo.readState.data).toHaveLength(1));
     await act(async () => {
       await result.current.deleteAsset(logoAsset);
     });

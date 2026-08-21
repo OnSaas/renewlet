@@ -27,13 +27,10 @@ import { useSettingsEnvelope, useUpdateSettings } from "@/hooks/use-settings";
 import { useSubscriptionFacets } from "@/hooks/use-subscriptions";
 import { usePasswordResetAvailability } from "@/hooks/use-password-reset-availability";
 import { useSetupStatus } from "@/hooks/use-setup-status";
-import { useCalendarFeedStatus, useCreateCalendarFeed, useDeleteCalendarFeed } from "@/hooks/use-calendar-feed";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/sonner";
 import { getDisplayErrorMessage } from "@/lib/display-error";
 import type { RawErrorResponseDetails } from "@/lib/raw-error-response";
 import { applyThemeVariant } from "@/lib/theme-variant";
-import { openValidatedWebcalUrl } from "@/shared/browser/calendar-links";
-import { copyTextToClipboard, type ClipboardCopyTarget } from "@/shared/browser/clipboard";
 import {
   clearSettingsAppearanceDraftFromStorage,
   writeAppearancePendingToStorage,
@@ -70,6 +67,7 @@ import { type SettingsSecretKey } from "@/lib/api/schemas/settings";
 import { EMPTY_SETTINGS_SECRET_STATUS } from "@/services/settings-service";
 import { useSettingsSecretDrafts } from "./use-settings-secret-drafts";
 import type { SettingsFormController } from "./settings-form-controller-types";
+import { toSettingsReadState } from "./settings-read-state";
 export type { SettingsFormController } from "./settings-form-controller-types";
 
 /**
@@ -94,6 +92,7 @@ export function useSettingsFormController(): SettingsFormController {
   const remoteSettings = remoteEnvelope?.settings;
   const secretStatus = remoteEnvelope?.secretStatus ?? EMPTY_SETTINGS_SECRET_STATUS;
   const subscriptionFacetsQuery = useSubscriptionFacets();
+  const subscriptionFacets = toSettingsReadState(subscriptionFacetsQuery);
   const updateSettings = useUpdateSettings();
   const { theme, setTheme } = useTheme();
   const { config: persistedCustomConfig } = useCustomConfigState();
@@ -110,7 +109,6 @@ export function useSettingsFormController(): SettingsFormController {
     reportBasisStatus,
     getCurrencySymbol,
   } = useReportExchangeRates(savedSettings.exchangeRateProvider);
-  const { toast } = useToast();
   const { t, commitLocale, syncRemoteLocale } = useI18n();
   const appStatus = useSetupStatus();
   const externalIntegrationsDisabled = appStatus.isLoading || appStatus.demoMode;
@@ -135,13 +133,15 @@ export function useSettingsFormController(): SettingsFormController {
     clearedSecrets,
   );
   const notificationHistory = useNotificationHistory();
-  const calendarFeedStatus = useCalendarFeedStatus();
-  const createCalendarFeed = useCreateCalendarFeed();
-  const deleteCalendarFeed = useDeleteCalendarFeed();
   const canRefreshBuiltInIconIndex = accountIdentity.role === "admin";
   const builtInIconIndex = useSettingsBuiltInIconIndexController(canRefreshBuiltInIconIndex);
   const authSecurity = useAuthSecuritySettingsController(canManageUsers, sensitiveAccountActionsDisabled);
-  const { refetch: refetchNotificationHistory } = notificationHistory;
+  const refetchNotificationHistory = useCallback(async () => {
+    await Promise.all([
+      notificationHistory.overview.retry(),
+      notificationHistory.history.retry(),
+    ]);
+  }, [notificationHistory.history, notificationHistory.overview]);
   const hasInitializedFromRemoteRef = useRef(false);
   const hasResolvedDefaultRecipientEmailRef = useRef(false);
   const settingsDirtyRef = useRef(false);
@@ -151,7 +151,7 @@ export function useSettingsFormController(): SettingsFormController {
     () => new Map(Object.entries(subscriptionFacetsQuery.data?.categoryCounts ?? {})),
     [subscriptionFacetsQuery.data?.categoryCounts],
   );
-  const publicStatusPage = usePublicStatusPageSettingsController(subscriptionFacetsQuery.data);
+  const publicStatusPage = usePublicStatusPageSettingsController(subscriptionFacets);
   const publicApi = usePublicApiSettingsController();
   const telegramBotCommands = useTelegramBotCommandsController({
     settings: settingsWithDrafts,
@@ -301,11 +301,8 @@ export function useSettingsFormController(): SettingsFormController {
 
   const handleRefreshRates = useCallback(async () => {
     await refreshRates(savedSettings.exchangeRateProvider);
-    toast({
-      title: t("settings.ratesUpdated"),
-      description: t("settings.ratesUpdatedDescription"),
-    });
-  }, [refreshRates, savedSettings.exchangeRateProvider, t, toast]);
+    toast.success(t("settings.ratesUpdated"));
+  }, [refreshRates, savedSettings.exchangeRateProvider, t]);
 
   const handleUpdateCurrencies = useCallback(
     (items: ConfigItem[]) => {
@@ -316,19 +313,18 @@ export function useSettingsFormController(): SettingsFormController {
         return;
       }
 
-      toast({
-        title: result.reason === "none-enabled"
+      toast.error(
+        result.reason === "none-enabled"
           ? t("settings.currencyPolicy.noneTitle")
           : t("settings.currencyPolicy.defaultTitle"),
-        description: result.reason === "none-enabled"
+        { description: result.reason === "none-enabled"
           ? t("settings.currencyPolicy.noneDescription")
-          : t("settings.currencyPolicy.defaultDescription", { currency: settings.defaultCurrency }),
-        variant: "destructive",
-      });
+          : t("settings.currencyPolicy.defaultDescription", { currency: settings.defaultCurrency }) },
+      );
 
       if (result.items) updateCurrencies(result.items);
     },
-    [settings.defaultCurrency, t, toast, updateCurrencies],
+    [settings.defaultCurrency, t, updateCurrencies],
   );
 
   const syncSavedPreviewState = useCallback(
@@ -353,11 +349,7 @@ export function useSettingsFormController(): SettingsFormController {
   const handleSaveChanges = useCallback(async () => {
     if (isSavingSettings || !hasUnsavedChanges) return;
     if (monthlyBudgetError) {
-      toast({
-        title: t("settings.saveFailed"),
-        description: monthlyBudgetError,
-        variant: "destructive",
-      });
+      toast.error(t("settings.saveFailed"), { description: monthlyBudgetError });
       return;
     }
 
@@ -427,22 +419,17 @@ export function useSettingsFormController(): SettingsFormController {
           : settings;
         setMonthlyBudgetInput(String(committedSettings.monthlyBudget));
         setMonthlyBudgetError(null);
-        toast({
-          title: t("settings.saved"),
-          description: t("settings.savedDescription"),
-        });
+        toast.success(t("settings.saved"));
         return;
       }
 
       const fallbackDescription = providerChanged && firstError
         ? getExchangeRateProviderSaveErrorMessage(firstError, t)
         : getDisplayErrorMessage(firstError, t("settings.saveFailedDescription"));
-      toast({
-        title: t("settings.saveFailed"),
+      toast.error(t("settings.saveFailed"), {
         description: failedScopes.length > 1
           ? t("settings.partialSaveFailedDescription", { scope: failedScopes.join(", ") })
           : fallbackDescription,
-        variant: "destructive",
       });
     } finally {
       setIsSavingSettings(false);
@@ -468,7 +455,6 @@ export function useSettingsFormController(): SettingsFormController {
     syncSavedPreviewState,
     t,
     refetchTelegramBotCommands,
-    toast,
     updateSettings,
   ]);
 
@@ -494,95 +480,6 @@ export function useSettingsFormController(): SettingsFormController {
     },
     [updateSetting],
   );
-
-  const handleCreateCalendarFeed = useCallback(async () => {
-    try {
-      // Feed URL 是低权限 bearer secret；创建成功后由 React Query 缓存接住新 token，避免用户复制旧地址。
-      await createCalendarFeed.mutateAsync();
-      toast({
-        title: t("settings.calendarFeedGenerated"),
-        description: t("settings.calendarFeedGeneratedDescription"),
-      });
-    } catch (error) {
-      toast({
-        title: t("settings.calendarFeedFailed"),
-        description: getDisplayErrorMessage(error, t("settings.calendarFeedFailedDescription")),
-        variant: "destructive",
-      });
-    }
-  }, [createCalendarFeed, t, toast]);
-
-  const handleCopyCalendarFeedUrl = useCallback(async (target?: ClipboardCopyTarget | null) => {
-    const feedUrl = calendarFeedStatus.data?.feedUrl;
-    if (!feedUrl) return;
-    // 复制只读当前缓存中的 URL；不在点击时重新请求，避免系统剪贴板动作和网络竞态叠加。
-    const copyResult = await copyTextToClipboard(feedUrl, { target });
-    if (copyResult.ok) {
-      toast({
-        title: t("settings.calendarFeedCopied"),
-        description: t("settings.calendarFeedCopiedDescription"),
-      });
-      return;
-    }
-    toast({
-      title: t("settings.calendarFeedCopyFailed"),
-      description: t("settings.calendarFeedCopyFailedDescription"),
-      variant: "destructive",
-    });
-  }, [calendarFeedStatus.data?.feedUrl, t, toast]);
-
-  const handleOpenCalendarFeedSystem = useCallback(async () => {
-    const feedUrl = calendarFeedStatus.data?.feedUrl;
-    if (!feedUrl) return;
-    try {
-      await openValidatedWebcalUrl(feedUrl);
-      toast({
-        title: t("settings.calendarFeedOpenSystemAttempted"),
-        description: t("settings.calendarFeedOpenSystemAttemptedDescription"),
-      });
-    } catch (error) {
-      toast({
-        title: t("settings.calendarFeedOpenSystemFailed"),
-        description: getDisplayErrorMessage(error, t("settings.calendarFeedOpenSystemFailedDescription")),
-        variant: "destructive",
-      });
-    }
-  }, [calendarFeedStatus.data?.feedUrl, t, toast]);
-
-  const handleRevokeCalendarFeed = useCallback(async () => {
-    try {
-      // 撤销必须立即清远端 token；前端缓存只负责让 UI 及时显示 disabled，不作为安全边界。
-      await deleteCalendarFeed.mutateAsync();
-      toast({
-        title: t("settings.calendarFeedRevoked"),
-        description: t("settings.calendarFeedRevokedDescription"),
-      });
-    } catch (error) {
-      toast({
-        title: t("settings.calendarFeedFailed"),
-        description: getDisplayErrorMessage(error, t("settings.calendarFeedRevokeFailedDescription")),
-        variant: "destructive",
-      });
-    }
-  }, [deleteCalendarFeed, t, toast]);
-
-  const handleRegenerateCalendarFeed = useCallback(async () => {
-    try {
-      // 轮换使用“先撤销后创建”，确保旧 URL 在服务端失效后才展示新 URL。
-      await deleteCalendarFeed.mutateAsync();
-      await createCalendarFeed.mutateAsync();
-      toast({
-        title: t("settings.calendarFeedRegenerated"),
-        description: t("settings.calendarFeedRegeneratedDescription"),
-      });
-    } catch (error) {
-      toast({
-        title: t("settings.calendarFeedFailed"),
-        description: getDisplayErrorMessage(error, t("settings.calendarFeedFailedDescription")),
-        variant: "destructive",
-      });
-    }
-  }, [createCalendarFeed, deleteCalendarFeed, t, toast]);
 
   const handleThemeModeChange = useCallback(
     (value: ThemeMode) => {
@@ -646,7 +543,7 @@ export function useSettingsFormController(): SettingsFormController {
     canManageUsers,
     canAccessPocketBaseAdmin: canManageUsers && !isCloudflareRuntime,
     customConfig,
-    subscriptionFacetsQuery,
+    subscriptionFacets,
     categoryUsageCount,
     rates,
     activeRateProvider,
@@ -683,18 +580,6 @@ export function useSettingsFormController(): SettingsFormController {
     notificationTestErrorDetailsOpen: notificationTest.errorDetailsOpen,
     setNotificationTestErrorDetailsOpen: notificationTest.setErrorDetailsOpen,
     notificationHistory,
-    calendarFeed: {
-      data: calendarFeedStatus.data,
-      feedUrl: calendarFeedStatus.data?.feedUrl ?? null,
-      isLoading: calendarFeedStatus.isLoading,
-      isCreating: createCalendarFeed.isPending,
-      isDeleting: deleteCalendarFeed.isPending,
-      createOrRotate: handleCreateCalendarFeed,
-      copyUrl: handleCopyCalendarFeedUrl,
-      openSystem: handleOpenCalendarFeedSystem,
-      regenerate: handleRegenerateCalendarFeed,
-      revoke: handleRevokeCalendarFeed,
-    },
     builtInIconIndex,
     publicStatusPage,
     publicApi,

@@ -715,7 +715,7 @@ export function AIRecognizeSubscriptionDialogContent({
               </div>
               <div className="min-w-0 text-left">
                 <DialogTitle className="text-lg">{t("aiRecognition.dialogTitle")}</DialogTitle>
-                <DialogDescription className="mt-1 max-w-3xl text-left leading-5">{t("aiRecognition.dialogDescription")}</DialogDescription>
+                <DialogDescription className="sr-only">{t("aiRecognition.dialogDescription")}</DialogDescription>
               </div>
             </div>
             <AIRecognitionStepper

@@ -8,7 +8,6 @@
  */
 
 import type { SubscriptionCollectionItem } from '@/types/subscription';
-import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDateOnlyMonthDay } from '@/lib/time/date-only';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -30,12 +29,7 @@ export function UpcomingRenewals({ subscriptions, timeZone, notificationReminder
 
   if (upcoming.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success/10">
-          <Clock className="h-6 w-6 text-success" />
-        </div>
-        <p className="text-sm text-muted-foreground">{t("upcoming.noneNextTwoWeeks")}</p>
-      </div>
+      <p className="py-4 text-center text-sm leading-6 text-muted-foreground">{t("upcoming.noneNextTwoWeeks")}</p>
     );
   }
 

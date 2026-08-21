@@ -181,8 +181,10 @@ describe("AIRecognizeSubscriptionDialog", () => {
 
     expect(screen.getByRole("tab", { name: "文本" })).toBeInTheDocument();
     const dialogDescription = screen.getByText("使用已配置的 AI 模型生成可编辑订阅草稿，确认后再导入。");
+    expect(dialogDescription).toHaveClass("sr-only");
     expect(dialogDescription).not.toHaveTextContent("粘贴备忘录");
     expect(dialogDescription).not.toHaveTextContent("上传图片");
+    expect(screen.queryByRole("heading", { name: "文本内容" })).not.toBeInTheDocument();
     expect(screen.getByText("支持纯文本、CSV/TSV 和表格复制文本；.xlsx 文件请先复制内容。")).toBeInTheDocument();
     expect(dialog).toHaveClass("h5-ai-recognition-input-dialog-frame");
     expect(dialog).not.toHaveClass("h-fit");
@@ -237,7 +239,7 @@ describe("AIRecognizeSubscriptionDialog", () => {
 
     await user.click(screen.getByRole("tab", { name: "图片" }));
     const uploadButton = screen.getByTestId("ai-recognition-image-upload-button");
-    expect(uploadButton).toHaveClass("min-h-[12rem]", "w-full");
+    expect(uploadButton).toHaveClass("min-h-48", "w-full");
     expect(screen.getByTestId("ai-recognition-image-scrollport")).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
 
     await user.upload(screen.getByLabelText("添加订阅图片"), image);
@@ -245,14 +247,14 @@ describe("AIRecognizeSubscriptionDialog", () => {
     expect(screen.getByTestId("ai-recognition-image-upload-button")).toHaveClass("h-12", "w-full");
   });
 
-  it("图片输入区只展示一次标题和说明", async () => {
+  it("输入 Tabs 是唯一模式标题并保留图片约束", async () => {
     const user = userEvent.setup();
     renderDialog();
 
     await user.click(screen.getByRole("tab", { name: "图片" }));
 
     const imagePanel = screen.getByTestId("ai-recognition-image-panel");
-    expect(screen.getAllByText("上传订阅图片")).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "上传订阅图片" })).not.toBeInTheDocument();
     expect(screen.getAllByText("点击、拖拽或粘贴添加 PNG、JPG、WebP 图片，最多 5 张。")).toHaveLength(1);
     expect(screen.getByRole("button", { name: /添加图片/ })).toBeInTheDocument();
     expect(within(imagePanel).getByText("0/5 张图片")).toBeInTheDocument();

@@ -26,7 +26,8 @@ import { UpcomingRenewals } from "@/components/upcoming-renewals";
 import { DashboardPageSkeleton } from "@/components/loading-skeleton";
 import { QueryErrorState } from "@/components/query-error-state";
 import { EditSubscriptionDialog } from "@/components/edit-subscription-dialog";
-import { CreditCard, TrendingUp, Clock, Sparkles } from "lucide-react";
+import { AddSubscriptionDialog } from "@/components/add-subscription-dialog";
+import { CreditCard, TrendingUp, Clock, Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useReportExchangeRates } from "@/hooks/use-report-exchange-rates";
 import { useSubscriptionAnalytics, useSubscriptionFacets } from "@/hooks/use-subscriptions";
@@ -184,28 +185,45 @@ export default function Index() {
                 </Button>
               </Link>
             </div>
-            <div className="grid items-stretch gap-4 sm:grid-cols-2">
-              {displayedSubscriptions.map((sub, index) => (
-                <div key={sub.id} className="h-full animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
-                  <SubscriptionCard
-                    subscription={sub}
-                    timeZone={timeZone}
-                    inheritedReminderDays={inheritedReminderDays}
-                    currencyConvert={convert}
-                    currencyRatesReady={currencyRatesReady}
-                    priceReferenceCurrency={priceReferenceCurrency}
-                    categoryByValue={categoryByValue}
-                    paymentMethodByValue={paymentMethodByValue}
-                    onEdit={handleEditSubscription}
-                    onDelete={handleDeleteSubscription}
-                    onTogglePublicHidden={handleTogglePublicHiddenSubscription}
-                    onViewDetails={handleViewDetails}
-                    onAddToCalendar={calendarDialog.show}
-                    onPrefetchDetails={handlePrefetchSubscription}
-                  />
-                </div>
-              ))}
-            </div>
+            {subscriptions.length === 0 ? (
+              <div className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 px-4 py-10 text-center">
+                <h3 className="text-base font-semibold text-foreground">{t("dashboard.emptyTitle")}</h3>
+                <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{t("dashboard.emptyDescription")}</p>
+                <AddSubscriptionDialog
+                  onAdd={handleAddSubscription}
+                  availableTags={availableTags}
+                  trigger={(
+                    <Button className="mt-5 gap-2">
+                      <Plus className="h-4 w-4" />
+                      {t("subscriptions.addFirst")}
+                    </Button>
+                  )}
+                />
+              </div>
+            ) : (
+              <div className="grid items-stretch gap-4 sm:grid-cols-2">
+                {displayedSubscriptions.map((sub, index) => (
+                  <div key={sub.id} className="h-full animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+                    <SubscriptionCard
+                      subscription={sub}
+                      timeZone={timeZone}
+                      inheritedReminderDays={inheritedReminderDays}
+                      currencyConvert={convert}
+                      currencyRatesReady={currencyRatesReady}
+                      priceReferenceCurrency={priceReferenceCurrency}
+                      categoryByValue={categoryByValue}
+                      paymentMethodByValue={paymentMethodByValue}
+                      onEdit={handleEditSubscription}
+                      onDelete={handleDeleteSubscription}
+                      onTogglePublicHidden={handleTogglePublicHiddenSubscription}
+                      onViewDetails={handleViewDetails}
+                      onAddToCalendar={calendarDialog.show}
+                      onPrefetchDetails={handlePrefetchSubscription}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
             {subscriptions.length > 6 && (
               <div className="mt-4 text-center">
                 <Link href="/subscriptions">

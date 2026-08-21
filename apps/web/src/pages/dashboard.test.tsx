@@ -127,6 +127,10 @@ vi.mock("@/components/edit-subscription-dialog", () => ({
   EditSubscriptionDialog: () => null,
 }));
 
+vi.mock("@/components/add-subscription-dialog", () => ({
+  AddSubscriptionDialog: ({ trigger }: { trigger: React.ReactNode }) => trigger,
+}));
+
 vi.mock("@/hooks/use-report-exchange-rates", () => ({
   useReportExchangeRates: () => ({
     convert: (amount: number | string, from: string, to: string) => {
@@ -298,6 +302,21 @@ describe("Dashboard page loading state", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
+  it("uses one primary empty-state action while keeping secondary panels compact", () => {
+    mocks.useSubscriptionAnalytics.mockReturnValue({
+      data: [],
+      isPending: false,
+    });
+
+    renderDashboard();
+
+    expect(screen.getAllByRole("heading", { name: "从第一个订阅开始" })).toHaveLength(1);
+    expect(screen.getByText("添加订阅后，这里会汇总支出、续费和提醒。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "添加第一个订阅" })).toBeInTheDocument();
+    expect(screen.getByTestId("spending-chart")).toHaveTextContent("0:CNY:Asia/Shanghai:7");
+    expect(screen.getByTestId("upcoming-renewals")).toHaveTextContent("0");
+  });
+
   it("uses compact mobile-first summary cards without changing the desktop columns", () => {
     renderDashboard();
 
@@ -307,7 +326,7 @@ describe("Dashboard page loading state", () => {
     const trials = screen.getByTestId("dashboard-stat-trials");
 
     expect(grid).toHaveClass("grid", "gap-3", "sm:gap-5", "sm:grid-cols-2", "lg:grid-cols-4");
-    expect(grid.className).toContain("[grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr))]");
+    expect(grid.className).toContain("grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))]");
     expect(monthlySpend).toHaveClass("p-4", "lg:p-6", "col-span-full", "sm:col-span-1");
     expect(activeSubscriptions).toHaveClass("p-4", "lg:p-6");
     expect(trials).toHaveClass("p-4", "lg:p-6", "col-span-full", "sm:col-span-1");

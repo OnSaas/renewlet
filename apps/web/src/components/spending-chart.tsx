@@ -132,7 +132,7 @@ export function SpendingChart({ subscriptions, categories, defaultCurrency, time
 
   if (data.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-muted-foreground">
+      <div className="flex min-h-20 items-center justify-center py-4 text-center text-sm text-muted-foreground">
         {t("statistics.noSubscriptionData")}
       </div>
     );

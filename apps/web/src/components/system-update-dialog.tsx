@@ -273,7 +273,7 @@ export function SystemUpdateDialog({
                 </div>
               ) : version.deployment === "cloudflare" ? (
                 <div className="space-y-3">
-                  <StatePanel icon={<Check className="h-4 w-4" />} tone="success" title={t("system.noUpdateTitle")} description={t("system.noUpdateDescription")} />
+                  <StatePanel icon={<Check className="h-4 w-4" />} tone="success" title={t("system.noUpdateTitle")} />
                   <SystemLinks version={version} commitLink={commitLink} />
                 </div>
               ) : !version.updateSupported ? (
@@ -288,7 +288,7 @@ export function SystemUpdateDialog({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <StatePanel icon={<Check className="h-4 w-4" />} tone="success" title={t("system.noUpdateTitle")} description={t("system.noUpdateDescription")} />
+                  <StatePanel icon={<Check className="h-4 w-4" />} tone="success" title={t("system.noUpdateTitle")} />
                   <SystemLinks version={version} commitLink={commitLink} />
                 </div>
               )}
@@ -408,7 +408,7 @@ function commitUrl(commit: string): string | null {
   return `${GITHUB_COMMIT_URL_PREFIX}${trimmed}`;
 }
 
-function StatePanel({ icon, tone, title, description }: { icon: ReactNode; tone: "danger" | "info" | "neutral" | "success" | "warning"; title: string; description: string }) {
+function StatePanel({ icon, tone, title, description }: { icon: ReactNode; tone: "danger" | "info" | "neutral" | "success" | "warning"; title: string; description?: string }) {
   const toneClassName = {
     danger: "border-destructive/30 bg-destructive/10 text-destructive",
     info: "border-sky-300/40 bg-sky-500/10 text-sky-700 dark:text-sky-300",
@@ -423,7 +423,7 @@ function StatePanel({ icon, tone, title, description }: { icon: ReactNode; tone:
       <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background/60">{icon}</div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold">{title}</div>
-        <div className="mt-0.5 text-xs opacity-90">{description}</div>
+        {description ? <div className="mt-0.5 text-xs opacity-90">{description}</div> : null}
       </div>
     </div>
   );

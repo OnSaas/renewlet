@@ -4,12 +4,13 @@ import { cn } from "@/lib/utils";
 
 interface SubscriptionCalendarScaffoldProps extends HTMLAttributes<HTMLDivElement> {
   facts: ReactNode;
-  feedActions?: ReactNode;
+  syncHeading: ReactNode;
+  syncContent: ReactNode;
+  oneTimeHeading: ReactNode;
+  oneTimeActions: ReactNode;
   notice: ReactNode;
-  primaryAction: ReactNode;
   providerHeading: ReactNode;
   providers: ReactNode;
-  secondaryActions: ReactNode;
 }
 
 interface SubscriptionCalendarFactRowProps {
@@ -22,23 +23,25 @@ interface SubscriptionCalendarFactRowProps {
 export type SubscriptionCalendarScaffoldSlots = Pick<
   SubscriptionCalendarScaffoldProps,
   | "facts"
-  | "feedActions"
+  | "syncHeading"
+  | "syncContent"
+  | "oneTimeHeading"
+  | "oneTimeActions"
   | "notice"
-  | "primaryAction"
   | "providerHeading"
   | "providers"
-  | "secondaryActions"
 >;
 
 export function SubscriptionCalendarScaffold({
   className,
   facts,
-  feedActions,
+  syncHeading,
+  syncContent,
+  oneTimeHeading,
+  oneTimeActions,
   notice,
-  primaryAction,
   providerHeading,
   providers,
-  secondaryActions,
   ...props
 }: SubscriptionCalendarScaffoldProps) {
   return (
@@ -49,20 +52,21 @@ export function SubscriptionCalendarScaffold({
       >
         {facts}
       </dl>
-      <div className="grid gap-3" data-dialog-region="calendar-feed-actions">
-        {primaryAction}
-        {feedActions}
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          {secondaryActions}
-        </div>
+      <section className="grid gap-3 border-t border-border pt-4" data-dialog-region="calendar-feed-actions">
+        {syncHeading}
+        {syncContent}
+      </section>
+      <section className="grid gap-3 border-t border-border pt-4" data-dialog-region="calendar-one-time-actions">
+        {oneTimeHeading}
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">{oneTimeActions}</div>
         {notice}
-      </div>
-      <div className="grid gap-2" data-dialog-region="calendar-providers">
-        {providerHeading}
-        <div className="overflow-hidden rounded-md border border-border bg-background/50">
-          {providers}
+        <div className="grid gap-2" data-dialog-region="calendar-providers">
+          {providerHeading}
+          <div className="overflow-hidden rounded-md border border-border bg-background/50">
+            {providers}
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
@@ -105,12 +109,14 @@ export function createSubscriptionCalendarLoadingSlots(label: string): Subscript
         />
         <SubscriptionCalendarFactRow
           label={<Skeleton aria-hidden="true" className="h-4 w-20" />}
-          value={<Skeleton aria-hidden="true" className="h-5 w-28" />}
+          value={<Skeleton aria-hidden="true" className="h-5 w-20" />}
         />
       </>
     ),
-    primaryAction: <Skeleton className="h-10 w-full" />,
-    secondaryActions: <Skeleton className="h-9 w-full sm:w-28" />,
+    syncHeading: <Skeleton className="h-4 w-24" />,
+    syncContent: <Skeleton className="h-11 w-full" />,
+    oneTimeHeading: <Skeleton className="h-4 w-24" />,
+    oneTimeActions: <Skeleton className="h-11 w-full sm:w-32" />,
     notice: <Skeleton className="h-5 w-full" />,
     providerHeading: <Skeleton className="h-4 w-28" />,
     providers: (

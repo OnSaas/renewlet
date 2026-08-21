@@ -18,7 +18,7 @@ function extractRemoteTestPhone(payload: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-type SettingsSectionId = "settings-data-config" | "settings-display" | "settings-notifications";
+type SettingsSectionId = "settings-calendar-feed" | "settings-data-config" | "settings-display" | "settings-notifications";
 
 export async function gotoSettingsSectionAfterHydration(page: Page, sectionId: SettingsSectionId) {
   // 设置页会先渲染默认值再被远端设置覆盖；E2E 必须等 GET 返回后再断言表单，避免首帧默认值造成 flaky。

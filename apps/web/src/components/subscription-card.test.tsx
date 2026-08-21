@@ -131,7 +131,7 @@ describe("SubscriptionCard", () => {
     expect(logo).not.toHaveClass("media-thumbnail-image", "invert", "brightness-125", "mix-blend-screen");
     expect(logoTile).not.toBeNull();
     expect(logoTile).not.toHaveClass("media-thumbnail-canvas");
-    expect(logoTile).not.toHaveClass("bg-gradient-to-br");
+    expect(logoTile).not.toHaveClass("bg-linear-to-br");
     expect(logoTile?.getAttribute("style")).not.toContain("accent");
   });
 
@@ -167,7 +167,7 @@ describe("SubscriptionCard", () => {
 
     expect(initials).toHaveClass("subscription-logo-fallback");
     expect(logoTile).not.toBeNull();
-    expect(logoTile).not.toHaveClass("bg-gradient-to-br");
+    expect(logoTile).not.toHaveClass("bg-linear-to-br");
   });
 
   it("shows pin actions from the card menu", () => {
@@ -291,7 +291,7 @@ describe("SubscriptionCard", () => {
       "px-2",
       "sm:px-2.5",
     );
-    expect(categoryBadge).not.toHaveClass("min-w-[3.5rem]", "max-w-[7.5rem]");
+    expect(categoryBadge).not.toHaveClass("min-w-14", "max-w-30");
     expect(categoryText).toHaveClass("block", "max-w-full", "truncate");
     expect(statusBadge).toHaveClass("shrink-0", "whitespace-nowrap");
   });
@@ -304,7 +304,7 @@ describe("SubscriptionCard", () => {
 
     expect(categoryBadge).toHaveTextContent(mocks.shortCategoryLabel);
     expect(categoryBadge).not.toHaveAttribute("title");
-    expect(categoryBadge).not.toHaveClass("min-w-[3.5rem]", "max-w-[7.5rem]");
+    expect(categoryBadge).not.toHaveClass("min-w-14", "max-w-30");
     expect(categoryText).toHaveAttribute("data-slot", "truncated-tooltip-text");
     expect(categoryText).toHaveClass("block", "max-w-full", "truncate");
   });

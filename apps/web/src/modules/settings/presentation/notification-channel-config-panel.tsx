@@ -5,7 +5,7 @@
  *
  * 注意： Webhook/DingTalk/WeCom/Bark/Discord URL 最终会触发后端外连，展示层不能把“看起来像 URL”当作安全保证。
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Bot, ExternalLink, Check, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,16 +13,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { useI18n } from '@/i18n/I18nProvider';
 import type { MessageKey } from '@/i18n/messages';
 import {
@@ -34,9 +24,9 @@ import { ChoiceRadioGroup, CheckboxSettingRow, LoadingButtonContent, type Update
 import { NotificationDingTalkConfigPanel, NotificationWebhookConfigPanel } from './notification-webhook-dingtalk-configs';
 import type { SettingsTelegramBotCommandsController } from '../application/use-telegram-bot-commands-controller';
 import type { SettingsSecretKey, SettingsSecretStatus } from '@/lib/api/schemas/settings';
-
+import { ManagerDataBoundary } from './manager-data-boundary';
+import { TelegramBotCommandsDeleteDialog } from './telegram-bot-commands-delete-dialog';
 type Translate = (key: MessageKey, params?: Record<string, string | number>) => string;
-
 const NOTIFICATION_TEST_LABEL_KEYS: Record<NotificationChannel, MessageKey> = {
   telegram: "settings.testChannel.telegram",
   notifyx: "settings.testChannel.notifyx",
@@ -170,15 +160,27 @@ export function NotificationChannelConfigPanel({
 }) {
   const { t, label, formatDateTime } = useI18n();
   const [deleteCommandsOpen, setDeleteCommandsOpen] = useState(false);
+  const telegramCommandsFocusFallbackRef = useRef<HTMLButtonElement>(null);
   const help = getNotificationChannelHelp(channel, t);
   const channelLabel = label(CHANNEL_LABELS[channel]);
   const testChannelLabel = t(NOTIFICATION_TEST_LABEL_KEYS[channel], { channel: channelLabel });
-  const commandStatus = telegramBotCommands?.data?.status ?? "not_configured";
-  const commandStatusLabel = t(TELEGRAM_BOT_COMMAND_STATUS_LABEL_KEYS[commandStatus]);
+  const commandData = telegramBotCommands?.readState.data;
+  const commandStatus = commandData?.status;
+  const commandStatusLabel = !telegramBotCommands
+    ? t("settings.statusUnknown")
+    : telegramBotCommands.readState.isInitialLoading
+      ? t("common.loading")
+      : !telegramBotCommands.readState.hasData && telegramBotCommands.readState.error
+        ? t("settings.statusUnknown")
+        : telegramBotCommands.readState.error
+          ? t("settings.notUpdated")
+          : commandStatus
+            ? t(TELEGRAM_BOT_COMMAND_STATUS_LABEL_KEYS[commandStatus])
+            : t("settings.statusUnknown");
   const commandBindingPresent = commandStatus === "installed" || commandStatus === "installing";
   const commandInstalling = Boolean(telegramBotCommands?.isInstalling) || commandStatus === "installing";
-  const commandInstallDisabled = Boolean(telegramBotCommands?.installDisabledReason) || !telegramBotCommands || telegramBotCommands.isLoading || telegramBotCommands.isDeleting || commandInstalling;
-  const commandDeleteDisabled = Boolean(telegramBotCommands?.deleteDisabledReason) || !telegramBotCommands || telegramBotCommands.isLoading || commandInstalling || !commandBindingPresent;
+  const commandInstallDisabled = Boolean(telegramBotCommands?.installDisabledReason) || !telegramBotCommands || !telegramBotCommands.readState.hasData || telegramBotCommands.isDeleting || commandInstalling;
+  const commandDeleteDisabled = Boolean(telegramBotCommands?.deleteDisabledReason) || !telegramBotCommands || !telegramBotCommands.readState.hasData || commandInstalling || !commandBindingPresent;
   const commandInstallDisabledReason = telegramBotCommands?.installDisabledReason;
   const commandInstallDisabledReasonVisible = commandInstallDisabledReason && !commandInstalling;
   const commandTime = (value: string | null | undefined) => value
@@ -291,20 +293,23 @@ export function NotificationChannelConfigPanel({
                   <div className="flex items-center gap-2">
                     <Bot className="h-4 w-4 text-primary" />
                     <h4 className="text-sm font-medium text-foreground">{t("settings.telegramBotCommands")}</h4>
-                    <Badge variant={telegramBotCommands.data?.installed ? "default" : "secondary"}>{commandStatusLabel}</Badge>
+                    <Badge variant={commandData?.installed ? "default" : "secondary"}>{commandStatusLabel}</Badge>
                   </div>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("settings.telegramBotCommandsHelp")}</p>
-                  <div className="mt-2 grid gap-1 text-xs leading-5 text-muted-foreground">
-                    <span>{t("settings.telegramBotCommandsChat", { chatId: telegramBotCommands.data?.chatId ?? t("settings.telegramBotCommandsMissing") })}</span>
-                    <span>{t("settings.telegramBotCommandsInstalledAt", { time: commandTime(telegramBotCommands.data?.installedAt) })}</span>
-                    <span>{t("settings.telegramBotCommandsLastUsedAt", { time: commandTime(telegramBotCommands.data?.lastUsedAt) })}</span>
-                  </div>
+                  <ManagerDataBoundary state={telegramBotCommands.readState}>
+                    <div className="mt-2 grid gap-1 text-xs leading-5 text-muted-foreground">
+                      <span>{t("settings.telegramBotCommandsChat", { chatId: commandData?.chatId ?? t("settings.telegramBotCommandsMissing") })}</span>
+                      <span>{t("settings.telegramBotCommandsInstalledAt", { time: commandTime(commandData?.installedAt) })}</span>
+                      <span>{t("settings.telegramBotCommandsLastUsedAt", { time: commandTime(commandData?.lastUsedAt) })}</span>
+                    </div>
+                  </ManagerDataBoundary>
                   {commandInstallDisabledReasonVisible ? (
                     <p className="mt-2 text-xs font-medium text-muted-foreground">{commandInstallDisabledReason}</p>
                   ) : null}
                 </div>
                 <div className="flex shrink-0 flex-col gap-2 sm:items-end">
                   <Button
+                    ref={telegramCommandsFocusFallbackRef}
                     type="button"
                     size="sm"
                     onClick={() => {
@@ -315,7 +320,7 @@ export function NotificationChannelConfigPanel({
                     className="justify-center"
                   >
                     <LoadingButtonContent loading={commandInstalling} loadingLabel={t("settings.telegramBotCommandsInstalling")}>
-                      {telegramBotCommands.data?.installed ? t("settings.telegramBotCommandsReinstall") : t("settings.telegramBotCommandsInstall")}
+                      {commandData?.installed ? t("settings.telegramBotCommandsReinstall") : t("settings.telegramBotCommandsInstall")}
                     </LoadingButtonContent>
                   </Button>
                   <Button
@@ -334,24 +339,13 @@ export function NotificationChannelConfigPanel({
                   </Button>
                 </div>
               </div>
-              <AlertDialog open={deleteCommandsOpen} onOpenChange={setDeleteCommandsOpen}>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t("settings.telegramBotCommandsDeleteTitle")}</AlertDialogTitle>
-                    <AlertDialogDescription>{t("settings.telegramBotCommandsDeleteDescription")}</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => {
-                        void telegramBotCommands.deleteCommands();
-                      }}
-                    >
-                      {t("settings.telegramBotCommandsDelete")}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <TelegramBotCommandsDeleteDialog
+                open={deleteCommandsOpen}
+                pending={telegramBotCommands.isDeleting}
+                focusFallbackRef={telegramCommandsFocusFallbackRef}
+                onOpenChange={setDeleteCommandsOpen}
+                onDelete={telegramBotCommands.deleteCommands}
+              />
             </div>
           ) : null}
         </>

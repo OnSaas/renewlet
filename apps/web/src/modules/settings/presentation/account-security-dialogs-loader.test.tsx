@@ -62,8 +62,14 @@ function Harness() {
         onStateChange={setState}
         onPasskeysOpenChange={vi.fn()}
         accountEmail="alice@example.com"
-        passkeys={[]}
-        isLoading={false}
+        passkeys={{
+          data: [],
+          hasData: true,
+          error: null,
+          isInitialLoading: false,
+          isRefreshing: false,
+          retry: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        }}
       />
     </>
   );

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/sonner";
 import { useI18n } from "@/i18n/I18nProvider";
 import { createAIErrorDetails, type AIErrorDetails } from "@/lib/ai-error-details";
 import { cn } from "@/lib/utils";
@@ -79,7 +79,6 @@ export function AIRecognitionSettingsSection({
   onClearApiKey = () => undefined,
 }: AIRecognitionSettingsSectionProps) {
   const { t } = useI18n();
-  const { toast } = useToast();
   const [testing, setTesting] = useState(false);
   const [modelListState, setModelListState] = useState<AIModelListState>(EMPTY_MODEL_LIST_STATE);
   const [aiErrorDetails, setAIErrorDetails] = useState<AIErrorDetails | null>(null);
@@ -203,21 +202,14 @@ export function AIRecognitionSettingsSection({
   const handleTestConnection = async () => {
     if (disabled) return;
     if (testBlocker) {
-      toast({
-        title: t("aiRecognition.testBlockedTitle"),
-        description: t(testBlocker),
-        variant: "destructive",
-      });
+      toast.error(t("aiRecognition.testBlockedTitle"), { description: t(testBlocker) });
       return;
     }
     setTesting(true);
     try {
       await aiRecognitionService.testConnection(canonicalSettings, apiKeyMutation());
       setAIErrorDetails(null);
-      toast({
-        title: t("aiRecognition.testSucceeded"),
-        description: t("aiRecognition.testSucceededDescription"),
-      });
+      toast.success(t("aiRecognition.testSucceeded"));
     } catch (error) {
       const details = createAIErrorDetails(error, t("aiRecognition.testFailedDescription"));
       setAIErrorDetails(details);

@@ -42,17 +42,24 @@ vi.mock("@/hooks/use-settings", () => ({
 }));
 
 vi.mock("@/hooks/use-calendar-feed", () => ({
-  useCreateSubscriptionCalendarFeed: () => ({
-    isPending: false,
-    mutateAsync: vi.fn(),
-  }),
-  useDeleteSubscriptionCalendarFeed: () => ({
-    isPending: false,
-    mutateAsync: vi.fn(),
-  }),
-  useSubscriptionCalendarFeedStatus: () => ({
+  useCalendarFeedStatus: () => ({
     data: { enabled: false, feedUrl: undefined },
-    isLoading: false,
+    isError: false,
+    isFetching: false,
+    isPending: false,
+    refetch: vi.fn(),
+  }),
+  useCreateCalendarFeed: () => ({
+    isPending: false,
+    mutateAsync: vi.fn(),
+  }),
+  useDeleteCalendarFeed: () => ({
+    isPending: false,
+    mutateAsync: vi.fn(),
+  }),
+  useRotateCalendarFeed: () => ({
+    isPending: false,
+    mutateAsync: vi.fn(),
   }),
 }));
 
@@ -167,7 +174,7 @@ describe("SubscriptionCalendar dialogs", () => {
     expect(logo).not.toHaveClass("object-cover");
     expect(logoTile).not.toBeNull();
     expect(logoTile).not.toHaveClass("media-thumbnail-canvas");
-    expect(logoTile).not.toHaveClass("bg-gradient-to-br");
+    expect(logoTile).not.toHaveClass("bg-linear-to-br");
   });
 
   it("uses the same detail dialog logo path for dark transparent logos", async () => {
@@ -202,7 +209,7 @@ describe("SubscriptionCalendar dialogs", () => {
 
     expect(initials).toHaveClass("subscription-logo-fallback");
     expect(logoTile).not.toBeNull();
-    expect(logoTile).not.toHaveClass("bg-gradient-to-br");
+    expect(logoTile).not.toHaveClass("bg-linear-to-br");
   });
 
   it("renders inherited reminder days in the detail dialog", async () => {
@@ -275,7 +282,7 @@ describe("SubscriptionCalendar dialogs", () => {
     expect(logo).not.toHaveClass("object-cover");
     expect(logoTile).not.toBeNull();
     expect(logoTile).not.toHaveClass("media-thumbnail-canvas");
-    expect(logoTile).not.toHaveClass("bg-gradient-to-br");
+    expect(logoTile).not.toHaveClass("bg-linear-to-br");
   });
 
   it("renders the mobile agenda with only active and trial subscriptions", async () => {

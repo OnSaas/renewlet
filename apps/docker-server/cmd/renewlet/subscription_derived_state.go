@@ -365,6 +365,14 @@ func applySubscriptionDerivedMutation(app core.App, mutation subscriptionDerived
 	afterUser := subscriptionRecordOwner(mutation.After)
 	// 先清 before 的行级派生值，再写 after，最后应用 aggregate delta；调用方必须把整个序列包在事实写事务内。
 	if mutation.Before != nil {
+		if mutation.After == nil {
+			// D1 由外键级联删除单订阅 Feed；PocketBase 仅存文本 ID，必须在同一事实写事务里显式收敛生命周期。
+			if _, err := app.DB().NewQuery(`DELETE FROM calendar_feeds
+				WHERE user = {:user} AND scope = 'subscription' AND subscriptionId = {:id}`).
+				Bind(dbx.Params{"user": beforeUser, "id": mutation.Before.Id}).Execute(); err != nil {
+				return err
+			}
+		}
 		if _, err := app.DB().NewQuery("DELETE FROM subscription_tags WHERE user_id = {:user} AND subscription_id = {:id}").
 			Bind(dbx.Params{"user": beforeUser, "id": mutation.Before.Id}).Execute(); err != nil {
 			return err

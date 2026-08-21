@@ -581,6 +581,7 @@ func ensureCalendarFeedsCollection(app core.App, users *core.Collection) error {
 		c.AddIndex("idx_calendar_feeds_user_all_unique", true, "user", "scope = 'all'")
 		c.AddIndex("idx_calendar_feeds_token_unique", true, "token", "")
 		c.AddIndex("idx_calendar_feeds_user_subscription_unique", true, "user, subscriptionId", "scope = 'subscription'")
+		c.AddIndex("idx_calendar_feeds_user_scope_updated_id", false, "user, scope, updated DESC, id DESC", "")
 		return nil
 	})
 }
