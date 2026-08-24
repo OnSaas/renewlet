@@ -7,12 +7,12 @@
  */
 import { toMonthlyAmount } from "@/lib/subscription-billing";
 import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
-import { DEFAULT_NOTIFICATION_REMINDER_DAYS, type Subscription } from "@/types/subscription";
+import { DEFAULT_NOTIFICATION_REMINDER_DAYS, type SubscriptionCollectionItem } from "@/types/subscription";
 import { getEffectiveSubscriptionStatus, isEffectivelyActiveSubscription } from "./subscription-status";
 import { buildUpcomingReminderItems } from "./upcoming-reminders";
 
 interface BuildDashboardStatsInput {
-  subscriptions: readonly Subscription[];
+  subscriptions: readonly SubscriptionCollectionItem[];
   defaultCurrency: string;
   convert: (amount: number | string, from: string, to: string) => number;
   notificationReminderDays?: number;

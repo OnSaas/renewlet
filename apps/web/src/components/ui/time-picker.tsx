@@ -23,6 +23,7 @@ interface TimePickerProps {
   className?: string;
   disabled?: boolean;
   ariaLabel?: string;
+  ariaDescribedBy?: string | undefined;
   density?: 'default' | 'compact';
 }
 
@@ -311,8 +312,8 @@ function WheelColumn({
         <div 
           className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-10 bg-primary/10 rounded-lg border border-primary/20 pointer-events-none z-0 shadow-[inset_0_0_18px_hsl(var(--primary)/0.08)]"
         />
-        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-card to-transparent pointer-events-none z-10" />
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-card to-transparent pointer-events-none z-10" />
+        <div className="absolute inset-x-0 top-0 h-16 bg-linear-to-b from-card to-transparent pointer-events-none z-10" />
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-card to-transparent pointer-events-none z-10" />
         
         <div
           ref={containerRef}
@@ -389,6 +390,7 @@ export function TimePicker({
   className,
   disabled = false,
   ariaLabel,
+  ariaDescribedBy,
   density = 'default',
 }: TimePickerProps) {
   const { t } = useI18n();
@@ -444,6 +446,7 @@ export function TimePicker({
           variant="outline"
           disabled={disabled}
           aria-label={buttonAriaLabel}
+          aria-describedby={ariaDescribedBy}
           className={cn(
             isCompact
               ? "h-9 w-full justify-start border-border bg-background px-3 py-2 text-left font-medium tabular-nums hover:bg-accent hover:text-accent-foreground group"

@@ -51,10 +51,8 @@ vi.mock("@/i18n/I18nProvider", () => ({
     t: (key: string, params?: Record<string, unknown>) => {
       const messages: Record<string, string> = {
         "publicStatus.activeCount": "活跃/试用",
-        "publicStatus.activeSubtitle": "状态正常运行",
         "publicStatus.annualTotal": "年化总价",
         "header.toggleTheme": "切换主题",
-        "publicStatus.emptyDescription": "当前公开链接没有可见订阅。",
         "publicStatus.emptyTitle": "暂无可展示订阅",
         "publicStatus.errorDescription": "请稍后刷新重试。",
         "publicStatus.errorTitle": "无法加载公开页",
@@ -79,7 +77,6 @@ vi.mock("@/i18n/I18nProvider", () => ({
         "publicStatus.updatedAt": `记录更新：${String(params?.["time"] ?? "")}`,
         "publicStatus.visibleCount": "展示订阅",
         "publicStatus.visibleMoneySubtitle": `其中 ${String(params?.["count"] ?? "")} 个计入金额`,
-        "publicStatus.visibleSubtitle": "当前公开可见",
         "subscription.billingCycle.annual": "每年",
         "subscription.billingCycle.monthly": "每月",
         "theme.dark": "深色",
@@ -167,7 +164,8 @@ describe("PublicStatusPage", () => {
     expect(screen.getByText("活跃/试用")).toBeInTheDocument();
     expect(screen.getByText("未来 7 天")).toBeInTheDocument();
     expect(screen.getByText("非活跃")).toBeInTheDocument();
-    expect(screen.getByText("当前公开可见")).toBeInTheDocument();
+    expect(screen.queryByText("当前公开可见")).not.toBeInTheDocument();
+    expect(screen.queryByText("状态正常运行")).not.toBeInTheDocument();
     expect(screen.getByText("即将到期或续费")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
@@ -244,6 +242,19 @@ describe("PublicStatusPage", () => {
     expect(screen.getByText("每年")).toBeInTheDocument();
     expect(screen.queryByText("显示金额")).not.toBeInTheDocument();
     expect(mocks.useExchangeRates).not.toHaveBeenCalled();
+  });
+
+  it("renders one concise empty state for a public page without visible subscriptions", () => {
+    mocks.usePublicStatus.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { ...baseResponse, subscriptions: [] },
+    });
+
+    renderPage();
+
+    expect(screen.getAllByRole("heading", { name: "暂无可展示订阅" })).toHaveLength(1);
+    expect(screen.queryByText("当前公开链接没有可见订阅。")).not.toBeInTheDocument();
   });
 
   it("hides the start-date line when a public subscription has no known start date", () => {

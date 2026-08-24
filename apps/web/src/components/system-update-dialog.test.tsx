@@ -37,7 +37,6 @@ vi.mock("@/i18n/I18nProvider", () => ({
         "system.commitLink": "提交",
         "system.currentVersion": "当前版本",
         "system.latestVersion": "最新版本",
-        "system.noUpdateDescription": "无需操作。",
         "system.noUpdateTitle": "已是最新版本",
         "system.openUpdateDialog": "打开系统更新",
         "system.cloudflareDeployGuide": "Cloudflare 部署说明",
@@ -204,7 +203,7 @@ describe("SystemUpdateDialog", () => {
 
     expect(await screen.findByText("已是最新版本")).toBeInTheDocument();
     expect(screen.getAllByText("已是最新版本")).toHaveLength(1);
-    expect(screen.getByText("无需操作。")).toBeInTheDocument();
+    expect(screen.queryByText("无需操作。")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("已是最新版本");
     expect(screen.queryByText("暂时无法检查更新")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "立即更新" })).not.toBeInTheDocument();
@@ -494,7 +493,7 @@ describe("SystemUpdateDialog", () => {
     await user.click(await screen.findByRole("button", { name: "打开系统更新" }));
 
     expect(await screen.findByText("已是最新版本")).toBeInTheDocument();
-    expect(screen.getByText("无需操作。")).toBeInTheDocument();
+    expect(screen.queryByText("无需操作。")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "提交" })).toHaveAttribute("href", "https://github.com/zhiyingzzhou/renewlet/commit/504c1681822ac60f0caafdb0b1ba731853c9169d");
     expect(screen.queryByText("页面内更新不可用")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Cloudflare 部署说明" })).not.toBeInTheDocument();

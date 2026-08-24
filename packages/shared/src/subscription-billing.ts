@@ -1,6 +1,10 @@
 import type { BillingCycle, CustomCycleUnit, DateOnly } from "./runtime";
 import { divideMoney, moneyToNumber, multiplyMoneyRatio, type MoneyString } from "./money";
-import { addBillingCycles, calculateNextBillingDate as calculateRenewalNextBillingDate } from "./subscription-renewal";
+import {
+  addBillingCycles,
+  calculateNextBillingDate as calculateRenewalNextBillingDate,
+  requireCustomBillingCycle,
+} from "./subscription-renewal";
 
 const AVERAGE_DAYS_PER_MONTH = 30;
 
@@ -21,9 +25,9 @@ export function toMonthlyAmount(
   amount: MoneyString | number,
   cycle: BillingCycle,
   customDays?: number | null | undefined,
-  customCycleUnit: CustomCycleUnit = "day",
+  customCycleUnit?: CustomCycleUnit | null | undefined,
   oneTimeTermCount?: number | null | undefined,
-  oneTimeTermUnit: CustomCycleUnit = "day",
+  oneTimeTermUnit?: CustomCycleUnit | null | undefined,
 ): number {
   switch (cycle) {
     case "weekly":
@@ -36,11 +40,16 @@ export function toMonthlyAmount(
       return moneyToNumber(divideMoney(amount, 6));
     case "annual":
       return moneyToNumber(divideMoney(amount, 12));
-    case "custom":
-      return customDays ? customCycleToMonthlyAmount(amount, customDays, customCycleUnit) : moneyToNumber(amount);
-    case "one-time":
+    case "custom": {
+      const custom = requireCustomBillingCycle(customDays, customCycleUnit);
+      return customCycleToMonthlyAmount(amount, custom.count, custom.unit);
+    }
+    case "one-time": {
       // one-time 无服务期是买断，不进入月均；固定服务期才把整段预付权益按月摊销。
-      return oneTimeTermCount ? customCycleToMonthlyAmount(amount, oneTimeTermCount, oneTimeTermUnit) : 0;
+      if (!oneTimeTermCount) return 0;
+      const term = requireCustomBillingCycle(oneTimeTermCount, oneTimeTermUnit);
+      return customCycleToMonthlyAmount(amount, term.count, term.unit);
+    }
   }
 }
 
@@ -49,9 +58,9 @@ export function toSubscriptionMonthlyAmount(amount: MoneyString | number, subscr
     amount,
     subscription.billingCycle,
     subscription.customDays,
-    subscription.customCycleUnit ?? "day",
+    subscription.customCycleUnit,
     subscription.oneTimeTermCount,
-    subscription.oneTimeTermUnit ?? "day",
+    subscription.oneTimeTermUnit,
   );
 }
 
@@ -81,7 +90,7 @@ export function calculateNextBillingDate(
   cycle: BillingCycle,
   customDays?: number | null | undefined,
   referenceDate?: string | null | undefined,
-  customCycleUnit: CustomCycleUnit = "day",
+  customCycleUnit?: CustomCycleUnit | null | undefined,
 ): DateOnly {
   return calculateRenewalNextBillingDate(startDate, cycle, customDays, referenceDate, customCycleUnit);
 }
