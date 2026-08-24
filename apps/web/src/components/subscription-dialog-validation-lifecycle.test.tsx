@@ -74,7 +74,8 @@ describe("SubscriptionDialog validation lifecycle", () => {
     const purchaseDateError = screen.getByText("请选择购买日期");
     expect(purchaseDateButton).toHaveAttribute("aria-invalid", "true");
     expect(purchaseDateButton.getAttribute("aria-describedby")?.split(" ")).toContain("startDate-error");
-    expect(purchaseDateButton.closest('[data-slot="form-field"]')).toContainElement(purchaseDateError);
+    expect(purchaseDateButton.closest('[data-slot="form-field-row"]')).toContainElement(purchaseDateError);
+    expect(purchaseDateButton.closest('[data-slot="form-field"]')).not.toContainElement(purchaseDateError);
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,7 @@ import { useRef, useState } from 'react';
 import { Bot, ExternalLink, Check, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FormField, FormFieldRow } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumericInput } from '@/components/ui/numeric-input';
@@ -431,24 +432,25 @@ export function NotificationChannelConfigPanel({
               />
               <p className="text-xs text-muted-foreground">{t("settings.wechatHelp")}</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="wechatMsgType">{t("settings.messageType")}</Label>
-                <Select
-                  value={settings.wechatMessageType}
-                  disabled={disabled}
-                  onValueChange={(value) => updateSetting('wechatMessageType', value as 'text' | 'markdown')}
-                >
-                  <SelectTrigger className="border-border bg-secondary">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="text">{t("settings.textMessage")}</SelectItem>
-                    <SelectItem value="markdown">Markdown</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <FormFieldRow alignAt="sm" rowClassName="sm:grid-cols-2">
+              <FormField id="wechatMsgType" label={t("settings.messageType")}>
+                {({ id }) => (
+                  <Select
+                    value={settings.wechatMessageType}
+                    disabled={disabled}
+                    onValueChange={(value) => updateSetting('wechatMessageType', value as 'text' | 'markdown')}
+                  >
+                    <SelectTrigger id={id} className="border-border bg-secondary">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text">{t("settings.textMessage")}</SelectItem>
+                      <SelectItem value="markdown">Markdown</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              </FormField>
+            </FormFieldRow>
             <CheckboxSettingRow
               id="wechatModeTag"
               checked={settings.wechatAddModeTag}
@@ -496,36 +498,38 @@ export function NotificationChannelConfigPanel({
       {channel === 'email' ? (
         <>
           <div className="grid gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="smtpHost">{t("settings.smtpHost")}</Label>
-                <Input
-                  id="smtpHost"
-                  placeholder="smtp.example.com"
-                  value={settings.smtpHost}
-                  disabled={disabled}
-                  onChange={(e) => updateSetting('smtpHost', e.target.value)}
-                  className="border-border bg-secondary"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="smtpPort">{t("settings.smtpPort")}</Label>
-                <NumericInput
-                  id="smtpPort"
-                  name="smtpPort"
-                  inputMode="numeric"
-                  enterKeyHint="next"
-                  placeholder="587"
-                  value={settings.smtpPort}
-                  allowNegative={false}
-                  decimalScale={0}
-                  isAllowed={isAllowedSmtpPortValue}
-                  disabled={disabled}
-                  onRawValueChange={(value) => updateSetting('smtpPort', value)}
-                  className="border-border bg-secondary"
-                />
-              </div>
-            </div>
+            <FormFieldRow alignAt="sm" rowClassName="sm:grid-cols-2">
+              <FormField id="smtpHost" label={t("settings.smtpHost")}>
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    placeholder="smtp.example.com"
+                    value={settings.smtpHost}
+                    disabled={disabled}
+                    onChange={(e) => updateSetting('smtpHost', e.target.value)}
+                    className="border-border bg-secondary"
+                  />
+                )}
+              </FormField>
+              <FormField id="smtpPort" label={t("settings.smtpPort")}>
+                {({ id }) => (
+                  <NumericInput
+                    id={id}
+                    name="smtpPort"
+                    inputMode="numeric"
+                    enterKeyHint="next"
+                    placeholder="587"
+                    value={settings.smtpPort}
+                    allowNegative={false}
+                    decimalScale={0}
+                    isAllowed={isAllowedSmtpPortValue}
+                    disabled={disabled}
+                    onRawValueChange={(value) => updateSetting('smtpPort', value)}
+                    className="border-border bg-secondary"
+                  />
+                )}
+              </FormField>
+            </FormFieldRow>
             <CheckboxSettingRow
               id="smtpSecure"
               checked={settings.smtpSecure}
@@ -534,59 +538,63 @@ export function NotificationChannelConfigPanel({
               description={t("settings.smtpSecureHelp")}
               disabled={disabled}
             />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="smtpUser">{t("settings.smtpUser")}</Label>
-                <Input
-                  id="smtpUser"
-                  name="smtpUser"
-                  value={settings.smtpUser}
-                  disabled={disabled}
-                  onChange={(e) => updateSetting('smtpUser', e.target.value)}
-                  className="border-border bg-secondary"
-                  autoComplete="username"
-                  enterKeyHint="next"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="smtpPassword">{t("settings.smtpPassword")}</Label>
-                <Input
-                  id="smtpPassword"
-                  name="smtpPassword"
-                  type="password"
-                  value={settings.smtpPassword}
-                  disabled={disabled}
-                  onChange={(e) => updateSetting('smtpPassword', e.target.value)}
-                  className="border-border bg-secondary"
-                  autoComplete="new-password"
-                  enterKeyHint="next"
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="smtpFrom">{t("settings.smtpFrom")}</Label>
-                <Input
-                  id="smtpFrom"
-                  placeholder="Renewlet <noreply@example.com>"
-                  value={settings.smtpFrom}
-                  disabled={disabled}
-                  onChange={(e) => updateSetting('smtpFrom', e.target.value)}
-                  className="border-border bg-secondary"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="smtpReplyTo">{t("settings.smtpReplyTo")}</Label>
-                <Input
-                  id="smtpReplyTo"
-                  placeholder="support@example.com"
-                  value={settings.smtpReplyTo}
-                  disabled={disabled}
-                  onChange={(e) => updateSetting('smtpReplyTo', e.target.value)}
-                  className="border-border bg-secondary"
-                />
-              </div>
-            </div>
+            <FormFieldRow alignAt="sm" rowClassName="sm:grid-cols-2">
+              <FormField id="smtpUser" label={t("settings.smtpUser")}>
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    name="smtpUser"
+                    value={settings.smtpUser}
+                    disabled={disabled}
+                    onChange={(e) => updateSetting('smtpUser', e.target.value)}
+                    className="border-border bg-secondary"
+                    autoComplete="username"
+                    enterKeyHint="next"
+                  />
+                )}
+              </FormField>
+              <FormField id="smtpPassword" label={t("settings.smtpPassword")}>
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    name="smtpPassword"
+                    type="password"
+                    value={settings.smtpPassword}
+                    disabled={disabled}
+                    onChange={(e) => updateSetting('smtpPassword', e.target.value)}
+                    className="border-border bg-secondary"
+                    autoComplete="new-password"
+                    enterKeyHint="next"
+                  />
+                )}
+              </FormField>
+            </FormFieldRow>
+            <FormFieldRow alignAt="sm" rowClassName="sm:grid-cols-2">
+              <FormField id="smtpFrom" label={t("settings.smtpFrom")}>
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    placeholder="Renewlet <noreply@example.com>"
+                    value={settings.smtpFrom}
+                    disabled={disabled}
+                    onChange={(e) => updateSetting('smtpFrom', e.target.value)}
+                    className="border-border bg-secondary"
+                  />
+                )}
+              </FormField>
+              <FormField id="smtpReplyTo" label={t("settings.smtpReplyTo")}>
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    placeholder="support@example.com"
+                    value={settings.smtpReplyTo}
+                    disabled={disabled}
+                    onChange={(e) => updateSetting('smtpReplyTo', e.target.value)}
+                    className="border-border bg-secondary"
+                  />
+                )}
+              </FormField>
+            </FormFieldRow>
             <p className="text-xs text-muted-foreground">
               {t("settings.smtpHelp")}
             </p>
@@ -722,33 +730,35 @@ export function NotificationChannelConfigPanel({
               />
               <p className="text-xs text-muted-foreground">{t("settings.discordWebhookHelp")}</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="discordBotUsername">{t("settings.discordBotUsername")}</Label>
-                <Input
-                  id="discordBotUsername"
-                  value={settings.discordBotUsername}
-                  disabled={disabled}
-                  onChange={(e) => updateSetting('discordBotUsername', e.target.value)}
-                  className="border-border bg-secondary"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="discordBotAvatarUrl">{t("settings.discordBotAvatarUrl")}</Label>
-                <Input
-                  id="discordBotAvatarUrl"
-                  type="url"
-                  inputMode="url"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  placeholder="https://cdn.example.com/avatar.png"
-                  value={settings.discordBotAvatarUrl}
-                  disabled={disabled}
-                  onChange={(e) => updateSetting('discordBotAvatarUrl', e.target.value)}
-                  className="border-border bg-secondary"
-                />
-              </div>
-            </div>
+            <FormFieldRow alignAt="sm" rowClassName="sm:grid-cols-2">
+              <FormField id="discordBotUsername" label={t("settings.discordBotUsername")}>
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    value={settings.discordBotUsername}
+                    disabled={disabled}
+                    onChange={(e) => updateSetting('discordBotUsername', e.target.value)}
+                    className="border-border bg-secondary"
+                  />
+                )}
+              </FormField>
+              <FormField id="discordBotAvatarUrl" label={t("settings.discordBotAvatarUrl")}>
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    type="url"
+                    inputMode="url"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    placeholder="https://cdn.example.com/avatar.png"
+                    value={settings.discordBotAvatarUrl}
+                    disabled={disabled}
+                    onChange={(e) => updateSetting('discordBotAvatarUrl', e.target.value)}
+                    className="border-border bg-secondary"
+                  />
+                )}
+              </FormField>
+            </FormFieldRow>
           </div>
           <div className="mt-4 flex justify-end">
             <NotificationTestButton channel="discord" label={testChannelLabel} testingChannel={testingChannel} onTest={onTest} disabled={disabled} />

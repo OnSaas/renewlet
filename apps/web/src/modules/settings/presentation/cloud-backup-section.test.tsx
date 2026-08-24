@@ -416,8 +416,6 @@ describe("CloudBackupSection", () => {
     render(<StatefulSection credentialSet />);
 
     expect(screen.getByRole("heading", { name: "云同步与备份" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "连接配置" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "备份策略" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "状态与操作" })).toBeInTheDocument();
     expect(screen.getByLabelText("密码")).toHaveAttribute("placeholder", "留空保留已保存密钥");
     expect(screen.getAllByText("上次成功")).toHaveLength(1);

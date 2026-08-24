@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { FormField } from "@/components/ui/form-field";
+import { FormField, FormFieldRow, FormFieldRowAction } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/sonner";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -157,7 +157,10 @@ export function AccountPasskeysManagerDialog({
                   aria-hidden="true"
                   className="sr-only"
                 />
-                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+                <FormFieldRow
+                  alignAt="md"
+                  rowClassName="md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                >
                   <FormField id="passkey-name" label={t("settings.passkeyName")}>
                     {({ id }) => (
                       <Input
@@ -178,7 +181,7 @@ export function AccountPasskeysManagerDialog({
                     label={t("settings.currentPassword")}
                     description={t("settings.addPasskeyPasswordHelp")}
                   >
-                    {({ id }) => (
+                    {({ id, describedBy }) => (
                       <Input
                         id={id}
                         name="current-password"
@@ -188,20 +191,23 @@ export function AccountPasskeysManagerDialog({
                         onChange={(event) => setPasskeyPassword(event.target.value)}
                         placeholder={t("settings.currentPasswordPlaceholder")}
                         disabled={disabled || registerMutation.isPending}
+                        aria-describedby={describedBy}
                       />
                     )}
                   </FormField>
-                  <Button
-                    type="submit"
-                    className="justify-center gap-2"
-                    disabled={!canRegister}
-                  >
-                    <LoadingButtonContent loading={registerMutation.isPending} loadingLabel={t("common.saving")}>
-                      <Plus className="h-4 w-4" />
-                      {t("settings.addPasskey")}
-                    </LoadingButtonContent>
-                  </Button>
-                </div>
+                  <FormFieldRowAction>
+                    <Button
+                      type="submit"
+                      className="w-full justify-center gap-2 md:w-auto"
+                      disabled={!canRegister}
+                    >
+                      <LoadingButtonContent loading={registerMutation.isPending} loadingLabel={t("common.saving")}>
+                        <Plus className="h-4 w-4" />
+                        {t("settings.addPasskey")}
+                      </LoadingButtonContent>
+                    </Button>
+                  </FormFieldRowAction>
+                </FormFieldRow>
               </form>
 
               <div className="grid gap-3 border-t border-border pt-4">

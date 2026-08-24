@@ -134,7 +134,8 @@ describe("SubscriptionDialog", () => {
     expect(startDateButton).toHaveAttribute("aria-invalid", "false");
     expect(nextBillingDateButton).toHaveAttribute("aria-invalid", "true");
     expect(nextBillingDateButton).toHaveAttribute("aria-describedby", "nextBillingDate-error");
-    expect(nextBillingDateField).toContainElement(dateError);
+    expect(nextBillingDateButton.closest('[data-slot="form-field-row"]')).toContainElement(dateError);
+    expect(nextBillingDateField).not.toContainElement(dateError);
     expect(startDateField).not.toContainElement(dateError);
     expect(onSubmit).not.toHaveBeenCalled();
   });

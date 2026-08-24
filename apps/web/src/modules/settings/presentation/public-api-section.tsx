@@ -3,8 +3,8 @@ import { Clipboard, KeyRound, Plus, SlidersHorizontal, Trash2, X } from "lucide-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog } from "@/components/ui/dialog";
+import { FormField, FormFieldRow, FormFieldRowAction } from "@/components/ui/form-field";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -121,19 +121,31 @@ export function PublicApiSection({ id, className, controller }: PublicApiSection
                 </div>
               ) : null}
 
-              <div className="grid gap-2">
-                <Label htmlFor="public-api-token-name">{t("settings.publicApiCreateName")}</Label>
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <Input
-                    ref={tokenNameInputRef}
-                    id="public-api-token-name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder={t("settings.publicApiCreateNamePlaceholder")}
-                    maxLength={80}
-                    disabled={busy}
-                    className="border-border bg-secondary"
-                  />
+              <FormFieldRow
+                alignAt="sm"
+                rowClassName="sm:grid-cols-[minmax(0,1fr)_auto]"
+              >
+                <FormField
+                  id="public-api-token-name"
+                  label={t("settings.publicApiCreateName")}
+                  description={t("settings.publicApiCreateHelp")}
+                  descriptionClassName="leading-5"
+                >
+                  {({ id, describedBy }) => (
+                    <Input
+                      ref={tokenNameInputRef}
+                      id={id}
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder={t("settings.publicApiCreateNamePlaceholder")}
+                      maxLength={80}
+                      disabled={busy}
+                      className="border-border bg-secondary"
+                      aria-describedby={describedBy}
+                    />
+                  )}
+                </FormField>
+                <FormFieldRowAction>
                   <Button
                     type="button"
                     onClick={() => {
@@ -141,16 +153,15 @@ export function PublicApiSection({ id, className, controller }: PublicApiSection
                     }}
                     disabled={busy || name.trim().length === 0}
                     aria-busy={controller.isCreating ? true : undefined}
-                    className="justify-center gap-2"
+                    className="w-full justify-center gap-2 sm:w-auto"
                   >
                     <LoadingButtonContent loading={controller.isCreating} loadingLabel={t("common.saving")}>
                       <Plus className="h-4 w-4" />
                       {t("settings.publicApiCreate")}
                     </LoadingButtonContent>
                   </Button>
-                </div>
-                <p className="text-xs leading-5 text-muted-foreground">{t("settings.publicApiCreateHelp")}</p>
-              </div>
+                </FormFieldRowAction>
+              </FormFieldRow>
 
               <div className="grid gap-3 border-t border-border pt-4">
                 <ManagerDataBoundary state={controller.tokens}>

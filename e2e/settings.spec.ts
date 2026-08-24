@@ -1,6 +1,7 @@
 import { expect, test } from "./support/test";
 import {
   captureLayoutSnapshot,
+  expectFormFieldRowAlignment,
   expectLabelControlGap,
   expectRootScrollContainer,
   expectStableLayout,
@@ -14,6 +15,18 @@ import {
   gotoSettingsAfterHydration,
   gotoSettingsSectionAfterHydration,
 } from "./support/settings";
+
+test("desktop passkey fields and add action share stable form tracks", async ({ page }) => {
+  await gotoSettingsAfterHydration(page);
+  await page.getByRole("button", { name: "管理通行密钥" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "管理通行密钥" });
+  const nameInput = dialog.getByLabel("通行密钥名称");
+  const row = nameInput.locator('xpath=ancestor::*[@data-slot="form-field-row"][1]');
+  await expect(row).toHaveAttribute("data-align-at", "md");
+  await expect(row).toHaveAttribute("data-tracks", "3");
+  await expectFormFieldRowAlignment(row, "desktop passkey registration", { action: true });
+});
 
 test("settings directory waits for deferred content before scrolling to calendar feed", async ({ page }) => {
   const advancedModule = await deferAdvancedSettingsModule(page);

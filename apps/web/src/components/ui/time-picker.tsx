@@ -23,6 +23,7 @@ interface TimePickerProps {
   className?: string;
   disabled?: boolean;
   ariaLabel?: string;
+  ariaDescribedBy?: string | undefined;
   density?: 'default' | 'compact';
 }
 
@@ -389,6 +390,7 @@ export function TimePicker({
   className,
   disabled = false,
   ariaLabel,
+  ariaDescribedBy,
   density = 'default',
 }: TimePickerProps) {
   const { t } = useI18n();
@@ -444,6 +446,7 @@ export function TimePicker({
           variant="outline"
           disabled={disabled}
           aria-label={buttonAriaLabel}
+          aria-describedby={ariaDescribedBy}
           className={cn(
             isCompact
               ? "h-9 w-full justify-start border-border bg-background px-3 py-2 text-left font-medium tabular-nums hover:bg-accent hover:text-accent-foreground group"

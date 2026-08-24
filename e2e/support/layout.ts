@@ -54,6 +54,65 @@ export async function expectLabelControlGap(control: Locator, label: string) {
   }, `${label}: stable label/control gap`).toPass();
 }
 
+export async function expectFormFieldRowAlignment(
+  row: Locator,
+  label: string,
+  options: { action?: boolean } = {},
+) {
+  await expect(row, `${label}: row visible before layout measurement`).toBeVisible();
+  await expect.poll(async () => row.evaluate((element, expectAction) => {
+    const layout = element.firstElementChild;
+    if (!(layout instanceof HTMLElement)) {
+      throw new Error("Missing FormFieldRow layout");
+    }
+
+    const fields = Array.from(layout.children).filter((child): child is HTMLElement => (
+      child instanceof HTMLElement && child.dataset.slot === "form-field"
+    ));
+    const labelTops = fields.map((field) => {
+      const fieldLabel = field.querySelector<HTMLElement>('[data-slot="form-field-label"] label');
+      if (!fieldLabel) throw new Error("Missing FormField label");
+      return fieldLabel.getBoundingClientRect().top;
+    });
+    const controlTops = fields.map((field) => {
+      const control = field.querySelector<HTMLElement>('[data-slot="form-field-control"]');
+      if (!control) throw new Error("Missing FormField control");
+      return control.getBoundingClientRect().top;
+    });
+    const action = layout.querySelector<HTMLElement>(
+      ':scope > [data-slot="form-field-row-action"] > [data-slot="form-field-row-action-control"]',
+    );
+    if (expectAction && !action) throw new Error("Missing FormFieldRow action");
+    const actionTop = action?.getBoundingClientRect().top;
+    const spread = (values: number[]) => Math.max(...values) - Math.min(...values);
+
+    return spread(labelTops) <= 1
+      && spread(controlTops) <= 1
+      && (actionTop === undefined || Math.abs(actionTop - controlTops[0]!) <= 1);
+  }, Boolean(options.action)), { message: `${label}: shared field tracks` }).toBe(true);
+}
+
+export async function expectFormFieldRowStacked(row: Locator, label: string) {
+  await expect(row, `${label}: row visible before mobile layout measurement`).toBeVisible();
+  const metrics = await row.evaluate((element) => {
+    const layout = element.firstElementChild;
+    if (!(layout instanceof HTMLElement)) {
+      throw new Error("Missing FormFieldRow layout");
+    }
+    const children = Array.from(layout.children).filter((child): child is HTMLElement => (
+      child instanceof HTMLElement && child.offsetParent !== null
+    ));
+    const rects = children.map((child) => child.getBoundingClientRect());
+    return {
+      ordered: rects.every((rect, index) => index === 0 || rect.top >= rects[index - 1]!.bottom - 1),
+      overflow: Math.max(0, layout.scrollWidth - layout.clientWidth),
+    };
+  });
+
+  expect(metrics.ordered, `${label}: fields and action follow mobile DOM order`).toBe(true);
+  expect(metrics.overflow, `${label}: row horizontal overflow`).toBeLessThanOrEqual(1);
+}
+
 interface LayoutSnapshot {
   header: { x: number };
   content: { x: number };

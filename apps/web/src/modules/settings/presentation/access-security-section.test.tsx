@@ -173,6 +173,10 @@ describe("AccessSecuritySection", () => {
     expect(screen.getByRole("checkbox", { name: "要求邮箱密码登录通过人机验证" })).toBeChecked();
     expect(screen.getByLabelText("Site key")).toHaveValue("site-key");
     expect(screen.getByLabelText("Secret key")).toHaveAttribute("placeholder", "已保存，留空则保持不变");
+    const credentialsRow = screen.getByLabelText("Site key").closest('[data-slot="form-field-row"]');
+    expect(credentialsRow).toHaveAttribute("data-align-at", "sm");
+    expect(credentialsRow).toHaveAttribute("data-tracks", "3");
+    expect(credentialsRow?.querySelectorAll('[data-slot="form-field"]')).toHaveLength(2);
     expect(screen.getByRole("button", { name: "保存 Turnstile 配置" })).toBeDisabled();
     expect(screen.queryByTestId("turnstile-test-widget")).not.toBeInTheDocument();
   });

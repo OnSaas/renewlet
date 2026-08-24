@@ -453,7 +453,8 @@ describe("AIRecognizeSubscriptionDialog", () => {
     expect(startDateButton).toHaveAttribute("aria-invalid", "false");
     expect(nextBillingDateButton).toHaveAttribute("aria-invalid", "true");
     expect(nextBillingDateButton).toHaveAttribute("aria-describedby", "ai-draft-1-nextBillingDate-error");
-    expect(nextBillingDateButton.closest('[data-slot="form-field"]')).toHaveTextContent("请选择到期日期");
+    expect(nextBillingDateButton.closest('[data-slot="form-field-row"]')).toHaveTextContent("请选择到期日期");
+    expect(nextBillingDateButton.closest('[data-slot="form-field"]')).not.toHaveTextContent("请选择到期日期");
     expect(startDateButton.closest('[data-slot="form-field"]')).not.toHaveTextContent("请选择到期日期");
     expect(startDateButton.closest('[data-slot="form-field"]')).not.toHaveTextContent("请选择购买日期");
     expect(screen.getByRole("button", { name: "生成导入预览" })).toBeDisabled();
@@ -486,7 +487,8 @@ describe("AIRecognizeSubscriptionDialog", () => {
     }
     expect(purchaseDateButton).toHaveAttribute("aria-invalid", "true");
     expect(purchaseDateButton).toHaveAttribute("aria-describedby", "ai-draft-1-startDate-error");
-    expect(purchaseDateButton.closest('[data-slot="form-field"]')).toHaveTextContent("请选择购买日期");
+    expect(purchaseDateButton.closest('[data-slot="form-field-row"]')).toHaveTextContent("请选择购买日期");
+    expect(purchaseDateButton.closest('[data-slot="form-field"]')).not.toHaveTextContent("请选择购买日期");
     expect(expiryDateButton).toHaveAttribute("aria-invalid", "false");
     expect(expiryDateButton.closest('[data-slot="form-field"]')).not.toHaveTextContent("请选择到期日期");
     expect(screen.getByRole("button", { name: "生成导入预览" })).toBeDisabled();

@@ -77,6 +77,22 @@ describe("TimePicker", () => {
     expect(minuteColumn).toHaveAttribute("aria-valuetext", "12");
   });
 
+  it("forwards the field description relationship to the trigger", () => {
+    render(
+      <TimePicker
+        value="08:12"
+        onChange={vi.fn()}
+        ariaLabel="通知时间"
+        ariaDescribedBy="notification-time-description"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /通知时间/ })).toHaveAttribute(
+      "aria-describedby",
+      "notification-time-description",
+    );
+  });
+
   it("selects an option by click", async () => {
     const onChange = vi.fn();
     const { hourColumn } = await openPicker("08:12", onChange);

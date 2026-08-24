@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { Activity, Coins, CreditCard, FolderKanban, Settings2 } from "lucide-react";
 import { DeferredImportDataDialog } from "@/components/import-data-dialog-loader";
 import { RawErrorResponseDialog } from "@/components/raw-error-response-dialog";
-import { FormField } from "@/components/ui/form-field";
+import { FormField, FormFieldRow } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -378,32 +378,46 @@ export function SettingsAdvancedSections({
       <section id="settings-notifications" className={SETTINGS_SECTION_FRAME_CLASS}>
         <h2 className="mb-6 text-lg font-semibold text-foreground">{t("settings.notifications")}</h2>
         <div className="grid gap-6">
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>{t("settings.notificationTime")}</Label>
-              <TimePicker
-                value={settings.notificationTimeLocal}
-                onChange={(value) => updateSetting("notificationTimeLocal", assertLocalTime(value))}
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">{t("settings.notificationTimeHelp")}</p>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="notificationReminderDays">{t("settings.notificationReminderDays")}</Label>
-              <NumericInput
+          <div className="grid gap-6">
+            <FormFieldRow alignAt="sm" rowClassName="sm:grid-cols-2 sm:gap-x-6">
+              <FormField
+                id="notificationTimeLocal"
+                label={t("settings.notificationTime")}
+                description={t("settings.notificationTimeHelp")}
+              >
+                {({ id: fieldId, describedBy }) => (
+                  <TimePicker
+                    id={fieldId}
+                    value={settings.notificationTimeLocal}
+                    onChange={(value) => updateSetting("notificationTimeLocal", assertLocalTime(value))}
+                    className="w-full"
+                    ariaLabel={t("settings.notificationTime")}
+                    ariaDescribedBy={describedBy}
+                  />
+                )}
+              </FormField>
+              <FormField
                 id="notificationReminderDays"
-                name="notificationReminderDays"
-                allowNegative={false}
-                decimalScale={0}
-                inputMode="numeric"
-                enterKeyHint="done"
-                value={notificationReminderDaysInput}
-                onRawValueChange={handleNotificationReminderDaysInputChange}
-                className="border-border bg-secondary"
-              />
-              <p className="text-xs text-muted-foreground">{t("settings.notificationReminderDaysHelp")}</p>
-            </div>
-            <div className="grid content-start gap-2 sm:col-span-2">
+                label={t("settings.notificationReminderDays")}
+                description={t("settings.notificationReminderDaysHelp")}
+              >
+                {({ id: fieldId, describedBy }) => (
+                  <NumericInput
+                    id={fieldId}
+                    name="notificationReminderDays"
+                    allowNegative={false}
+                    decimalScale={0}
+                    inputMode="numeric"
+                    enterKeyHint="done"
+                    value={notificationReminderDaysInput}
+                    onRawValueChange={handleNotificationReminderDaysInputChange}
+                    className="border-border bg-secondary"
+                    aria-describedby={describedBy}
+                  />
+                )}
+              </FormField>
+            </FormFieldRow>
+            <div className="grid content-start gap-2">
               <Label>{t("settings.tip")}</Label>
               <p className="text-xs text-muted-foreground">{t("settings.cronTip")}</p>
             </div>

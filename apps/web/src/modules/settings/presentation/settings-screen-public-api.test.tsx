@@ -76,7 +76,15 @@ describe("SettingsScreen Public API and Telegram commands", () => {
     await user.click(getDialogOverlay());
     expect(screen.getByRole("dialog", { name: "管理 Public API token" })).toBeInTheDocument();
 
-    await user.type(within(managementDialog).getByLabelText("Token 名称"), "Shortcuts");
+    const tokenNameInput = within(managementDialog).getByLabelText("Token 名称");
+    const tokenCreateRow = tokenNameInput.closest('[data-slot="form-field-row"]');
+    expect(tokenCreateRow).toHaveAttribute("data-align-at", "sm");
+    expect(tokenNameInput).toHaveAttribute("aria-describedby", "public-api-token-name-description");
+    expect(tokenCreateRow?.querySelector('[data-slot="form-field-row-action"]')).toContainElement(
+      within(managementDialog).getByRole("button", { name: "创建 token" }),
+    );
+
+    await user.type(tokenNameInput, "Shortcuts");
     await user.click(within(managementDialog).getByRole("button", { name: "创建 token" }));
     expect(controller.publicApi.createToken).toHaveBeenCalledWith("Shortcuts");
 

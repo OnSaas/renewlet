@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FormField } from "@/components/ui/form-field";
+import { FormField, FormFieldRow } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useTheme } from "@/lib/theme-provider";
@@ -73,7 +73,7 @@ export function AccessSecuritySection({ id, className, controller }: AccessSecur
           description={t("settings.turnstileEnableHelp")}
         />
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <FormFieldRow alignAt="sm" rowClassName="sm:grid-cols-2">
           <FormField
             id="turnstile-site-key"
             label={t("settings.turnstileSiteKey")}
@@ -114,7 +114,7 @@ export function AccessSecuritySection({ id, className, controller }: AccessSecur
               />
             )}
           </FormField>
-        </div>
+        </FormFieldRow>
 
         <div className="flex flex-wrap gap-2">
           <Button

@@ -231,6 +231,12 @@ describe("RenewSubscriptionDialog", () => {
     expect(screen.getByRole("button", { name: /开始日期 2026-08-12/ })).toBeEnabled();
     expect(screen.getByRole("button", { name: /到期日期 2026-09-12/ })).toBeEnabled();
     expect(screen.getByRole("button", { name: "重新开始订阅" })).toBeEnabled();
+    const pricingRow = screen.getByLabelText("价格").closest('[data-slot="form-field-row"]');
+    const scheduleRow = screen.getByRole("button", { name: /开始日期 2026-08-12/ }).closest('[data-slot="form-field-row"]');
+    expect(pricingRow).toHaveAttribute("data-align-at", "sm");
+    expect(pricingRow).toHaveAttribute("data-tracks", "2");
+    expect(scheduleRow).toHaveAttribute("data-align-at", "sm");
+    expect(scheduleRow).toHaveAttribute("data-tracks", "2");
   });
 
   it("opens active subscriptions in continue mode and submits an explicit payload", async () => {

@@ -294,7 +294,8 @@ export function RenewSubscriptionDialogContent({
       ) : null)}
       pricing={loadingSlots?.pricing ?? (currentForm ? (
         <FormFieldRow
-          rowClassName="grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)]"
+          alignAt="sm"
+          rowClassName="sm:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)]"
           errors={[
             { id: "renew-price-error", message: errors.price },
             { id: "renew-currency-error", message: errors.currency },
@@ -337,7 +338,8 @@ export function RenewSubscriptionDialogContent({
         <>
           {restartMode ? (
             <FormFieldRow
-              rowClassName="grid-cols-1 gap-4 sm:grid-cols-2"
+              alignAt="sm"
+              rowClassName="sm:grid-cols-2"
               errors={[
                 { id: "renew-start-date-error", message: errors.startDate },
                 { id: "renew-next-billing-date-error", message: errors.nextBillingDate },

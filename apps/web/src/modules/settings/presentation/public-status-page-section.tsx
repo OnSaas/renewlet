@@ -1,9 +1,9 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState } from "react";
 import { Clipboard, ExternalLink, Globe2, RefreshCw, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FormField, FormFieldRow } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -96,32 +96,6 @@ function PublicStatusLinkRow({
   );
 }
 
-interface PublicStatusSettingRowProps {
-  label: ReactNode;
-  description: ReactNode;
-  control: ReactNode;
-}
-
-function PublicStatusSettingRow({
-  label,
-  description,
-  control,
-}: PublicStatusSettingRowProps) {
-  return (
-    <div className="grid min-w-0 gap-3">
-      <div className="flex min-w-0 items-start justify-between gap-4">
-        <div className="min-w-0">
-          {label}
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
-        </div>
-        <div className="flex shrink-0 items-center pt-0.5">
-          {control}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /**
  * 管理公开展示页的私密 URL。
  *
@@ -206,46 +180,54 @@ export function PublicStatusPageSection({
             onOpenPage={onOpenPage}
           />
 
-          <div className="grid gap-4 border-t border-border pt-4 lg:grid-cols-2 lg:gap-6">
-            <PublicStatusSettingRow
-              label={(
-                <Label htmlFor="publicStatusShowPrices" className="cursor-pointer text-sm font-medium">
-                  {t("settings.publicStatusShowPrices")}
-                </Label>
-              )}
+          <FormFieldRow
+            alignAt="lg"
+            className="border-t border-border pt-4"
+            rowClassName="lg:grid-cols-2 lg:gap-x-6"
+          >
+            <FormField
+              id="publicStatusShowPrices"
+              label={t("settings.publicStatusShowPrices")}
+              labelClassName="cursor-pointer text-sm font-medium"
               description={t("settings.publicStatusShowPricesHelp")}
-              control={(
+            >
+              {({ id, describedBy }) => (
                 <Switch
-                  id="publicStatusShowPrices"
+                  id={id}
                   checked={showPrices}
                   disabled={busy}
                   onCheckedChange={onShowPricesChange}
                   aria-label={t("settings.publicStatusShowPrices")}
+                  aria-describedby={describedBy}
                 />
               )}
-            />
+            </FormField>
 
-            <div className="grid min-w-0 gap-2">
-              <div className="min-w-0">
-                <Label className="text-sm font-medium">{t("settings.publicStatusCurrency")}</Label>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {t("settings.publicStatusCurrencyHelp", { currency: effectivePublicStatusCurrency })}
-                </p>
-              </div>
-              <SearchableSelect
-                value={publicStatusCurrency}
-                onValueChange={onPublicStatusCurrencyChange}
-                options={publicStatusCurrencyOptions}
-                placeholder={t("settings.currencyPlaceholder")}
-                searchPlaceholder={t("settings.currencySearch")}
-                emptyMessage={t("settings.currencyEmpty")}
-                disabled={busy}
-                className="h-9 w-full border-border bg-background"
-                contentClassName="max-w-md"
-                aria-label={t("settings.publicStatusCurrency")}
-              />
-            </div>
-          </div>
+            <FormField
+              id="publicStatusCurrency"
+              label={t("settings.publicStatusCurrency")}
+              labelClassName="text-sm font-medium"
+              description={t("settings.publicStatusCurrencyHelp", { currency: effectivePublicStatusCurrency })}
+              descriptionClassName="leading-5"
+            >
+              {({ id, describedBy }) => (
+                <SearchableSelect
+                  id={id}
+                  value={publicStatusCurrency}
+                  onValueChange={onPublicStatusCurrencyChange}
+                  options={publicStatusCurrencyOptions}
+                  placeholder={t("settings.currencyPlaceholder")}
+                  searchPlaceholder={t("settings.currencySearch")}
+                  emptyMessage={t("settings.currencyEmpty")}
+                  disabled={busy}
+                  className="h-9 w-full border-border bg-background"
+                  contentClassName="max-w-md"
+                  aria-label={t("settings.publicStatusCurrency")}
+                  aria-describedby={describedBy}
+                />
+              )}
+            </FormField>
+          </FormFieldRow>
 
           <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">

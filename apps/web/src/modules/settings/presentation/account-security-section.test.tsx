@@ -330,6 +330,7 @@ describe("AccountSettingsSection account security dialogs", () => {
     const usernameInput = addForm.querySelector<HTMLInputElement>('input[name="username"]');
     const nameInput = within(addForm).getByLabelText("通行密钥名称");
     const passwordInput = within(addForm).getByLabelText("当前密码");
+    const accountCredentialsRow = document.getElementById("username")?.closest('[data-slot="form-field-row"]');
 
     expect(usernameInput).toHaveAttribute("autocomplete", "username");
     expect(usernameInput).toHaveValue("alice@example.com");
@@ -337,6 +338,18 @@ describe("AccountSettingsSection account security dialogs", () => {
     expect(nameInput).toHaveAttribute("autocomplete", "off");
     expect(passwordInput).toHaveAttribute("name", "current-password");
     expect(passwordInput).toHaveAttribute("autocomplete", "current-password");
+    expect(passwordInput).toHaveAttribute("aria-describedby", "passkey-password-description");
+    expect(accountCredentialsRow).toHaveAttribute("data-align-at", "sm");
+    expect(accountCredentialsRow).toHaveAttribute("data-tracks", "3");
+
+    const fieldRow = nameInput.closest('[data-slot="form-field-row"]');
+    const rowLayout = fieldRow?.firstElementChild;
+    expect(fieldRow).toHaveAttribute("data-align-at", "md");
+    expect(fieldRow).toHaveAttribute("data-tracks", "3");
+    expect(rowLayout?.children[0]).toHaveAttribute("data-slot", "form-field");
+    expect(rowLayout?.children[1]).toHaveAttribute("data-slot", "form-field");
+    expect(rowLayout?.children[2]).toHaveAttribute("data-slot", "form-field-row-action");
+    expect(rowLayout?.children[2]).toContainElement(within(addForm).getByRole("button", { name: "添加通行密钥" }));
   });
 
   it("does not open MFA dialogs when a password manager fills the passkey form", async () => {

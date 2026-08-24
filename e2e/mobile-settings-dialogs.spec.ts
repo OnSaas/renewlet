@@ -1,8 +1,8 @@
 // 移动端设置/订阅弹窗测试覆盖 visualViewport、软键盘和 Radix 动画交界；这些问题只有真实浏览器布局能暴露。
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
-import { expectNoHorizontalOverflow } from "./support/layout";
-import { gotoSettingsSectionAfterHydration } from "./support/settings";
+import { expectFormFieldRowStacked, expectNoHorizontalOverflow } from "./support/layout";
+import { gotoSettingsAfterHydration, gotoSettingsSectionAfterHydration } from "./support/settings";
 import { expectSideDrawerExitLifecycle } from "./support/side-drawer";
 import {
   createSubscription,
@@ -12,6 +12,18 @@ import {
 } from "./support/subscriptions";
 
 const VIEWPORT_SYNC_SETTLE_MS = 540;
+
+test("mobile passkey fields keep DOM order without horizontal overflow", async ({ page }) => {
+  await gotoSettingsAfterHydration(page);
+  await page.getByRole("button", { name: "管理通行密钥" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "管理通行密钥" });
+  const row = dialog.getByLabel("通行密钥名称").locator('xpath=ancestor::*[@data-slot="form-field-row"][1]');
+  await expect(row).toHaveAttribute("data-align-at", "md");
+  await expect(row).toHaveAttribute("data-tracks", "3");
+  await expectFormFieldRowStacked(row, "mobile passkey registration");
+  await expectNoHorizontalOverflow(page, "mobile passkey manager");
+});
 
 test("mobile settings navigation completes the left-side exit lifecycle", async ({ page }) => {
   await gotoSettingsSectionAfterHydration(page, "settings-display");

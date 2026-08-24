@@ -348,6 +348,9 @@ describe("SettingsScreen SMTP email settings", () => {
     const input = screen.getByLabelText("默认提前提醒天数");
     expect(input).toHaveValue("5");
     expect(input).toHaveAttribute("inputmode", "numeric");
+    const notificationScheduleRow = input.closest('[data-slot="form-field-row"]');
+    expect(notificationScheduleRow).toHaveAttribute("data-align-at", "sm");
+    expect(notificationScheduleRow).toHaveAttribute("data-tracks", "3");
 
     await user.clear(input);
     await user.type(input, "14");
@@ -456,6 +459,10 @@ describe("SettingsScreen SMTP email settings", () => {
     expect(controller.publicStatusPage.updateShowPrices).toHaveBeenCalledWith(false);
 
     const currencySelect = screen.getByRole("combobox", { name: "公开页统计货币" });
+    const publicStatusFields = currencySelect.closest('[data-slot="form-field-row"]');
+    expect(publicStatusFields).toHaveAttribute("data-align-at", "lg");
+    expect(publicStatusFields?.querySelectorAll('[data-slot="form-field"]')).toHaveLength(2);
+    expect(screen.getByRole("switch", { name: "公开金额" }).closest('[data-slot="form-field-row"]')).toBe(publicStatusFields);
     expect(currencySelect).toHaveTextContent("继承统计货币（当前 USD）");
 
     await user.click(currencySelect);
@@ -572,8 +579,9 @@ describe("SettingsScreen SMTP email settings", () => {
     renderSettingsScreen();
 
     const providerModelGrid = screen.getByTestId("ai-provider-model-grid");
-    expect(providerModelGrid).toHaveClass("items-start");
-    expect(providerModelGrid).toHaveClass("md:gap-y-2");
+    expect(providerModelGrid).toHaveAttribute("data-align-at", "md");
+    expect(providerModelGrid).toHaveAttribute("data-tracks", "2");
+    expect(providerModelGrid.firstElementChild).toHaveClass("md:grid-cols-2", "md:gap-y-2");
   });
 
   it("uses test wording for the Notifyx channel button", () => {
