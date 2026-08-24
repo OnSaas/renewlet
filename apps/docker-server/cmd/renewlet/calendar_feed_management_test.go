@@ -169,33 +169,78 @@ func TestCalendarFeedAtomicRotateAndRevokeLifecycle(t *testing.T) {
 	}
 }
 
-func TestSubscriptionDeleteRemovesCalendarFeedAndOrphanRepair(t *testing.T) {
+func TestSubscriptionDeleteRevokesOnlyTargetCalendarFeed(t *testing.T) {
 	app := newSchemaTestApp(t)
 	if err := ensureSchema(app); err != nil {
 		t.Fatal(err)
 	}
 	registerRecordHooks(app)
 	user, token := createRouteTestUser(t, app, "user")
-	subscription := createCalendarFeedTestSubscription(t, app, user.Id, calendarFeedTestSubscription{
+	otherUser, otherToken := createRouteTestUser(t, app, "admin")
+	target := createCalendarFeedTestSubscription(t, app, user.Id, calendarFeedTestSubscription{
 		Name: "Delete with feed", BillingCycle: "monthly", Status: "active", NextBillingDate: "2099-06-01",
 	})
-	createdResponse := serveTestRequest(t, app, http.MethodPost, "/api/app/subscriptions/"+subscription.Id+"/calendar-feed", `{}`, token)
-	created := decodeAPISuccessDataForTest[calendarFeedCreateResponse](t, createdResponse.Body.Bytes()).CalendarFeed
+	preserved := createCalendarFeedTestSubscription(t, app, user.Id, calendarFeedTestSubscription{
+		Name: "Preserved same owner", BillingCycle: "monthly", Status: "active", NextBillingDate: "2099-06-02",
+	})
+	foreign := createCalendarFeedTestSubscription(t, app, otherUser.Id, calendarFeedTestSubscription{
+		Name: "Preserved other owner", BillingCycle: "monthly", Status: "active", NextBillingDate: "2099-06-03",
+	})
+	for _, request := range []struct {
+		target string
+		token  string
+	}{
+		{target: "/api/app/subscriptions/" + target.Id + "/calendar-feed", token: token},
+		{target: "/api/app/subscriptions/" + preserved.Id + "/calendar-feed", token: token},
+		{target: "/api/app/subscriptions/" + foreign.Id + "/calendar-feed", token: otherToken},
+	} {
+		if response := serveTestRequest(t, app, http.MethodPost, request.target, `{}`, request.token); response.Code != http.StatusOK {
+			t.Fatalf("create %s: %d %s", request.target, response.Code, response.Body.String())
+		}
+	}
+	createdResponse := serveTestRequest(t, app, http.MethodGet, "/api/app/subscriptions/"+target.Id+"/calendar-feed", "", token)
+	if createdResponse.Code != http.StatusOK {
+		t.Fatalf("load target feed: %d %s", createdResponse.Code, createdResponse.Body.String())
+	}
+	created := decodeAPISuccessDataForTest[calendarFeedStatusResponse](t, createdResponse.Body.Bytes()).CalendarFeed
 
-	if response := serveTestRequest(t, app, http.MethodDelete, "/api/app/subscriptions/"+subscription.Id, "", token); response.Code != http.StatusOK {
+	if response := serveTestRequest(t, app, http.MethodDelete, "/api/app/subscriptions/"+target.Id, "", token); response.Code != http.StatusOK {
 		t.Fatalf("delete subscription: %d %s", response.Code, response.Body.String())
 	}
+	if _, err := app.FindRecordById("subscriptions", target.Id); err == nil || !errorsIsNoRows(err) {
+		t.Fatalf("expected target subscription to be deleted, got %v", err)
+	}
 	if records, err := app.FindRecordsByFilter("calendar_feeds", "user = {:user} && subscriptionId = {:subscription}", "", 10, 0, dbx.Params{
-		"user": user.Id, "subscription": subscription.Id,
+		"user": user.Id, "subscription": target.Id,
 	}); err != nil || len(records) != 0 {
 		t.Fatalf("expected subscription delete to remove its feed, records=%d err=%v", len(records), err)
 	}
 	if response := serveTestRequest(t, app, http.MethodGet, calendarFeedRequestTarget(t, created.FeedURL), "", ""); response.Code != http.StatusNotFound {
 		t.Fatalf("expected deleted subscription feed URL to return 404, got %d", response.Code)
 	}
+	for _, item := range []struct {
+		userID         string
+		subscriptionID string
+	}{
+		{userID: user.Id, subscriptionID: preserved.Id},
+		{userID: otherUser.Id, subscriptionID: foreign.Id},
+	} {
+		record, err := findSubscriptionCalendarFeedForUser(app, item.userID, item.subscriptionID)
+		if err != nil || record == nil {
+			t.Fatalf("expected unrelated feed to remain, user=%q subscription=%q record=%v err=%v", item.userID, item.subscriptionID, record, err)
+		}
+	}
+}
 
+func TestDeleteOrphanSubscriptionCalendarFeedsRepairsHistoricalRows(t *testing.T) {
+	app := newSchemaTestApp(t)
+	if err := ensureSchema(app); err != nil {
+		t.Fatal(err)
+	}
+	registerRecordHooks(app)
+	user, token := createRouteTestUser(t, app, "user")
 	orphanSubscription := createCalendarFeedTestSubscription(t, app, user.Id, calendarFeedTestSubscription{
-		Name: "Historical orphan", BillingCycle: "monthly", Status: "active", NextBillingDate: "2099-06-02",
+		Name: "Historical orphan", BillingCycle: "monthly", Status: "active", NextBillingDate: "2099-06-01",
 	})
 	if response := serveTestRequest(t, app, http.MethodPost, "/api/app/subscriptions/"+orphanSubscription.Id+"/calendar-feed", `{}`, token); response.Code != http.StatusOK {
 		t.Fatalf("create orphan fixture feed: %d %s", response.Code, response.Body.String())
@@ -210,5 +255,38 @@ func TestSubscriptionDeleteRemovesCalendarFeedAndOrphanRepair(t *testing.T) {
 		"user": user.Id, "subscription": orphanSubscription.Id,
 	}); err != nil || len(records) != 0 {
 		t.Fatalf("expected data repair to remove orphan feed, records=%d err=%v", len(records), err)
+	}
+}
+
+func TestSubscriptionDeleteRollsBackWhenCalendarFeedRevocationFails(t *testing.T) {
+	app := newSchemaTestApp(t)
+	if err := ensureSchema(app); err != nil {
+		t.Fatal(err)
+	}
+	registerRecordHooks(app)
+	user := createSchemaTestUser(t, app, "calendar-feed-delete-rollback@example.com")
+	subscription := createCalendarFeedTestSubscription(t, app, user.Id, calendarFeedTestSubscription{
+		Name: "Rollback feed", BillingCycle: "monthly", Status: "active", NextBillingDate: "2099-06-01",
+	})
+	feed, err := ensureSubscriptionCalendarFeed(app, user.Id, subscription.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.DB().NewQuery(`CREATE TRIGGER fail_calendar_feed_delete
+		BEFORE DELETE ON calendar_feeds
+		BEGIN
+			SELECT RAISE(ABORT, 'injected calendar feed delete failure');
+		END`).Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := app.Delete(subscription); err == nil || !strings.Contains(err.Error(), "injected calendar feed delete failure") {
+		t.Fatalf("expected injected calendar feed delete failure, got %v", err)
+	}
+	if _, err := app.FindRecordById("subscriptions", subscription.Id); err != nil {
+		t.Fatalf("subscription delete must roll back with feed revocation: %v", err)
+	}
+	if _, err := app.FindRecordById("calendar_feeds", feed.Id); err != nil {
+		t.Fatalf("calendar feed must remain when its revocation fails: %v", err)
 	}
 }

@@ -86,7 +86,9 @@ func TestStaticContentEncodingResponseContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	registerStaticFallback(router, staticFS)
+	if err := registerStaticFallback(router, staticFS, customHeadHTMLConfig{}); err != nil {
+		t.Fatal(err)
+	}
 	mux, err := router.BuildMux()
 	if err != nil {
 		t.Fatal(err)

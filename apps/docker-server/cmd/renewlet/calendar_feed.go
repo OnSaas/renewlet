@@ -23,9 +23,10 @@ import (
 )
 
 const (
-	calendarFeedScopeAll          = "all"
-	calendarFeedScopeSubscription = "subscription"
-	calendarFeedTokenBytes        = 32
+	calendarFeedScopeAll             = "all"
+	calendarFeedScopeSubscription    = "subscription"
+	calendarFeedSubscriptionPageSize = 500
+	calendarFeedTokenBytes           = 32
 )
 
 type calendarFeedStatus struct {
@@ -389,27 +390,11 @@ func ensureSubscriptionCalendarFeed(app core.App, userID string, subscriptionID 
 }
 
 func deleteSubscriptionCalendarFeeds(app core.App, userID string, subscriptionID string) error {
-	for {
-		records, err := app.FindRecordsByFilter(
-			"calendar_feeds",
-			"user = {:user} && scope = {:scope} && subscriptionId = {:subscriptionId}",
-			"created",
-			notificationSubscriptionPageSize,
-			0,
-			dbx.Params{"user": userID, "scope": calendarFeedScopeSubscription, "subscriptionId": subscriptionID},
-		)
-		if err != nil {
-			return err
-		}
-		for _, record := range records {
-			if err := app.Delete(record); err != nil {
-				return err
-			}
-		}
-		if len(records) < notificationSubscriptionPageSize {
-			return nil
-		}
-	}
+	_, err := app.DB().NewQuery(`DELETE FROM calendar_feeds
+		WHERE user = {:user} AND scope = {:scope} AND subscriptionId = {:subscriptionId}`).
+		Bind(dbx.Params{"user": userID, "scope": calendarFeedScopeSubscription, "subscriptionId": subscriptionID}).
+		Execute()
+	return err
 }
 
 func calendarFeedStatusFromRecord(request *http.Request, record *core.Record) calendarFeedStatus {
@@ -438,15 +423,15 @@ func calendarFeedURL(request *http.Request, token string) string {
 
 func listCalendarFeedSubscriptions(app core.App, userID string) ([]calendarFeedSubscription, error) {
 	items := []calendarFeedSubscription{}
-	for offset := 0; ; offset += notificationSubscriptionPageSize {
-		rows, err := app.FindRecordsByFilter("subscriptions", "user = {:user}", "nextBillingDate,name", notificationSubscriptionPageSize, offset, dbx.Params{"user": userID})
+	for offset := 0; ; offset += calendarFeedSubscriptionPageSize {
+		rows, err := app.FindRecordsByFilter("subscriptions", "user = {:user}", "nextBillingDate,name", calendarFeedSubscriptionPageSize, offset, dbx.Params{"user": userID})
 		if err != nil {
 			return nil, err
 		}
 		for _, row := range rows {
 			items = append(items, calendarFeedSubscriptionFromRecord(row))
 		}
-		if len(rows) < notificationSubscriptionPageSize {
+		if len(rows) < calendarFeedSubscriptionPageSize {
 			return items, nil
 		}
 	}

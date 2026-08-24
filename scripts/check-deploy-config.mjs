@@ -31,6 +31,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkCloudflareDevRunner } from "./check-cloudflare-dev-runner.mjs";
 import { checkCloudflareD1DeployContract } from "./check-cloudflare-d1-deploy-contract.mjs";
+import { checkCustomHeadHTMLDeployContract } from "./check-custom-head-html-deploy-contract.mjs";
 import { checkDockerBuildContract } from "./check-docker-build-contract.mjs";
 import { checkSyncRenewletUpstream } from "./check-deploy-sync-upstream.mjs";
 
@@ -315,27 +316,6 @@ function checkDockerSelfUpdateLayout() {
   ]) {
     if (!releaseWorkflow.includes(snippet)) {
       throw new Error(`release-publish.yml must keep GitHub Release hygiene snippet: ${snippet}`);
-    }
-  }
-}
-
-function checkDockerCustomHeadScriptEnv() {
-  const expectedEnv = "RENEWLET_CUSTOM_HEAD_SCRIPT";
-  const files = [
-    ".env.example",
-    "deploy/env.example",
-    "docker-compose.yml",
-    "docker-compose.ghcr.yml",
-    "deploy/docker-compose.yml",
-    "README.md",
-    "README.zh-CN.md",
-  ];
-
-  // 自定义 head 脚本同时影响 HTML 注入与 CSP；部署入口漏传会让文档配置变成静默无效。
-  for (const relativePath of files) {
-    const content = readFileSync(join(repoRoot, relativePath), "utf8");
-    if (!content.includes(expectedEnv)) {
-      throw new Error(`${relativePath} must document or pass through ${expectedEnv}.`);
     }
   }
 }
@@ -773,7 +753,7 @@ checkInvalidExistingPBKeyIsRejected();
 checkGoToolchainConsistency();
 checkDockerSelfUpdateLayout();
 checkDockerBuildContract(repoRoot);
-checkDockerCustomHeadScriptEnv();
+checkCustomHeadHTMLDeployContract(repoRoot);
 checkDockerProxyEnv();
 checkCloudflareDeployMigrationScript();
 checkCloudflareDevRunner(repoRoot);

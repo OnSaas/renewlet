@@ -6,13 +6,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv, type Plugin, type PluginOption } from "vite";
 import {
-  appendUniqueString,
-  customHeadScriptEnvName,
-  injectCustomHeadScriptHtml,
-  parseCustomHeadScript,
-  updateCustomHeadScriptStaticHeaders,
-  type CustomHeadScript,
-} from "./vite/custom-head-script.js";
+  customHeadHTMLEnvName,
+  parseCustomHeadHTML,
+  transformCustomHeadHTML,
+  trustedExtensionContentSecurityPolicy,
+  updateCustomHeadHTMLStaticHeaders,
+  type CustomHeadHTML,
+} from "./vite/custom-head-html.js";
 import { resolveClientBuildVersion } from "./vite/build-version.js";
 import { bundleModuleGraphPlugin } from "./vite/bundle-module-graph.js";
 
@@ -24,31 +24,31 @@ const devProxyOptions = (target: string) => ({
   xfwd: true,
 });
 
-const customHeadScriptPlugin = (script: CustomHeadScript | undefined, options: { updateStaticHeaders: boolean }): Plugin => ({
-  name: "renewlet-custom-head-script",
+const customHeadHTMLPlugin = (customHeadHTML: CustomHeadHTML | undefined, options: { updateStaticHeaders: boolean }): Plugin => ({
+  name: "renewlet-custom-head-html",
+  // 正式 HTML entry hook 同时覆盖 dev 与 build；返回完整源码字符串才能保留任意 head 片段，不经 tag descriptor 重新序列化。
   transformIndexHtml(html) {
-    return injectCustomHeadScriptHtml(html, script);
+    return transformCustomHeadHTML(html, customHeadHTML);
   },
   writeBundle() {
-    if (!script || !options.updateStaticHeaders) return;
+    if (!customHeadHTML || !options.updateStaticHeaders) return;
+    // Cloudflare 的 public/_headers 到 build 输出完成后才可改写；开发服务器的 CSP 由 server.headers 使用同一配置快照提供。
     const headersPath = path.resolve(rootDir, "dist/_headers");
     if (!existsSync(headersPath)) {
-      throw new Error("Missing apps/web/dist/_headers. Cloudflare custom head script build needs Static Assets headers.");
+      throw new Error("Missing apps/web/dist/_headers. Cloudflare custom head HTML build needs Static Assets headers.");
     }
     const headers = readFileSync(headersPath, "utf8");
-    const nextHeaders = updateCustomHeadScriptStaticHeaders(headers, script);
+    const nextHeaders = updateCustomHeadHTMLStaticHeaders(headers, customHeadHTML);
     if (nextHeaders !== headers) writeFileSync(headersPath, nextHeaders);
   },
 });
 
-function contentSecurityPolicy(script: CustomHeadScript | undefined): string {
+function contentSecurityPolicy(customHeadHTML: CustomHeadHTML | undefined): string {
+  if (customHeadHTML) return trustedExtensionContentSecurityPolicy(false);
+
   const turnstileChallengeOrigin = "https://challenges.cloudflare.com";
   const scriptSources = ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", turnstileChallengeOrigin];
   const connectSources = ["'self'", "https:", turnstileChallengeOrigin];
-  if (script) {
-    appendUniqueString(scriptSources, script.scriptOrigin);
-    for (const origin of script.connectOrigins) appendUniqueString(connectSources, origin);
-  }
   return [
     "default-src 'self'",
     "script-src " + scriptSources.join(" "),
@@ -86,14 +86,14 @@ export default defineConfig(async ({ command, mode }) => {
   const devProxyTarget = process.env["VITE_DEV_PROXY_TARGET"] ?? env["VITE_DEV_PROXY_TARGET"] ?? "http://127.0.0.1:3000";
   const renewletRuntime = process.env["VITE_RENEWLET_RUNTIME"] ?? env["VITE_RENEWLET_RUNTIME"];
   const clientBuildVersion = resolveClientBuildVersion(repoRoot, { ...env, ...process.env });
-  const shouldInjectCustomHeadScript = command === "serve" || renewletRuntime === "cloudflare";
-  // Docker build 的最终 HTML 由 Go 运行时注入；只有 Vite dev 和 Cloudflare Static Assets build 在这一层拥有最终 HTML/CSP。
-  const customHeadScript = shouldInjectCustomHeadScript
-    ? parseCustomHeadScript(process.env[customHeadScriptEnvName] ?? env[customHeadScriptEnvName])
+  const shouldInjectCustomHeadHTML = command === "serve" || renewletRuntime === "cloudflare";
+  // Docker 在进程启动时冻结配置，Cloudflare Static Assets 则只能在构建期注入；修改 Cloudflare 变量后必须重新构建部署。
+  const customHeadHTML = shouldInjectCustomHeadHTML
+    ? parseCustomHeadHTML(process.env[customHeadHTMLEnvName] ?? env[customHeadHTMLEnvName])
     : undefined;
 
   const plugins: PluginOption[] = [
-    customHeadScriptPlugin(customHeadScript, {
+    customHeadHTMLPlugin(customHeadHTML, {
       updateStaticHeaders: command === "build" && renewletRuntime === "cloudflare",
     }),
     lingui({ failOnCompileError: true }),
@@ -131,7 +131,7 @@ export default defineConfig(async ({ command, mode }) => {
     server: {
       port: 5173,
       headers: {
-        "Content-Security-Policy": contentSecurityPolicy(customHeadScript),
+        "Content-Security-Policy": contentSecurityPolicy(customHeadHTML),
       },
       proxy: {
         "/api": devProxyOptions(devProxyTarget),
