@@ -6,6 +6,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readSuccessData } from "./api-test-helpers";
 import { SUBSCRIPTION_COLUMNS } from "./db";
 import { readSubscriptions } from "./subscriptions";
+import {
+  readSubscriptionAnalytics,
+  readSubscriptionCalendar,
+  readSubscriptionFacets,
+  readSubscriptionIndex,
+} from "./subscription-collections";
 import type { Env } from "./types";
 
 const authMocks = vi.hoisted(() => ({
@@ -162,6 +168,79 @@ describe("Cloudflare D1 subscription migrations", () => {
       );
       expect(tableColumnNames(db, "subscription_derived_backfills")).toEqual(["name", "completed_at"]);
       expect(readScalar<number>(db, "SELECT COUNT(*) FROM subscription_derived_backfills")).toBe(0);
+      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rebuilds every collection API after 0035 cascades projections with D1 foreign keys enabled", async () => {
+    const db = openSubscriptionMigrationDatabase();
+    try {
+      insertCostSharingSubscription(db, {
+        costSharingJson: JSON.stringify(costSharingJson({})),
+        billingCycle: "monthly",
+      });
+      db.prepare("UPDATE subscriptions SET tags_json = ? WHERE id = ?")
+        .run(JSON.stringify([" Work ", "work", "工具"]), "sub_migrated");
+      db.prepare(`INSERT INTO subscription_list_index (
+        subscription_id, user_id, name, search_text_lower, category, billing_cycle, currency, status,
+        next_billing_date, auto_renew, reminder_days, repeat_reminder_enabled, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run("sub_migrated", USER_ID, "stale", "stale", "stale", "monthly", "USD", "active",
+          "2026-09-01", 0, 0, 0, timestamp, timestamp);
+      db.prepare(`INSERT INTO subscription_tags
+        (user_id, subscription_id, tag_norm, tag, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(USER_ID, "sub_migrated", "stale", "stale", timestamp, timestamp);
+
+      applyMigrationWithD1ForeignKeys(db, "0035_rebuild_cost_sharing_collection_reminder_schema.sql");
+      expect(readScalar<number>(db, "SELECT COUNT(*) FROM subscription_list_index")).toBe(0);
+      expect(readScalar<number>(db, "SELECT COUNT(*) FROM subscription_tags")).toBe(0);
+      applyMigration(db, "0036_subscription_derived_state_v2.sql");
+
+      applyMigration(db, "0039_rebuild_subscription_collection_projections.sql");
+
+      expect(db.prepare(`SELECT subscription_id, user_id, name, category, status
+        FROM subscription_list_index`).get()).toEqual({
+        subscription_id: "sub_migrated",
+        user_id: USER_ID,
+        name: "Netflix",
+        category: "streaming",
+        status: "active",
+      });
+      expect(db.prepare("SELECT tag_norm, tag FROM subscription_tags ORDER BY tag_norm").all()).toEqual([
+        { tag_norm: "work", tag: "work" },
+        { tag_norm: "工具", tag: "工具" },
+      ]);
+      expect(db.prepare(`SELECT total_count, active_count, trial_count
+        FROM subscription_user_stats WHERE user_id = ?`).get(USER_ID)).toEqual({
+        total_count: 1,
+        active_count: 1,
+        trial_count: 0,
+      });
+      const env = {
+        DB: new SqliteD1Database(db) as unknown as D1Database,
+        ASSETS: {} as Fetcher,
+        ASSETS_BUCKET: {} as R2Bucket,
+      } satisfies Env;
+      const [list, filtered, index, analytics, calendar, facets] = await Promise.all([
+        readSubscriptions(new Request("https://renewlet.test/api/app/subscriptions?limit=10"), env),
+        readSubscriptions(new Request("https://renewlet.test/api/app/subscriptions?q=netflix&tag=work&limit=10"), env),
+        readSubscriptionIndex(new Request("https://renewlet.test/api/app/subscriptions/index?category=streaming"), env),
+        readSubscriptionAnalytics(new Request("https://renewlet.test/api/app/subscriptions/analytics"), env),
+        readSubscriptionCalendar(new Request("https://renewlet.test/api/app/subscriptions/calendar?from=2026-01-01&to=2026-12-31"), env),
+        readSubscriptionFacets(new Request("https://renewlet.test/api/app/subscriptions/facets"), env),
+      ]);
+      expect(await readSuccessData<{ subscriptions: unknown[]; total: number }>(list)).toMatchObject({ total: 1 });
+      expect(await readSuccessData<{ subscriptions: unknown[]; total: number }>(filtered)).toMatchObject({ total: 1 });
+      expect(await readSuccessData<{ subscriptions: unknown[]; total: number }>(index)).toMatchObject({ total: 1 });
+      expect((await readSuccessData<{ subscriptions: unknown[] }>(analytics)).subscriptions).toHaveLength(1);
+      expect((await readSuccessData<{ subscriptions: unknown[] }>(calendar)).subscriptions).toHaveLength(1);
+      expect(await readSuccessData<{ total: number; tags: string[] }>(facets)).toMatchObject({
+        total: 1,
+        tags: ["work", "工具"],
+      });
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     } finally {
       db.close();
@@ -440,6 +519,12 @@ function costSharingJson(options: { intervalMonths?: number }) {
 
 function applyMigration(db: DatabaseSync, name: string): void {
   db.exec(readFileSync(resolve("migrations", name), "utf8"));
+}
+
+function applyMigrationWithD1ForeignKeys(db: DatabaseSync, name: string): void {
+  const sql = readFileSync(resolve("migrations", name), "utf8")
+    .replace(/^\s*PRAGMA\s+foreign_keys\s*=\s*(?:OFF|ON)\s*;\s*$/gim, "");
+  db.exec(sql);
 }
 
 function subscriptionColumnNames(db: DatabaseSync): string[] {

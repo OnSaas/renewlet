@@ -110,6 +110,9 @@ function checkWorkflowRuntimeSmoke(repoRoot) {
   const buildSmoke = readRepoFile(repoRoot, ".github/workflows/build-smoke.yml");
   for (const snippet of [
     "load: true",
+    "docker run --rm renewlet:smoke --version",
+    "docker run --rm --entrypoint /docker-entrypoint.sh renewlet:smoke --version",
+    "docker run --detach --entrypoint /docker-entrypoint.sh renewlet:smoke serve --http=0.0.0.0:3000 --dir=/pb_data --encryptionEnv=PB_ENCRYPTION_KEY",
     "docker run --detach renewlet:smoke",
     'docker exec "$container_id" /renewlet healthcheck',
     "trap cleanup EXIT",
@@ -196,7 +199,7 @@ export function checkDockerBuildContract(repoRoot) {
   for (const forbidden of [
     { pattern: /^\s*RUN\s+/im, label: "RUN instructions" },
     { pattern: /\b(?:apk|apt-get|apt|dnf|yum)\b/i, label: "package managers" },
-    { pattern: /docker-entrypoint\.sh|\/bin\/(?:ba)?sh/i, label: "shell entrypoints" },
+    { pattern: /\/bin\/(?:ba)?sh/i, label: "shell entrypoints" },
     { pattern: /^\s*USER\s+/im, label: "a USER override that bypasses root volume initialization" },
   ]) {
     if (forbidden.pattern.test(runner)) {
@@ -206,6 +209,7 @@ export function checkDockerBuildContract(repoRoot) {
   for (const snippet of [
     "COPY --from=server-builder --chown=1000:1000 /out/renewlet /opt/renewlet/current/renewlet",
     "COPY --from=server-builder --chown=0:0 /out/container-init /container-init",
+    "COPY --from=server-builder --chown=0:0 /out/container-init /docker-entrypoint.sh",
     'ENTRYPOINT ["/container-init"]',
   ]) {
     if (!runner.includes(snippet)) {
