@@ -82,10 +82,12 @@ function renderCalendarPage({ mobile }: { mobile: boolean }) {
   return root;
 }
 
-describe("Calendar page back-to-top float button", () => {
+describe("Calendar page", () => {
   beforeEach(() => {
     mocks.useSubscriptionCalendar.mockReturnValue({
       data: [],
+      error: null,
+      isFetching: false,
       isPending: false,
     });
   });
@@ -120,6 +122,37 @@ describe("Calendar page back-to-top float button", () => {
     expect(screen.queryByTestId("subscription-calendar")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the calendar mounted and marks background month loading as busy", () => {
+    mocks.useSubscriptionCalendar.mockReturnValue({
+      data: [],
+      error: null,
+      isFetching: true,
+      isPending: false,
+      isPlaceholderData: true,
+    });
+
+    renderCalendarPage({ mobile: false });
+
+    expect(screen.getByTestId("subscription-calendar")).toBeInTheDocument();
+    expect(screen.queryByTestId("calendar-skeleton")).not.toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("keeps resolved calendar data visible after a background refresh error", () => {
+    mocks.useSubscriptionCalendar.mockReturnValue({
+      data: [],
+      error: new Error(),
+      isFetching: false,
+      isPending: false,
+    });
+
+    renderCalendarPage({ mobile: false });
+
+    expect(screen.getByTestId("subscription-calendar")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("main")).not.toHaveAttribute("aria-busy");
   });
 
   it("shows the back-to-top float button on H5 calendar pages", async () => {
