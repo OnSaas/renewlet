@@ -27,6 +27,7 @@ const Calendar = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const range = useMemo(() => getSubscriptionCalendarRange(currentMonth), [currentMonth]);
   const subscriptionsQuery = useSubscriptionCalendar(range.from, range.to);
+  const hasCalendarData = subscriptionsQuery.data !== undefined;
   const subscriptions = subscriptionsQuery.data ?? EMPTY_SUBSCRIPTIONS;
   const facetsQuery = useSubscriptionFacets();
   const { t } = useI18n();
@@ -43,8 +44,7 @@ const Calendar = () => {
     handleEditDialogOpenChange,
   } = useSubscriptionCrud(subscriptions);
 
-  // 与参考项目保持一致：订阅数据未加载完成前展示日历骨架屏。
-  if (subscriptionsQuery.isPending) {
+  if (!hasCalendarData && subscriptionsQuery.isPending) {
     return (
       <div className="app-page bg-background">
         <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
@@ -55,7 +55,7 @@ const Calendar = () => {
     );
   }
 
-  if (subscriptionsQuery.error) {
+  if (!hasCalendarData && subscriptionsQuery.error) {
     return (
       <div className="app-page bg-background">
         <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
@@ -70,7 +70,10 @@ const Calendar = () => {
     <div className="app-page bg-background">
       <Header onAddSubscription={handleAddSubscription} availableTags={availableTags} />
 
-      <main className="app-main mx-auto max-w-7xl">
+      <main
+        className="app-main mx-auto max-w-7xl"
+        aria-busy={subscriptionsQuery.isFetching ? true : undefined}
+      >
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">{t("calendar.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t("calendar.pageSubtitle")}</p>

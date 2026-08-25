@@ -23,6 +23,7 @@ import {
   useCreateSubscription,
   useDeleteSubscription,
   usePatchSubscription,
+  useSubscriptionCalendar,
   useSubscriptionIndex,
   useUpdateSubscription,
 } from "./use-subscriptions";
@@ -342,6 +343,71 @@ describe("use-subscriptions collection queries", () => {
     expect(queryClient.getQueryCache().findAll({
       queryKey: ["subscriptions", "collections", "index"],
     })).toHaveLength(1);
+  });
+
+  it("keeps the last calendar result while newer ranges load and cancels superseded requests", async () => {
+    type CalendarResponse = { subscriptions: ApiSubscriptionCollectionItem[] };
+    let resolveJune: ((value: CalendarResponse) => void) | undefined;
+    let resolveJuly: ((value: CalendarResponse) => void) | undefined;
+    let juneSignal: AbortSignal | undefined;
+    const mayItem = apiCollectionItemFromDraft(
+      "may",
+      subscriptionDraft({ nextBillingDate: assertDateOnly("2026-05-14") }),
+    );
+    const juneItem = apiCollectionItemFromDraft(
+      "june",
+      subscriptionDraft({ nextBillingDate: assertDateOnly("2026-06-14") }),
+    );
+    const julyItem = apiCollectionItemFromDraft(
+      "july",
+      subscriptionDraft({ nextBillingDate: assertDateOnly("2026-07-14") }),
+    );
+
+    mocks.apiFetch.mockImplementation((url: string, _schema: unknown, init?: RequestInit) => {
+      if (url.includes("from=2026-05-01")) return Promise.resolve({ subscriptions: [mayItem] });
+      if (url.includes("from=2026-06-01")) {
+        juneSignal = init?.signal ?? undefined;
+        return new Promise((resolve) => {
+          resolveJune = resolve;
+        });
+      }
+      return new Promise((resolve) => {
+        resolveJuly = resolve;
+      });
+    });
+
+    const { result, rerender } = renderHook(
+      ({ from, to }: { from: string; to: string }) =>
+        useSubscriptionCalendar(assertDateOnly(from), assertDateOnly(to)),
+      {
+        initialProps: { from: "2026-05-01", to: "2026-05-31" },
+        wrapper: createWrapper(),
+      },
+    );
+
+    expect(result.current.isPending).toBe(true);
+    await waitFor(() => expect(result.current.data?.[0]?.id).toBe("may"));
+
+    rerender({ from: "2026-06-01", to: "2026-06-30" });
+    await waitFor(() => expect(result.current.isPlaceholderData).toBe(true));
+    expect(result.current.isPending).toBe(false);
+    expect(result.current.isFetching).toBe(true);
+    expect(result.current.data?.[0]?.id).toBe("may");
+
+    rerender({ from: "2026-07-01", to: "2026-07-31" });
+    await waitFor(() => expect(juneSignal?.aborted).toBe(true));
+    await waitFor(() => expect(resolveJuly).toBeTypeOf("function"));
+    expect(result.current.data?.[0]?.id).toBe("may");
+
+    await act(async () => {
+      resolveJune?.({ subscriptions: [juneItem] });
+      resolveJuly?.({ subscriptions: [julyItem] });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(result.current.data?.[0]?.id).toBe("july"));
+    expect(result.current.isPlaceholderData).toBe(false);
+    expect(result.current.isFetching).toBe(false);
   });
 
   it("aborts an in-flight index request when its last observer unmounts", async () => {

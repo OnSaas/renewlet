@@ -30,8 +30,15 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSettings } from "@/hooks/use-settings";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
+import { formatCompactCurrencyAmount } from "@/lib/currency";
 import type { DateOnly } from "@/lib/time/date-only";
-import { formatBillingCycleLabel, isOneTimeBuyout, isOneTimeFixedTerm } from "@/lib/subscription-billing";
+import {
+  formatBillingCycleLabel,
+  isOneTimeBuyout,
+  isOneTimeFixedTerm,
+  toDailyAmountFromMonthly,
+  toSubscriptionMonthlyAmount,
+} from "@/lib/subscription-billing";
 import {
   getSubscriptionPriceReference,
   type SubscriptionCurrencyConverter,
@@ -95,6 +102,7 @@ function resolveDetailLoadingStructure(
   return {
     showCalendarAction: preview !== null && !buyout,
     showCostSharing: preview?.costSharing?.enabled === true,
+    showDailyAverage: preview !== null && !buyout,
     showNextBillingDate: preview !== null && (!buyout || preview.startDate !== null),
     showPaymentMethod: Boolean(preview?.paymentMethod),
     showStartDate: preview?.startDate !== null && preview?.startDate !== undefined,
@@ -149,6 +157,9 @@ function SubscriptionDetailContent({
   const isBuyout = isOneTimeBuyout(subscription);
   const isFixedTermOneTime = isOneTimeFixedTerm(subscription);
   const isOneTime = subscription.billingCycle === "one-time";
+  const dailyAmount = isBuyout
+    ? null
+    : toDailyAmountFromMonthly(toSubscriptionMonthlyAmount(subscription.price, subscription));
   const canManualRenew = Boolean(onRenewSubscription) && isManualRenewEligible(subscription);
   const costSharingSummary = calculateCostSharingSummary(subscription.costSharing, subscription.price, {
     baseCurrency: subscription.currency,
@@ -228,6 +239,13 @@ function SubscriptionDetailContent({
       )}
       facts={(
         <>
+          {dailyAmount !== null ? (
+            <DetailRow label={t("subscription.detail.dailyAverage")}>
+              <span className="tabular-nums">
+                {formatCompactCurrencyAmount(dailyAmount, subscription.currency, locale)}
+              </span>
+            </DetailRow>
+          ) : null}
           {costSharingSummary.enabled ? (
             <div className="grid gap-2 rounded-lg border border-border bg-secondary/40 p-3">
               <DetailRow label={t("subscription.field.price")}>

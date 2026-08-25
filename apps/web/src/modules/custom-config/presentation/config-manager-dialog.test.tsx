@@ -85,7 +85,7 @@ describe("ConfigManagerDialog", () => {
     for (const value of expectedValues) {
       expect(within(dialog).getByText(value)).toBeInTheDocument();
     }
-    expect(dialog.querySelector('[class*="min-h-[240px]"]')).toBeNull();
+    expect(dialog.querySelector('[class~="min-h-60"]')).toBeNull();
   });
 
   it("uses the visible description as the dialog accessible description", async () => {

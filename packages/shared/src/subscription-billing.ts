@@ -64,6 +64,15 @@ export function toSubscriptionMonthlyAmount(amount: MoneyString | number, subscr
   );
 }
 
+/**
+ * 从调用方已经归一化的月均金额派生标准化日均成本。
+ *
+ * 固定 30 天仅用于跨周期比较；真实结算必须继续使用具体账期与日期规则。
+ */
+export function toDailyAmountFromMonthly(monthlyAmount: number): number {
+  return monthlyAmount / AVERAGE_DAYS_PER_MONTH;
+}
+
 function customCycleToMonthlyAmount(amount: MoneyString | number, count: number, unit: CustomCycleUnit): number {
   switch (unit) {
     case "week":

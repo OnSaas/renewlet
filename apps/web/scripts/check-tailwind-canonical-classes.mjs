@@ -2,15 +2,16 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { __unstable__loadDesignSystem } from "@tailwindcss/node";
 import { Scanner } from "@tailwindcss/oxide";
 import ts from "typescript";
 
-const APP_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const APP_ROOT = resolve(import.meta.dirname, "..");
 const SOURCE_ROOT = join(APP_ROOT, "src");
 const ENTRY_CSS = join(SOURCE_ROOT, "index.css");
 const SOURCE_EXTENSIONS = new Set([".js", ".jsx", ".ts", ".tsx"]);
+// Tailwind IntelliSense 默认同样按 16px 换算；根字号变化时必须同步两侧，否则 px 类名会只在 IDE 中告警。
+const ROOT_FONT_SIZE_PX = 16;
 
 async function collectSourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -68,11 +69,20 @@ function sourceLocation(content, position) {
   };
 }
 
-async function findViolations() {
+export async function loadProjectDesignSystem() {
   // 直接加载项目 CSS 的设计系统，确保检查结果随 Tailwind/theme 演进，不维护会漂移的 class 映射表。
-  const designSystem = await __unstable__loadDesignSystem(await readFile(ENTRY_CSS, "utf8"), {
+  return __unstable__loadDesignSystem(await readFile(ENTRY_CSS, "utf8"), {
     base: SOURCE_ROOT,
   });
+}
+
+export function canonicalizeCandidate(designSystem, candidate) {
+  const suggestions = designSystem.canonicalizeCandidates([candidate], { rem: ROOT_FONT_SIZE_PX });
+  return suggestions.length === 1 ? suggestions[0] : candidate;
+}
+
+export async function findViolations() {
+  const designSystem = await loadProjectDesignSystem();
   const scanner = new Scanner({});
   const canonicalByCandidate = new Map();
   const violations = [];
@@ -89,8 +99,7 @@ async function findViolations() {
 
       let canonical = canonicalByCandidate.get(candidate);
       if (canonical === undefined) {
-        const suggestions = designSystem.canonicalizeCandidates([candidate]);
-        canonical = suggestions.length === 1 ? suggestions[0] : candidate;
+        canonical = canonicalizeCandidate(designSystem, candidate);
         canonicalByCandidate.set(candidate, canonical);
       }
       if (canonical === candidate) continue;
@@ -107,16 +116,23 @@ async function findViolations() {
   return violations;
 }
 
-const violations = await findViolations();
+async function main() {
+  const violations = await findViolations();
 
-if (violations.length > 0) {
-  console.error("Non-canonical Tailwind classes found:");
-  for (const violation of violations) {
-    console.error(
-      `${violation.file}:${violation.line}:${violation.column} ${violation.candidate} -> ${violation.canonical}`,
-    );
+  if (violations.length > 0) {
+    console.error("Non-canonical Tailwind classes found:");
+    for (const violation of violations) {
+      console.error(
+        `${violation.file}:${violation.line}:${violation.column} ${violation.candidate} -> ${violation.canonical}`,
+      );
+    }
+    process.exitCode = 1;
+    return;
   }
-  process.exit(1);
+
+  console.log("Tailwind canonical class check passed.");
 }
 
-console.log("Tailwind canonical class check passed.");
+if (import.meta.main) {
+  await main();
+}

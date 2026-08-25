@@ -41,6 +41,7 @@ import { DEFAULT_NOTIFICATION_REMINDER_DAYS } from "@/types/subscription";
 import { useSubscriptionDetailDialog } from "@/hooks/use-subscription-detail-dialog";
 import { useSubscriptionCalendarDialog } from "@/hooks/use-subscription-calendar-dialog";
 import { todayDateOnlyInTimeZone } from "@/lib/time/date-only";
+import { formatCompactCurrencyAmount } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 const EMPTY_SUBSCRIPTIONS: SubscriptionCollectionItem[] = [];
@@ -53,7 +54,7 @@ export default function Index() {
   const settingsQuery = useSettings();
   const settings = settingsQuery.data;
   const { config } = useCustomConfigState();
-  const { t, formatCurrency } = useI18n();
+  const { t, locale, formatCurrency } = useI18n();
   const exchangeRateProvider = settings?.exchangeRateProvider;
   const { convert, loading: ratesLoading, sourceDate: ratesSourceDate } = useReportExchangeRates(exchangeRateProvider);
   const currencyRatesReady = Boolean(ratesSourceDate) && !ratesLoading;
@@ -74,7 +75,7 @@ export default function Index() {
     handleDetailDialogOpenChange,
   } = useSubscriptionDetailDialog(subscriptions);
   const calendarDialog = useSubscriptionCalendarDialog(subscriptions);
-  const { activeSubscriptions, totalMonthly, upcomingCount, trialCount } = useDashboardStats(
+  const { activeSubscriptions, totalMonthly, totalDaily, upcomingCount, trialCount } = useDashboardStats(
     subscriptions,
     defaultCurrency,
     convert,
@@ -136,7 +137,10 @@ export default function Index() {
             data-testid="dashboard-stat-monthly-spend"
             title={t("dashboard.monthlySpend")}
             value={formatCurrency(totalMonthly, defaultCurrency)}
-            subtitle={ratesLoading ? t("dashboard.ratesLoading") : t("dashboard.realTimeRates", { currency: defaultCurrency })}
+            subtitle={t("dashboard.monthlySpendSubtitle", {
+              amount: formatCompactCurrencyAmount(totalDaily, defaultCurrency, locale),
+              rates: ratesLoading ? t("dashboard.ratesLoading") : t("dashboard.realTimeRates", { currency: defaultCurrency }),
+            })}
             icon={<CreditCard className="h-6 w-6" />}
             variant="primary"
             density="compact"

@@ -2,7 +2,7 @@
   "name": "renewlet",
   "private": true,
   "license": "MIT",
-  "version": "0.3.21",
+  "version": "0.3.22",
   "packageManager": "pnpm@11.20.0",
   "engines": {
     "node": ">=24.19.0 <25 || >=26.5.0 <27"
@@ -91,14 +91,14 @@
     "update:built-in-icons-index": "node scripts/update-built-in-icons-index.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260815.1",
+    "@cloudflare/workers-types": "^5.20260820.1",
     "@lingui/format-po": "6.6.0",
     "@playwright/test": "^1.62.1",
     "@redocly/cli": "2.45.0",
     "@types/node": "24.13.3",
     "tsx": "4.23.9",
     "typescript": "6.0.3",
-    "wrangler": "^4.124.0",
+    "wrangler": "^4.125.0",
     "zod": "4.4.3"
   }
 }

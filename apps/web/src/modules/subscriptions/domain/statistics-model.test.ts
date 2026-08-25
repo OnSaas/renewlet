@@ -74,6 +74,7 @@ describe("subscription statistics models", () => {
     });
 
     expect(model.totalMonthly).toBe(15);
+    expect(model.totalDaily).toBe(0.5);
     expect(model.activeCount).toBe(2);
     expect(model.inactiveCount).toBe(2);
     expect(model.monthlySavings).toBe(200);
@@ -108,9 +109,11 @@ describe("subscription statistics models", () => {
 
     expect(model.activeCount).toBe(1);
     expect(model.totalMonthly).toBe(0);
+    expect(model.totalDaily).toBe(0);
     expect(model.inactiveCount).toBe(0);
     expect(dashboard.activeSubscriptions).toHaveLength(1);
     expect(dashboard.totalMonthly).toBe(0);
+    expect(dashboard.totalDaily).toBe(0);
     expect(dashboard.upcomingCount).toBe(0);
   });
 
@@ -143,6 +146,7 @@ describe("subscription statistics models", () => {
     });
 
     expect(model.totalMonthly).toBe(20);
+    expect(model.totalDaily).toBe(2 / 3);
     expect(model.totalAnnual).toBe(240);
     expect(model.thisMonthDue).toBe(0);
     expect(model.budgetUsedPercent).toBe(50);
@@ -150,6 +154,7 @@ describe("subscription statistics models", () => {
       expect.objectContaining({ value: 20 }),
     ]);
     expect(dashboard.totalMonthly).toBe(20);
+    expect(dashboard.totalDaily).toBe(2 / 3);
     expect(dashboard.upcomingCount).toBe(1);
   });
 
@@ -206,6 +211,7 @@ describe("subscription statistics models", () => {
     });
 
     expect(model.totalMonthly).toBe(77);
+    expect(model.totalDaily).toBe(77 / 30);
     expect(model.budgetRemaining).toBe(23);
   });
 
@@ -401,12 +407,14 @@ describe("subscription statistics models", () => {
     });
 
     expect(totalModel.totalMonthly).toBe(100);
+    expect(totalModel.totalDaily).toBe(100 / 30);
     expect(totalModel.thisMonthDue).toBe(100);
     expect(totalModel.trendData[0]).toEqual(expect.objectContaining({ cashflow: 100, amortized: 100 }));
     expect(totalModel.trendData[0]?.cashflowItems).toEqual([
       expect.objectContaining({ subscriptionId: "family-plan", amount: 100 }),
     ]);
     expect(personalModel.totalMonthly).toBe(40);
+    expect(personalModel.totalDaily).toBe(40 / 30);
     expect(personalModel.thisMonthDue).toBe(40);
     expect(personalModel.budgetUsedPercent).toBe(40);
     expect(personalModel.categoryData).toEqual([

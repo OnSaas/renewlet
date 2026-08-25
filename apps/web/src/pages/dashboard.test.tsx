@@ -180,6 +180,7 @@ vi.mock("@/modules/subscriptions/application/use-subscription-crud", () => ({
 function subscription(
   overrides: Partial<RecurringCycleSubscriptionCollectionItem> = {},
 ): RecurringCycleSubscriptionCollectionItem {
+  // 页面装配测试不验证过期规则；远期扣费日避免真实系统时间把公共夹具判为过期。
   return {
     id: "codex-pro",
     name: "Codex Pro",
@@ -197,7 +198,7 @@ function subscription(
     publicHidden: false,
     paymentMethod: undefined,
     startDate: assertDateOnly("2026-04-18"),
-    nextBillingDate: assertDateOnly("2026-05-18"),
+    nextBillingDate: assertDateOnly("2099-05-18"),
     autoRenew: false,
     autoCalculateNextBillingDate: true,
     trialEndDate: undefined,
@@ -281,7 +282,7 @@ describe("Dashboard page loading state", () => {
       notificationReminderDays: 5,
     });
     expect(screen.getByTestId("spending-chart")).toHaveTextContent("1:CNY:Asia/Shanghai:7");
-    expect(screen.getByText("汇率加载中...")).toBeInTheDocument();
+    expect(screen.getByText("日均 ¥46.67 · 汇率加载中...")).toBeInTheDocument();
   });
 
   it("shows a recoverable error instead of zeroed analytics", async () => {
@@ -331,6 +332,7 @@ describe("Dashboard page loading state", () => {
     expect(activeSubscriptions).toHaveClass("p-4", "lg:p-6");
     expect(trials).toHaveClass("p-4", "lg:p-6", "col-span-full", "sm:col-span-1");
     expect(monthlySpend).not.toHaveClass("p-6");
+    expect(screen.getByText("日均 ¥46.67 · 实时汇率换算 (CNY)")).toBeInTheDocument();
   });
 
   it("opens subscription details from a recent subscription card", async () => {

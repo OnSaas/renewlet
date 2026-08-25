@@ -139,6 +139,7 @@ describe("subscription dialog scaffolds", () => {
       structure: {
         showCalendarAction: false,
         showCostSharing: false,
+        showDailyAverage: false,
         showNextBillingDate: false,
         showPaymentMethod: false,
         showStartDate: false,
@@ -157,6 +158,7 @@ describe("subscription dialog scaffolds", () => {
       structure: {
         showCalendarAction: true,
         showCostSharing: false,
+        showDailyAverage: false,
         showNextBillingDate: true,
         showPaymentMethod: false,
         showStartDate: true,
@@ -170,6 +172,7 @@ describe("subscription dialog scaffolds", () => {
       structure: {
         showCalendarAction: true,
         showCostSharing: true,
+        showDailyAverage: true,
         showNextBillingDate: true,
         showPaymentMethod: true,
         showStartDate: true,

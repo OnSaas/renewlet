@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import {
   infiniteQueryOptions,
+  keepPreviousData,
   queryOptions,
   useInfiniteQuery,
   useMutation,
@@ -67,6 +68,8 @@ export function subscriptionCalendarQueryOptions(from: DateOnly, to: DateOnly) {
   return queryOptions({
     queryKey: subscriptionQueryKeys.calendar(from, to),
     queryFn: ({ signal }) => subscriptionService.calendar(from, to, signal),
+    // 月份范围属于缓存身份；换月沿用上一份成功结果，避免参数切换退回首次加载态。
+    placeholderData: keepPreviousData,
     staleTime: SUBSCRIPTIONS_STALE_TIME_MS,
   });
 }

@@ -17,6 +17,7 @@ import {
   calculateOneTimeTermEndDate as calculateSharedOneTimeTermEndDate,
   isOneTimeBuyout,
   isOneTimeFixedTerm,
+  toDailyAmountFromMonthly,
   toMonthlyAmount,
   toSubscriptionMonthlyAmount,
 } from "@renewlet/shared/subscription-billing";
@@ -25,6 +26,7 @@ import { requireCustomBillingCycle } from "@renewlet/shared/subscription-renewal
 export {
   isOneTimeBuyout,
   isOneTimeFixedTerm,
+  toDailyAmountFromMonthly,
   toMonthlyAmount,
   toSubscriptionMonthlyAmount,
 };
