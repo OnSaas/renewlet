@@ -44,6 +44,11 @@ msgid "publicStatus.nextBillingDate"
 msgstr "到期/续费：{date}"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/public-status.ts:28
+msgid "publicStatus.subscriptionDailyAverage"
+msgstr "日均 {amount}"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/public-status.ts:17
 msgid "publicStatus.upcomingSubtitle"
 msgstr "即将到期或续费"
@@ -92,6 +97,11 @@ msgstr "更新于 {time}"
 #: src/i18n/descriptors/public-status.ts:7
 msgid "publicStatus.monthlyTotal"
 msgstr "月均总价"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/public-status.ts:8
+msgid "publicStatus.monthlyTotalSubtitle"
+msgstr "日均 {amount} · {basis}"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/public-status.ts:16

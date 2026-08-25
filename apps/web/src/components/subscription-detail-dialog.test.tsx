@@ -208,6 +208,8 @@ describe("SubscriptionDetailDialog", () => {
     const dialog = screen.getByRole("dialog", { name: "Fastmail" });
     expect(dialog).toHaveAccessibleDescription("查看 Fastmail 的价格、周期、日期、标签、网站和备注。");
     expect(within(dialog).getByText("$159 USD")).toBeInTheDocument();
+    expect(within(dialog).getByText("日均支出")).toBeInTheDocument();
+    expect(within(dialog).getByText("$5.3")).toHaveClass("tabular-nums");
     expect(within(dialog).getByText("≈ ¥1,113 CNY")).toHaveClass(
       "text-xs",
       "tabular-nums",
@@ -281,6 +283,26 @@ describe("SubscriptionDetailDialog", () => {
     expect(within(dialog).getAllByText(/^≈/)).toHaveLength(1);
     expect(within(dialog).getByText("成员合计")).toBeInTheDocument();
     expect(within(dialog).getByText("你的份额")).toBeInTheDocument();
+    expect(within(dialog).getByText("$5.3")).toBeInTheDocument();
+  });
+
+  it("hides buyout daily cost and amortizes one-time fixed terms", () => {
+    const buyout = renderDetailDialog({
+      subscription: { ...baseSubscription, ...subscriptionCycleFixture({ billingCycle: "one-time" }) },
+    });
+    expect(within(screen.getByRole("dialog", { name: "Fastmail" })).queryByText("日均支出")).not.toBeInTheDocument();
+    buyout.unmount();
+
+    renderDetailDialog({
+      subscription: {
+        ...baseSubscription,
+        price: "180",
+        ...subscriptionCycleFixture({ billingCycle: "one-time", oneTimeTermCount: 6, oneTimeTermUnit: "month" }),
+      },
+    });
+    const fixedTermDialog = screen.getByRole("dialog", { name: "Fastmail" });
+    expect(within(fixedTermDialog).getByText("日均支出")).toBeInTheDocument();
+    expect(within(fixedTermDialog).getByText("$1")).toBeInTheDocument();
   });
 
   it("closes the detail dialog before opening the edit flow", () => {

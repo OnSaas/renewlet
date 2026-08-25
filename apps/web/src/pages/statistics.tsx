@@ -25,6 +25,7 @@ import { SubscriptionDetailDialog } from '@/components/subscription-detail-dialo
 import { DeferredStatisticsCharts } from '@/components/statistics-charts-loader';
 import { CircleHelp, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatCompactCurrencyAmount } from '@/lib/currency';
 import { useReportExchangeRates } from '@/hooks/use-report-exchange-rates';
 import { moneyToNumber } from "@renewlet/shared/money";
 import { Button } from '@/components/ui/button';
@@ -218,6 +219,11 @@ const Statistics = () => {
             <StatBox
               value={formatCurrency(stats.totalMonthly, defaultCurrency)}
               label={t("statistics.monthlyCost", { currency: defaultCurrency })}
+              variant="primary"
+            />
+            <StatBox
+              value={formatCompactCurrencyAmount(stats.totalDaily, defaultCurrency, locale)}
+              label={t("statistics.dailyCost", { currency: defaultCurrency })}
               variant="primary"
             />
             <StatBox

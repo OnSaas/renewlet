@@ -22,7 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { colorWithAlpha } from '@/lib/color';
-import { Calendar, MoreHorizontal, CalendarClock, Bell, CreditCard, CalendarPlus, Copy, Eye, EyeOff, Pencil, Pin, PinOff, RotateCw, Trash2 } from 'lucide-react';
+import { Calendar, MoreHorizontal, CalendarClock, Bell, CreditCard, CalendarPlus, Copy, Eye, EyeOff, Gauge, Pencil, Pin, PinOff, RotateCw, Trash2 } from 'lucide-react';
 import {
   daysBetweenDateOnly,
   todayDateOnlyInTimeZone,
@@ -53,7 +53,14 @@ import { useI18n } from '@/i18n/I18nProvider';
 import { localizedLabel } from '@/i18n/locales';
 import { SubscriptionLogo } from '@/components/subscription-logo';
 import { SubscriptionStatusBadge } from '@/components/subscription-status-badge';
-import { formatBillingCycleLabel, isOneTimeBuyout, isOneTimeFixedTerm } from '@/lib/subscription-billing';
+import { formatCompactCurrencyAmount } from '@/lib/currency';
+import {
+  formatBillingCycleLabel,
+  isOneTimeBuyout,
+  isOneTimeFixedTerm,
+  toDailyAmountFromMonthly,
+  toSubscriptionMonthlyAmount,
+} from '@/lib/subscription-billing';
 import {
   getSubscriptionPriceReference,
   type SubscriptionCurrencyConverter,
@@ -113,6 +120,7 @@ type SubscriptionCardMetaItem = {
   icon: ReactNode;
   text: string;
   tone: SubscriptionCardMetaTone;
+  tabular?: boolean;
   truncate?: boolean;
 };
 
@@ -126,7 +134,11 @@ function SubscriptionCardMetaToken({ item }: { item: SubscriptionCardMetaItem })
   return (
     <div
       data-testid={`subscription-card-meta-${item.key}`}
-      className={cn("inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap text-xs", metaToneClassNames[item.tone])}
+      className={cn(
+        "inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap text-xs",
+        item.tabular && "tabular-nums",
+        metaToneClassNames[item.tone],
+      )}
     >
       {item.icon}
       <span className={cn(item.truncate ? "block max-w-24 truncate sm:max-w-32" : "whitespace-nowrap")}>{item.text}</span>
@@ -192,6 +204,9 @@ function SubscriptionCardComponent({
   const isOneTime = subscription.billingCycle === "one-time";
   const isBuyout = isOneTimeBuyout(subscription);
   const isFixedTermOneTime = isOneTimeFixedTerm(subscription);
+  const dailyAmount = isBuyout
+    ? null
+    : toDailyAmountFromMonthly(toSubscriptionMonthlyAmount(subscription.price, subscription));
   const hasCalendarEvent = !isBuyout;
   const canManualRenew = Boolean(onRenew) && isManualRenewEligible(subscription);
   const billingCycleLabel = formatBillingCycleLabel(subscription, locale);
@@ -273,6 +288,17 @@ function SubscriptionCardComponent({
           icon: <Calendar className="h-3.5 w-3.5 shrink-0" />,
           text: billingDateText,
           tone: "muted" as const,
+        }]
+      : []),
+    ...(dailyAmount !== null
+      ? [{
+          key: "daily-average",
+          icon: <Gauge className="h-3.5 w-3.5 shrink-0" />,
+          text: t("subscription.card.dailyAverage", {
+            amount: formatCompactCurrencyAmount(dailyAmount, subscription.currency, locale),
+          }),
+          tone: "muted" as const,
+          tabular: true,
         }]
       : []),
     ...(paymentMethodLabel

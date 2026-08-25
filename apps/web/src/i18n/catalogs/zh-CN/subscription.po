@@ -824,6 +824,11 @@ msgid "subscription.detail.category"
 msgstr "分类"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:223
+msgid "subscription.detail.dailyAverage"
+msgstr "日均支出"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:279
 msgid "subscriptions.category.open"
 msgstr "分类"
@@ -1434,6 +1439,11 @@ msgid "subscription.card.startPrefix"
 msgstr "开始:"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:236
+msgid "subscription.card.dailyAverage"
+msgstr "日均 {amount}"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:99
 msgid "subscription.field.startDate"
 msgstr "开始日期"
@@ -2029,9 +2039,19 @@ msgid "dashboard.monthlySpend"
 msgstr "月均支出"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:643
+msgid "dashboard.monthlySpendSubtitle"
+msgstr "日均 {amount} · {rates}"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:596
 msgid "statistics.monthlyCost"
 msgstr "月均支出 ({currency})"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:599
+msgid "statistics.dailyCost"
+msgstr "日均支出 ({currency})"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:273

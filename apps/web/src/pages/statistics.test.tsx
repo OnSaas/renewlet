@@ -330,7 +330,7 @@ describe("Statistics page", () => {
 
     const skeleton = screen.getByTestId("statistics-skeleton");
     expect(skeleton).toHaveAttribute("aria-hidden", "true");
-    expect(skeleton.querySelectorAll(".rounded-xl.border.border-border.bg-card")).toHaveLength(15);
+    expect(skeleton.querySelectorAll(".rounded-xl.border.border-border.bg-card")).toHaveLength(16);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
@@ -422,10 +422,13 @@ describe("Statistics page", () => {
     expect(overviewHeadingRow).toContainElement(personalCostBasisSwitch);
     expect(overviewHeadingRow).toHaveClass("sm:flex-row", "sm:justify-between");
     expect(screen.getAllByText("¥100 CNY").length).toBeGreaterThan(0);
+    expect(screen.getByText("¥3.33")).toBeInTheDocument();
+    expect(overviewHeading.closest("section")).toHaveTextContent(/活跃订阅.*月均支出 \(CNY\).*日均支出 \(CNY\).*年化支出 \(CNY\)/);
 
     await user.click(personalCostBasisSwitch);
 
     expect(await screen.findAllByText("¥40 CNY")).not.toHaveLength(0);
+    expect(screen.getByText("¥1.33")).toBeInTheDocument();
   });
 
   it("disables position animation for all chart tooltips", () => {

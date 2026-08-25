@@ -824,6 +824,11 @@ msgid "subscription.detail.category"
 msgstr "Category"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:223
+msgid "subscription.detail.dailyAverage"
+msgstr "Daily cost"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:279
 msgid "subscriptions.category.open"
 msgstr "Category"
@@ -1434,6 +1439,11 @@ msgid "subscription.card.startPrefix"
 msgstr "Start:"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:236
+msgid "subscription.card.dailyAverage"
+msgstr "Daily {amount}"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:99
 msgid "subscription.field.startDate"
 msgstr "Start date"
@@ -2029,9 +2039,19 @@ msgid "dashboard.monthlySpend"
 msgstr "Monthly spend"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:643
+msgid "dashboard.monthlySpendSubtitle"
+msgstr "Daily {amount} · {rates}"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:596
 msgid "statistics.monthlyCost"
 msgstr "Monthly cost ({currency})"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/subscription.ts:599
+msgid "statistics.dailyCost"
+msgstr "Daily cost ({currency})"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:273

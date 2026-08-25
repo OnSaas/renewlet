@@ -238,7 +238,7 @@ function StatisticsContentSkeleton() {
           <SkeletonBox className="h-6 w-40 rounded-full" />
         </div>
         <div className="grid grid-cols-1 gap-4 min-[380px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-          {range(11).map((index) => (
+          {range(12).map((index) => (
             <div key={index} className="flex min-h-[116px] flex-col items-center justify-center rounded-xl border border-border bg-card p-5 text-center">
               <SkeletonBox className="mb-2 h-8 w-20" />
               <SkeletonBox className="h-4 w-24" />

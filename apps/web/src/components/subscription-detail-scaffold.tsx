@@ -18,6 +18,7 @@ export type SubscriptionDetailScaffoldSlots = Pick<
 export interface SubscriptionDetailLoadingStructure {
   showCalendarAction: boolean;
   showCostSharing: boolean;
+  showDailyAverage: boolean;
   showNextBillingDate: boolean;
   showPaymentMethod: boolean;
   showStartDate: boolean;
@@ -100,6 +101,7 @@ export function createSubscriptionDetailLoadingSlots({
     facts: (
       <>
         <span className="sr-only">{label}</span>
+        {structure.showDailyAverage ? <FactSkeleton /> : null}
         {structure.showCostSharing ? <Skeleton className="h-28 w-full rounded-lg" /> : null}
         <FactSkeleton />
         {structure.showPaymentMethod ? <FactSkeleton /> : null}

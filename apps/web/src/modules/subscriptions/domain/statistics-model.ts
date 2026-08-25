@@ -12,7 +12,7 @@
  *   -> StatBox / PieChart view model
  * ```
  */
-import { toMonthlyAmount } from "@/lib/subscription-billing";
+import { toDailyAmountFromMonthly, toMonthlyAmount } from "@/lib/subscription-billing";
 import { compareDateOnly, fromPlainDate, isSameMonthDateOnly, todayDateOnlyInTimeZone, toPlainDate, type DateOnly } from "@/lib/time/date-only";
 import { DEFAULT_LOCALE, localizedLabel, type Locale } from "@/i18n/locales";
 import { translate } from "@/i18n/messages";
@@ -258,7 +258,7 @@ export function buildStatisticsModel({
   const inactiveSubscriptions = subscriptions.filter((subscription) => isEffectivelyInactiveSubscription(subscription, today));
   const monthlyBudgetAmount = moneyToNumber(monthlyBudget);
 
-  // costBasis 是统计页的金额口径开关；一旦选 personal，月均、当月现金流、分类和趋势都必须使用个人份额。
+  // costBasis 是统计页的金额口径开关；一旦选 personal，月均、日均、当月现金流、分类和趋势都必须使用个人份额。
   const amountForStats = (subscription: SubscriptionCollectionItem): number | string =>
     costBasis === "personal"
       ? calculateCostSharingSummary(subscription.costSharing, subscription.price, {
@@ -281,6 +281,7 @@ export function buildStatisticsModel({
   };
 
   const totalMonthly = activeSubscriptions.reduce((sum, subscription) => sum + calculateMonthlyAmount(subscription), 0);
+  const totalDaily = toDailyAmountFromMonthly(totalMonthly);
   const totalAnnual = totalMonthly * 12;
   const avgMonthlyPerSub = activeSubscriptions.length > 0 ? totalMonthly / activeSubscriptions.length : 0;
   const mostExpensive = activeSubscriptions.reduce<SubscriptionCollectionItem | null>((max, subscription) => {
@@ -340,6 +341,7 @@ export function buildStatisticsModel({
     activeCount: activeSubscriptions.length,
     inactiveCount: inactiveSubscriptions.length,
     totalMonthly,
+    totalDaily,
     totalAnnual,
     avgMonthlyPerSub,
     mostExpensive,
