@@ -31,6 +31,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkCloudflareDevRunner } from "./check-cloudflare-dev-runner.mjs";
 import { checkCloudflareD1DeployContract } from "./check-cloudflare-d1-deploy-contract.mjs";
+import { checkCloudflareMigrationSafety } from "./check-cloudflare-migration-safety.mjs";
 import { checkCustomHeadHTMLDeployContract } from "./check-custom-head-html-deploy-contract.mjs";
 import { checkDockerBuildContract } from "./check-docker-build-contract.mjs";
 import { checkSyncRenewletUpstream } from "./check-deploy-sync-upstream.mjs";
@@ -428,6 +429,10 @@ function checkCloudflareDeployMigrationScript() {
     "Network connection lost",
     "A D1 target is required",
     "options.target === \"local\"",
+    "checkCloudflareMigrationSafety(repoRoot)",
+    "protect-cloudflare-calendar-feeds.ts",
+    'calendarFeedProtectionArgs(options, "prepare")',
+    'calendarFeedProtectionArgs(options, "restore")',
     "backfill-cloudflare-subscription-derived-state.ts",
     "PRAGMA foreign_key_check",
     "invalid Wrangler JSON",
@@ -756,6 +761,7 @@ checkDockerBuildContract(repoRoot);
 checkCustomHeadHTMLDeployContract(repoRoot);
 checkDockerProxyEnv();
 checkCloudflareDeployMigrationScript();
+checkCloudflareMigrationSafety(repoRoot);
 checkCloudflareDevRunner(repoRoot);
 checkCloudflareObservabilityProfiles();
 checkCloudflareStaticAssetHeadersContract();

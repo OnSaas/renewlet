@@ -28,6 +28,7 @@ RUN CGO_ENABLED=0 go build -o /out/renewlet ./cmd/renewlet \\
 FROM gcr.io/distroless/static-debian13@sha256:9197324ba51d9cd071af8505989365c006adf9d6d2067eada25aef00abbb5278 AS runner
 COPY --from=server-builder --chown=1000:1000 /out/renewlet /opt/renewlet/current/renewlet
 COPY --from=server-builder --chown=0:0 /out/container-init /container-init
+COPY --from=server-builder --chown=0:0 /out/container-init /docker-entrypoint.sh
 ENTRYPOINT ["/container-init"]
 `;
 
@@ -79,6 +80,9 @@ function createFixture() {
     ".github/workflows/build-smoke.yml",
     `${workflow}          load: true
       - run: |
+          docker run --rm renewlet:smoke --version
+          docker run --rm --entrypoint /docker-entrypoint.sh renewlet:smoke --version
+          legacy_id="$(docker run --detach --entrypoint /docker-entrypoint.sh renewlet:smoke serve --http=0.0.0.0:3000 --dir=/pb_data --encryptionEnv=PB_ENCRYPTION_KEY)"
           container_id="$(docker run --detach renewlet:smoke)"
           trap cleanup EXIT
           docker exec "$container_id" /renewlet healthcheck
@@ -248,6 +252,18 @@ test("rejects a shell entrypoint in the final runner", () => {
     );
     writeFileSync(dockerfilePath, content);
     assert.throws(() => checkDockerBuildContract(root), /must not contain shell entrypoints/);
+  });
+});
+
+test("rejects a missing legacy static init entrypoint", () => {
+  withFixture((root) => {
+    const dockerfilePath = join(root, "Dockerfile");
+    const content = readFileSync(dockerfilePath, "utf8").replace(
+      "COPY --from=server-builder --chown=0:0 /out/container-init /docker-entrypoint.sh\n",
+      "",
+    );
+    writeFileSync(dockerfilePath, content);
+    assert.throws(() => checkDockerBuildContract(root), /docker-entrypoint\.sh/);
   });
 });
 
