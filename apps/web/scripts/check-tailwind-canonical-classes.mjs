@@ -2,12 +2,11 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { __unstable__loadDesignSystem } from "@tailwindcss/node";
 import { Scanner } from "@tailwindcss/oxide";
 import ts from "typescript";
 
-const APP_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const APP_ROOT = resolve(import.meta.dirname, "..");
 const SOURCE_ROOT = join(APP_ROOT, "src");
 const ENTRY_CSS = join(SOURCE_ROOT, "index.css");
 const SOURCE_EXTENSIONS = new Set([".js", ".jsx", ".ts", ".tsx"]);
@@ -134,6 +133,6 @@ async function main() {
   console.log("Tailwind canonical class check passed.");
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (import.meta.main) {
   await main();
 }
