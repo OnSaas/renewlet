@@ -1,9 +1,9 @@
 import { CLOUD_BACKUP_MAX_SNAPSHOT_BYTES } from "@/lib/api/schemas/cloud-backup";
 import { MAX_IMAGE_BYTES } from "@/lib/upload-constraints";
-import { renewletExportV1Schema, type RenewletExportV1 } from "@/lib/api/schemas/import-export";
+import { renewletExportV2Schema, type RenewletExportV2 } from "@/lib/api/schemas/import-export";
 import type { WorkerJobEvent, WorkerJobRequest } from "@/lib/workers/job-protocol";
 import type JSZip from "jszip";
-import { IMPORT_MESSAGE_CODES, MAX_IMPORT_FILE_BYTES, MAX_IMPORT_PREVIEW_SUBSCRIPTIONS } from "./import-export-model";
+import { assertSupportedRenewletExportVersion, IMPORT_MESSAGE_CODES, MAX_IMPORT_FILE_BYTES, MAX_IMPORT_PREVIEW_SUBSCRIPTIONS } from "./import-export-model";
 import type { PreparedImport } from "./import-export-model";
 import {
   assertZipEntryWithinLimit,
@@ -156,7 +156,8 @@ async function parseZipBytes(
     const dataBytes = await dataJson.async("uint8array");
     if (dataBytes.byteLength > MAX_IMPORT_FILE_BYTES) throw new Error(IMPORT_MESSAGE_CODES.wallosTableTooLarge);
     const data: unknown = JSON.parse(new TextDecoder().decode(dataBytes));
-    const renewletExport = renewletExportV1Schema.safeParse(data);
+    assertSupportedRenewletExportVersion(data);
+    const renewletExport = renewletExportV2Schema.safeParse(data);
     if (renewletExport.success) {
       const metadata = collectRenewletAssetEntries(directory.entries, renewletExport.data);
       const assetEntries = await extractImportAssets(jobId, zip, metadata);
@@ -202,7 +203,7 @@ function assertImportZipEntrySize(entry: ZipCentralDirectoryEntry, maxBytes: num
 
 function collectRenewletAssetEntries(
   entries: readonly ZipCentralDirectoryEntry[],
-  data: RenewletExportV1,
+  data: RenewletExportV2,
 ): Map<string, ZipCentralDirectoryEntry> {
   const referencedPaths = new Set<string>();
   for (const subscription of data.data.subscriptions) {

@@ -340,7 +340,7 @@ func TestWebDAVCloudBackupSDKAdapterRoundTrip(t *testing.T) {
 		Path:     "renewlet",
 	}, "webdav-secret")
 	content := []byte("renewlet")
-	manifest := cloudBackupManifestForTest("renewlet-export-v1-20260609T000000Z-webdav", content)
+	manifest := cloudBackupManifestForTest("renewlet-export-v2-20260609T000000Z-webdav", content)
 
 	if err := client.Test(context.Background()); err != nil {
 		t.Fatalf("expected WebDAV test to succeed: %v", err)

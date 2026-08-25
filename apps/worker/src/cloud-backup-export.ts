@@ -5,8 +5,9 @@ import {
   type CloudBackupSnapshotManifest,
 } from "@renewlet/shared/schemas/cloud-backup";
 import {
-  renewletExportManifestV1Schema,
-  renewletExportV1Schema,
+  RENEWLET_EXPORT_SCHEMA_VERSION,
+  renewletExportManifestV2Schema,
+  renewletExportV2Schema,
   type RenewletExportAsset,
   type RenewletExportMissingAsset,
   type RenewletExportMissingAssetReason,
@@ -67,7 +68,7 @@ export async function buildCloudBackupSnapshotPayload(env: Env, userId: string):
     sizeBytes: content.length,
     sha256: await sha256Hex(content),
     exportKind: "renewlet-export",
-    exportSchemaVersion: 1,
+    exportSchemaVersion: RENEWLET_EXPORT_SCHEMA_VERSION,
   });
   return { content, id, filename, manifest };
 }
@@ -95,9 +96,9 @@ export async function buildCloudBackupExportZip(env: Env, userId: string): Promi
   }
   const customConfig = await buildExportCustomConfig(env, userId, collector);
   // 云备份使用业务恢复 allowlist 组包；sessions/MFA/passkey/tickets 和 R2 系统密钥对象都不进入 ZIP。
-  const payload = renewletExportV1Schema.parse({
+  const payload = renewletExportV2Schema.parse({
     kind: "renewlet-export",
-    schemaVersion: 1,
+    schemaVersion: RENEWLET_EXPORT_SCHEMA_VERSION,
     exportedAt: exportedAt.toISOString(),
     data: {
       subscriptions: exportSubscriptions,
@@ -109,7 +110,7 @@ export async function buildCloudBackupExportZip(env: Env, userId: string): Promi
         : {}),
     },
   });
-  const manifest = renewletExportManifestV1Schema.parse({
+  const manifest = renewletExportManifestV2Schema.parse({
     kind: payload.kind,
     schemaVersion: payload.schemaVersion,
     exportedAt: payload.exportedAt,

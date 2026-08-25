@@ -33,7 +33,7 @@ test.describe("release smoke", () => {
           name: "manifest.json",
           content: JSON.stringify({
             kind: "renewlet-export",
-            schemaVersion: 1,
+            schemaVersion: 2,
             exportedAt: "2026-08-05T00:00:00.000Z",
             subscriptions: 1,
             assets: 0,
@@ -177,7 +177,7 @@ function createRenewletExport(subscriptionName: string) {
   // 这里构造的是导入 wire fixture；字段保持和 shared import schema 对齐，避免 release smoke 依赖当前表单默认值。
   return {
     kind: "renewlet-export",
-    schemaVersion: 1,
+    schemaVersion: 2,
     exportedAt: "2026-08-05T00:00:00.000Z",
     data: {
       subscriptions: [{

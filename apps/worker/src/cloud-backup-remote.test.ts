@@ -51,7 +51,7 @@ describe("S3CloudBackupClient endpoint addressing", () => {
       return new Response([
         `<?xml version="1.0"?>`,
         `<ListBucketResult>`,
-        `<Contents><Key>snapshots%2Frenewlet-export-v1-20260609T000000Z-abcd1234.manifest.json</Key></Contents>`,
+        `<Contents><Key>snapshots%2Frenewlet-export-v2-20260609T000000Z-abcd1234.manifest.json</Key></Contents>`,
         `</ListBucketResult>`,
       ].join(""), { status: 200 });
     }));
@@ -254,13 +254,13 @@ describe("WebDAVCloudBackupClient protocol adapter", () => {
     const manifest = {
       kind: "renewlet-cloud-backup-snapshot" as const,
       schemaVersion: 1 as const,
-      id: "renewlet-export-v1-20260609T000000Z-webdav",
-      filename: "renewlet-export-v1-20260609T000000Z-webdav.zip",
+      id: "renewlet-export-v2-20260609T000000Z-webdav",
+      filename: "renewlet-export-v2-20260609T000000Z-webdav.zip",
       createdAt: "2026-06-09T00:00:00.000Z",
       sizeBytes: content.length,
       sha256: await sha256Hex(content),
       exportKind: "renewlet-export" as const,
-      exportSchemaVersion: 1 as const,
+      exportSchemaVersion: 2 as const,
     };
 
     await client.test();

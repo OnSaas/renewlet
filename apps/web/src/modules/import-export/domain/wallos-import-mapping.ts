@@ -1,4 +1,4 @@
-import { importPayloadSchema, type ImportSubscription, type RenewletExportV1 } from "@/lib/api/schemas/import-export";
+import { importPayloadSchema, type ImportSubscription, type RenewletExportV2 } from "@/lib/api/schemas/import-export";
 import { getIntlCurrencySymbol, SUPPORTED_EXCHANGE_RATE_CURRENCIES } from "@/lib/currency-data";
 import type { CustomConfig } from "@/types/config";
 import { DISABLED_REMINDER_DAYS, INHERIT_REMINDER_DAYS, MAX_REMINDER_DAYS, type AppSettings } from "@/types/subscription";
@@ -95,11 +95,11 @@ const WALLOS_AUDIT_FIELDS = [
 ] as const;
 
 export function buildFromRenewletExport(
-  data: RenewletExportV1,
+  data: RenewletExportV2,
   context: ImportBuildBaseContext,
   assetFiles = new Map<string, ImportAssetSource>(),
 ): PreparedImport {
-  // Renewlet v1 备份中的资产路径必须先转为本地待上传资产，不能直接把 ZIP 内路径写回订阅 logo。
+  // Renewlet v2 备份中的资产路径必须先转为本地待上传资产，不能直接把 ZIP 内路径写回订阅 logo。
   const warnings: string[] = [];
   const assets: ImportAssetRef[] = [];
   const subscriptions = data.data.subscriptions.map((subscription, index) => {
@@ -153,10 +153,10 @@ export function buildFromRenewletExport(
 }
 
 function prepareRenewletExportCustomConfig(
-  config: RenewletExportV1["data"]["customConfig"],
+  config: RenewletExportV2["data"]["customConfig"],
   assetFiles: Map<string, ImportAssetSource>,
   assets: ImportAssetRef[],
-): RenewletExportV1["data"]["customConfig"] {
+): RenewletExportV2["data"]["customConfig"] {
   if (!config) return undefined;
   return {
     ...config,

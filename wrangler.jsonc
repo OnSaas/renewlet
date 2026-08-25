@@ -73,6 +73,8 @@
   },
   "vars": {
     // Deploy Button 会把模板 vars 暴露给用户填写；构建元信息只允许 CI 写入生成配置。
-    "SETUP_ENABLED": "true"
+    "SETUP_ENABLED": "true",
+    // 正常配置永远显式关闭维护模式；排他迁移只通过生成的 maintenance 配置打开。
+    "RENEWLET_MAINTENANCE_MODE": "false"
   }
 }

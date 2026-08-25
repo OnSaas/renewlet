@@ -478,7 +478,7 @@ describe("ImportDataDialog", () => {
       Price: "$10",
       Category: "Software",
       "Payment Method": "Visa",
-    }])], "renewlet-export-v1-cloud.json", { type: "application/json" });
+    }])], "renewlet-export-v2-cloud.json", { type: "application/json" });
 
     renderImportDialog({ initialFile, onInitialFileConsumed: onConsumed });
 

@@ -1,4 +1,4 @@
-import { importPayloadSchema, renewletExportV1Schema, type ImportPayload, type ImportPreviewItem } from "@renewlet/shared/schemas/import-export";
+import { importPayloadSchema, renewletExportV2Schema, type ImportPayload, type ImportPreviewItem } from "@renewlet/shared/schemas/import-export";
 import { runWorkerJob } from "@/lib/workers/run-worker-job";
 import type { ImportBuildBaseContext } from "./wallos-import-mapping";
 import {
@@ -14,6 +14,7 @@ import {
 } from "./wallos-import-mapping";
 import {
   IMPORT_MESSAGE_CODES,
+  assertSupportedRenewletExportVersion,
   MAX_IMPORT_FILE_BYTES,
   MAX_IMPORT_PREVIEW_SUBSCRIPTIONS,
   type ImportAssetRef,
@@ -60,7 +61,7 @@ export async function parseImportFile(
 /**
  * parseJsonText 解析纯文本导入内容。
  *
- * Renewlet export v1 是唯一自导入格式；Wallos 分支只做外部备份字段映射。
+ * Renewlet export v2 是唯一自导入格式；Wallos 分支只做外部备份字段映射。
  */
 export async function parseJsonText(
   text: string,
@@ -71,7 +72,8 @@ export async function parseJsonText(
     throw new Error(IMPORT_MESSAGE_CODES.fileTooLarge);
   }
   const parsed = JSON.parse(text) as unknown;
-  const renewletExport = renewletExportV1Schema.safeParse(parsed);
+  assertSupportedRenewletExportVersion(parsed);
+  const renewletExport = renewletExportV2Schema.safeParse(parsed);
   if (renewletExport.success) {
     assertPreviewSubscriptionCount(renewletExport.data.data.subscriptions.length);
     return buildFromRenewletExport(renewletExport.data, context);

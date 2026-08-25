@@ -12,7 +12,7 @@ import {
   cloudBackupScheduleWeekdaySchema,
   cloudBackupSnapshotManifestSchema,
 } from "./cloud-backup";
-import { importPayloadSchema, renewletExportManifestV1Schema, renewletExportV1Schema } from "./import-export";
+import { importPayloadSchema, renewletExportManifestV2Schema, renewletExportV2Schema } from "./import-export";
 
 const success = <T>(data: T) => ({ ok: true, data });
 
@@ -260,7 +260,7 @@ describe("cloud backup schemas", () => {
   });
 
   it("validates multi-target create snapshot responses", () => {
-    const id = "renewlet-export-v1-20260609T000000Z-abcd1234";
+    const id = "renewlet-export-v2-20260609T000000Z-abcd1234";
     const parsed = cloudBackupCreateSnapshotResponseSchema.parse(success({
       snapshots: [
         {
@@ -289,13 +289,13 @@ describe("cloud backup schemas", () => {
     expect(cloudBackupSnapshotManifestSchema.parse({
       kind: "renewlet-cloud-backup-snapshot",
       schemaVersion: 1,
-      id: "renewlet-export-v1-20260609T000000Z-abcd1234",
-      filename: "renewlet-export-v1-20260609T000000Z-abcd1234.zip",
+      id: "renewlet-export-v2-20260609T000000Z-abcd1234",
+      filename: "renewlet-export-v2-20260609T000000Z-abcd1234.zip",
       createdAt: "2026-06-09T00:00:00.000Z",
       sizeBytes: 1024,
       sha256: "a".repeat(64),
       exportKind: "renewlet-export",
-      exportSchemaVersion: 1,
+      exportSchemaVersion: 2,
     }).sha256).toHaveLength(64);
 
     expect(cloudBackupSnapshotManifestSchema.safeParse({
@@ -307,7 +307,7 @@ describe("cloud backup schemas", () => {
       sizeBytes: 1024,
       sha256: "not-a-sha",
       exportKind: "renewlet-export",
-      exportSchemaVersion: 1,
+      exportSchemaVersion: 2,
     }).success).toBe(false);
   });
 
@@ -334,7 +334,7 @@ describe("renewlet export schema", () => {
   it("validates export manifests with missing private asset audit entries", () => {
     const manifest = {
       kind: "renewlet-export",
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: "2026-06-09T00:00:00.000Z",
       subscriptions: 2,
       assets: 1,
@@ -347,25 +347,25 @@ describe("renewlet export schema", () => {
       }],
     };
 
-    expect(renewletExportManifestV1Schema.parse(manifest).missingAssets[0]?.reason).toBe("file_missing");
-    expect(renewletExportManifestV1Schema.safeParse({
+    expect(renewletExportManifestV2Schema.parse(manifest).missingAssets[0]?.reason).toBe("file_missing");
+    expect(renewletExportManifestV2Schema.safeParse({
       ...manifest,
       missingAssets: [{ ...manifest.missingAssets[0], reason: "permission_denied" }],
     }).success).toBe(false);
-    expect(renewletExportManifestV1Schema.safeParse({
+    expect(renewletExportManifestV2Schema.safeParse({
       ...manifest,
       missingAssets: [{ ...manifest.missingAssets[0], reference: "settings.logo" }],
     }).success).toBe(false);
-    expect(renewletExportManifestV1Schema.safeParse({
+    expect(renewletExportManifestV2Schema.safeParse({
       ...manifest,
       missingAssets: [{ ...manifest.missingAssets[0], path: "assets/asset_missing.svg" }],
     }).success).toBe(false);
   });
 
   it("allows ZIP-internal asset logo paths without loosening subscription API paths", () => {
-    expect(renewletExportV1Schema.safeParse({
+    expect(renewletExportV2Schema.safeParse({
       kind: "renewlet-export",
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: "2026-06-09T00:00:00.000Z",
       data: {
         subscriptions: [{
@@ -394,9 +394,9 @@ describe("renewlet export schema", () => {
       },
     }).success).toBe(true);
 
-    expect(renewletExportV1Schema.safeParse({
+    expect(renewletExportV2Schema.safeParse({
       kind: "renewlet-export",
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: "2026-06-09T00:00:00.000Z",
       data: {
         subscriptions: [{
@@ -437,9 +437,9 @@ describe("renewlet export schema", () => {
       capturedAt: "2026-08-06T00:00:00.000Z",
     };
 
-    expect(renewletExportV1Schema.safeParse({
+    expect(renewletExportV2Schema.safeParse({
       kind: "renewlet-export",
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: "2026-08-06T00:00:00.000Z",
       data: {
         subscriptions: [],
@@ -451,9 +451,9 @@ describe("renewlet export schema", () => {
       subscriptions: [],
       exchangeRateSnapshots: [snapshot],
     }).success).toBe(true);
-    expect(renewletExportV1Schema.safeParse({
+    expect(renewletExportV2Schema.safeParse({
       kind: "renewlet-export",
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: "2026-08-06T00:00:00.000Z",
       data: {
         subscriptions: [],

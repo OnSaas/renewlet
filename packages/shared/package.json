@@ -45,6 +45,7 @@
     "./online-icon-sources": "./src/online-icon-sources.ts",
     "./email-template": "./src/email-template.ts",
     "./ics": "./src/ics.ts",
+    "./i18n-config": "./src/i18n-config.ts",
     "./subscription-billing": "./src/subscription-billing.ts",
     "./subscription-renewal": "./src/subscription-renewal.ts",
     "./settings-normalization": "./src/settings-normalization.ts",

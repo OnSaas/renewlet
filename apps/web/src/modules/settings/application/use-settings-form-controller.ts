@@ -109,7 +109,7 @@ export function useSettingsFormController(): SettingsFormController {
     reportBasisStatus,
     getCurrencySymbol,
   } = useReportExchangeRates(savedSettings.exchangeRateProvider);
-  const { t, commitLocale, syncRemoteLocale } = useI18n();
+  const { t, commitLocalePreference, syncRemoteLocalePreference } = useI18n();
   const appStatus = useSetupStatus();
   const externalIntegrationsDisabled = appStatus.isLoading || appStatus.demoMode;
   // demo 模式同时禁用外部集成和账号安全写操作；这里拆成两个语义，避免后续把密码/MFA/Passkey 误归到外部集成策略里。
@@ -338,12 +338,12 @@ export function useSettingsFormController(): SettingsFormController {
         clearSettingsAppearanceDraftFromStorage();
       }
       if (options.rememberLocalePreference) {
-        commitLocale(nextSettings.locale);
+        commitLocalePreference(nextSettings.localePreference);
       } else {
-        syncRemoteLocale(nextSettings.locale);
+        syncRemoteLocalePreference(nextSettings.localePreference);
       }
     },
-    [commitLocale, setTheme, syncRemoteLocale],
+    [commitLocalePreference, setTheme, syncRemoteLocalePreference],
   );
 
   const handleSaveChanges = useCallback(async () => {
@@ -357,7 +357,7 @@ export function useSettingsFormController(): SettingsFormController {
     const shouldSaveSettings = settingsDirty;
     const shouldSaveCustomConfig = customConfigDirty;
     const providerChanged = settings.exchangeRateProvider !== savedSettings.exchangeRateProvider;
-    const localeChanged = settings.locale !== savedSettings.locale;
+    const localeChanged = settings.localePreference !== savedSettings.localePreference;
     const appearanceChanged = settings.themeMode !== savedSettings.themeMode
       || settings.themeVariant !== savedSettings.themeVariant
       || !areJsonSnapshotsEqual(settings.themeCustomColor, savedSettings.themeCustomColor);
@@ -402,6 +402,11 @@ export function useSettingsFormController(): SettingsFormController {
       } else if (settingsResult.status === "rejected") {
         failedScopes.push(t("settings.appSettingsScope"));
         firstError = settingsResult.reason;
+        // 保存失败仍通过 Provider request-id 状态机回滚，防止尚未完成的预览 catalog 迟到后重新覆盖远端事实。
+        if (localeChanged) {
+          setSettings((current) => ({ ...current, localePreference: savedSettings.localePreference }));
+        }
+        syncSavedPreviewState(savedSettings, { syncAppearance: appearanceChanged });
       }
 
       if (customConfigResult.status === "fulfilled" && customConfigResult.value) {
@@ -444,7 +449,7 @@ export function useSettingsFormController(): SettingsFormController {
     refreshRates,
     saveConfig,
     savedSettings.exchangeRateProvider,
-    savedSettings.locale,
+    savedSettings.localePreference,
     savedSettings.themeCustomColor,
     savedSettings.themeMode,
     savedSettings.themeVariant,

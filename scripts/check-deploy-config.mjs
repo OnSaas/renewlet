@@ -376,9 +376,9 @@ function checkCloudflareDeployMigrationScript() {
   const queuesEnsureScript = packageJson.scripts?.["cloudflare:queues:ensure"];
   const migrationRunnerScript = readFileSync(join(repoRoot, "scripts/apply-cloudflare-d1-migrations.mjs"), "utf8");
 
-  // Deploy Button 和自管 Wrangler 部署都依赖这个顺序：先确认生产 headers，再迁移 D1/确保队列，最后更新 Worker。
-  if (deployScript !== "node scripts/prepare-cloudflare-local-headers.mjs --check-production && pnpm cloudflare:migrations:apply && pnpm cloudflare:queues:ensure && wrangler deploy") {
-    throw new Error("package.json deploy script must check production Cloudflare headers before remote migration, Queue setup, and wrangler deploy.");
+  // Deploy Button、自管 workflow 和正式发布只能委托同一个状态机，迁移顺序不能在入口层复制。
+  if (deployScript !== "tsx scripts/cloudflare-deploy.ts deploy") {
+    throw new Error("package.json deploy script must use the exclusive Cloudflare deployment orchestrator.");
   }
   if (deployCloudflareScript !== "pnpm build:cloudflare && pnpm deploy") {
     throw new Error("package.json deploy:cloudflare must rebuild production Cloudflare assets before deploy.");
@@ -416,7 +416,7 @@ function checkCloudflareDeployMigrationScript() {
   if (!checkCloudflareScript?.includes("pnpm typecheck:scripts")) {
     throw new Error("package.json check:cloudflare must typecheck the root Cloudflare operations scripts.");
   }
-  if (queuesEnsureScript !== "node scripts/ensure-cloudflare-queues.mjs") {
+  if (queuesEnsureScript !== "tsx scripts/ensure-cloudflare-queues.ts") {
     throw new Error("package.json cloudflare:queues:ensure must keep the idempotent Queue creation helper.");
   }
   if (devScript !== "pnpm build:cloudflare && node scripts/prepare-cloudflare-local-headers.mjs && pnpm cloudflare:migrations:apply:local && node scripts/cloudflare-dev-hint.mjs && node scripts/cloudflare-dev-wrangler.mjs --test-scheduled") {
@@ -447,7 +447,8 @@ function checkCloudflareDeployMigrationScript() {
 }
 
 function checkCloudflareObservabilityProfiles() {
-  const generator = readFileSync(join(repoRoot, "scripts/generate-cloudflare-wrangler-config.mjs"), "utf8");
+  const generator = readFileSync(join(repoRoot, "scripts/generate-cloudflare-wrangler-config.ts"), "utf8");
+  const configModule = readFileSync(join(repoRoot, "scripts/cloudflare-wrangler-config.ts"), "utf8");
   const template = readFileSync(join(repoRoot, "wrangler.jsonc"), "utf8");
   const selfHostedWorkflow = readFileSync(join(repoRoot, ".github/workflows/cloudflare-worker.yml"), "utf8");
   const releaseWorkflow = readFileSync(join(repoRoot, ".github/workflows/release-publish.yml"), "utf8");
@@ -460,6 +461,11 @@ function checkCloudflareObservabilityProfiles() {
   ]) {
     if (!generator.includes(snippet)) {
       throw new Error(`Cloudflare config generator must keep observability profile snippet: ${snippet}`);
+    }
+  }
+  for (const snippet of ["createMaintenanceWranglerConfig", 'RENEWLET_MAINTENANCE_MODE: "true"', "consumers: []"]) {
+    if (!configModule.includes(snippet)) {
+      throw new Error(`Cloudflare config module must keep maintenance profile snippet: ${snippet}`);
     }
   }
   for (const snippet of ['"head_sampling_rate": 1', '"enabled": true']) {
@@ -521,7 +527,7 @@ function checkCloudflareScheduledLocalRoute() {
 
 function checkCloudflareQueueConfig() {
   const wranglerConfig = readFileSync(join(repoRoot, "wrangler.jsonc"), "utf8");
-  const queueEnsureScript = readFileSync(join(repoRoot, "scripts/ensure-cloudflare-queues.mjs"), "utf8");
+  const queueEnsureScript = readFileSync(join(repoRoot, "scripts/ensure-cloudflare-queues.ts"), "utf8");
   const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
   const packageBindings = packageJson.cloudflare?.bindings ?? {};
 
@@ -549,7 +555,7 @@ function checkCloudflareQueueConfig() {
     "create conflicted but the queue could not be confirmed",
   ]) {
     if (!queueEnsureScript.includes(snippet)) {
-      throw new Error(`ensure-cloudflare-queues.mjs must keep idempotent Queue ensure snippet: ${snippet}`);
+      throw new Error(`ensure-cloudflare-queues.ts must keep idempotent Queue ensure snippet: ${snippet}`);
     }
   }
 }
@@ -646,9 +652,9 @@ function checkCloudflareWorkflowBuildMetadata() {
     "SHORT_SHA=\"${GITHUB_SHA::7}\"",
     "RENEWLET_VERSION=${PACKAGE_VERSION}-dev+${SHORT_SHA}",
     "RENEWLET_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-    "pnpm cloudflare:migrations:apply --config \"$CI_WRANGLER_CONFIG\"",
-    "Ensure Cloudflare Queues",
-    "pnpm cloudflare:queues:ensure",
+    "CI_WRANGLER_MAINTENANCE_CONFIG: wrangler.maintenance.generated.jsonc",
+    "Deploy Renewlet through the exclusive migration orchestrator",
+    "pnpm deploy -- --config \"$CI_WRANGLER_CONFIG\" --maintenance-config \"$CI_WRANGLER_MAINTENANCE_CONFIG\"",
   ]) {
     if (!selfHostedWorkflow.includes(snippet)) {
       throw new Error(`cloudflare-worker.yml must keep build metadata snippet: ${snippet}`);
@@ -659,9 +665,9 @@ function checkCloudflareWorkflowBuildMetadata() {
     "RENEWLET_VERSION: ${{ needs.metadata.outputs.version }}",
     "RENEWLET_COMMIT: ${{ github.sha }}",
     "RENEWLET_BUILD_TIME: ${{ steps.build-time.outputs.value }}",
-    "pnpm cloudflare:migrations:apply --config \"$CI_WRANGLER_CONFIG\"",
-    "Ensure Cloudflare Queues",
-    "pnpm cloudflare:queues:ensure",
+    "CI_WRANGLER_MAINTENANCE_CONFIG: wrangler.maintenance.generated.jsonc",
+    "Deploy Renewlet through the exclusive migration orchestrator",
+    "pnpm deploy -- --config \"$CI_WRANGLER_CONFIG\" --maintenance-config \"$CI_WRANGLER_MAINTENANCE_CONFIG\"",
   ]) {
     if (!releaseWorkflow.includes(snippet)) {
       throw new Error(`release-publish.yml must keep production Cloudflare metadata snippet: ${snippet}`);

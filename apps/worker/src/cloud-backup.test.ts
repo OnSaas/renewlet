@@ -232,7 +232,7 @@ function cloudBackupManifestForTest(id: string, content: Uint8Array, sha256: str
     sizeBytes: content.length,
     sha256,
     exportKind: "renewlet-export",
-    exportSchemaVersion: 1,
+    exportSchemaVersion: 2,
   };
 }
 
@@ -463,13 +463,13 @@ describe("Cloudflare cloud backup", () => {
         return new Response(JSON.stringify({
           kind: "renewlet-cloud-backup-snapshot",
           schemaVersion: 1,
-          id: "renewlet-export-v1-20260609T000000Z-abcd1234",
-          filename: "renewlet-export-v1-20260609T000000Z-abcd1234.zip",
+          id: "renewlet-export-v2-20260609T000000Z-abcd1234",
+          filename: "renewlet-export-v2-20260609T000000Z-abcd1234.zip",
           createdAt: "2026-06-09T00:00:00.000Z",
           sizeBytes: 4,
           sha256: "a".repeat(64),
           exportKind: "renewlet-export",
-          exportSchemaVersion: 1,
+          exportSchemaVersion: 2,
         }), { status: 200 });
       }
       if (href.endsWith(".zip")) return new Response(new Uint8Array([1, 2, 3, 4]), { status: 200 });
@@ -477,16 +477,16 @@ describe("Cloudflare cloud backup", () => {
     }));
 
     await expect(downloadCloudBackup(
-      authorizedRequest("/api/app/cloud-backups/renewlet-export-v1-20260609T000000Z-abcd1234/download?provider=webdav"),
+      authorizedRequest("/api/app/cloud-backups/renewlet-export-v2-20260609T000000Z-abcd1234/download?provider=webdav"),
       env,
-      "renewlet-export-v1-20260609T000000Z-abcd1234",
+      "renewlet-export-v2-20260609T000000Z-abcd1234",
     )).rejects.toMatchObject({
       code: "CLOUD_BACKUP_CHECKSUM_FAILED",
     });
   });
 
   it("downloads without provider by trying configured targets and returning the first valid snapshot", async () => {
-    const id = "renewlet-export-v1-20260609T111742Z-fcf646df";
+    const id = "renewlet-export-v2-20260609T111742Z-fcf646df";
     const content = new Uint8Array([1, 2, 3, 4]);
     const manifest = cloudBackupManifestForTest(id, content, await sha256Hex(content));
     const env = fakeEnvForRows([cloudBackupRow("webdav"), s3CloudBackupRow()]);
@@ -513,7 +513,7 @@ describe("Cloudflare cloud backup", () => {
   });
 
   it("returns all provider attempts when download without provider fails", async () => {
-    const id = "renewlet-export-v1-20260609T111742Z-fcf646df";
+    const id = "renewlet-export-v2-20260609T111742Z-fcf646df";
     const env = fakeEnvForRows([cloudBackupRow("webdav"), s3CloudBackupRow()]);
     vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
       const { href } = fetchCallFromArgs(url, init);
@@ -543,7 +543,7 @@ describe("Cloudflare cloud backup", () => {
   });
 
   it("returns structured details for an invalid explicit provider", async () => {
-    const id = "renewlet-export-v1-20260609T111742Z-fcf646df";
+    const id = "renewlet-export-v2-20260609T111742Z-fcf646df";
     const env = fakeEnvForRows([]);
 
     await expect(downloadCloudBackup(
@@ -560,7 +560,7 @@ describe("Cloudflare cloud backup", () => {
   });
 
   it("requires provider for delete without provider when the snapshot exists in multiple targets", async () => {
-    const id = "renewlet-export-v1-20260609T111742Z-fcf646df";
+    const id = "renewlet-export-v2-20260609T111742Z-fcf646df";
     const content = new Uint8Array([1, 2, 3, 4]);
     const manifest = cloudBackupManifestForTest(id, content, await sha256Hex(content));
     const deletedProviders: CloudBackupProvider[] = [];

@@ -200,13 +200,13 @@ func buildCloudBackupExportBundle(app core.App, user *core.Record, exportedAt ti
 	}
 	payload := map[string]interface{}{
 		"kind":          "renewlet-export",
-		"schemaVersion": 1,
+		"schemaVersion": renewletExportSchemaVersion,
 		"exportedAt":    exportedAt.Format(time.RFC3339Nano),
 		"data":          data,
 	}
 	manifest := cloudBackupExportManifest{
 		Kind:          "renewlet-export",
-		SchemaVersion: 1,
+		SchemaVersion: renewletExportSchemaVersion,
 		ExportedAt:    exportedAt.Format(time.RFC3339Nano),
 		Subscriptions: len(subscriptions),
 		Assets:        len(assetCollector.assets),
@@ -238,7 +238,10 @@ func cloudBackupExportSettings(app core.App, user *core.Record) (map[string]inte
 		}
 		return nil, false, err
 	}
-	settings := settingsFromRecord(record)
+	settings, err := settingsFromRecord(record)
+	if err != nil {
+		return nil, false, err
+	}
 	data, err := json.Marshal(settings)
 	if err != nil {
 		return nil, false, err
@@ -277,7 +280,7 @@ func cloudBackupExportCustomConfig(app core.App, user *core.Record, assetCollect
 		return nil, false, err
 	}
 	var config customConfigPayload
-	if err := decodeStrictJSONBytesInto(data, &config, localeZhCN, false); err != nil {
+	if err := decodeStrictJSONBytesInto(data, &config, defaultAppLocale, false); err != nil {
 		return nil, false, err
 	}
 	if err := normalizeCustomConfigPayload(&config); err != nil {

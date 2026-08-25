@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { persistedSettingsBackupSchema } from "./settings";
+import { persistedAppSettingsSchema, persistedSettingsBackupSchema } from "./settings";
 import { customConfigSchema } from "./custom-config";
 import {
   createApiSubscriptionSchema,
@@ -138,21 +138,24 @@ const renewletExportSubscriptionSchema = createApiSubscriptionSchema(
   logoReferenceSchema.or(exportAssetLogoPathSchema),
 );
 
-export const renewletExportV1Schema = z.object({
+export const RENEWLET_EXPORT_SCHEMA_VERSION = 2;
+
+export const renewletExportV2Schema = z.object({
   kind: z.literal("renewlet-export"),
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(RENEWLET_EXPORT_SCHEMA_VERSION),
   exportedAt: z.string(),
   data: z.object({
-    // Export v1 保存 API 订阅形状而不是 UI 草稿形状，保证 Docker 与 Cloudflare 导出的数据可以互导。
+    // Export v2 保存 API 订阅形状而不是 UI 草稿形状，保证 Docker 与 Cloudflare 导出的数据可以互导。
     subscriptions: z.array(renewletExportSubscriptionSchema),
-    settings: persistedSettingsBackupSchema.optional(),
+    // Renewlet v2 是完整备份；Wallos/AI 使用的通用 import settings 才允许局部 patch。
+    settings: persistedAppSettingsSchema.optional(),
     customConfig: customConfigSchema.optional(),
     // 历史汇率快照是 data.json 的恢复事实源；manifest 只做审计，不能承载报表口径。
     exchangeRateSnapshots: z.array(exchangeRateSnapshotV1Schema).max(240).optional(),
     assets: z.array(exportAssetSchema).optional(),
   }).strict(),
 }).strict();
-export type RenewletExportV1 = z.infer<typeof renewletExportV1Schema>;
+export type RenewletExportV2 = z.infer<typeof renewletExportV2Schema>;
 
 export const renewletExportMissingAssetReferenceSchema = z.enum(["subscription.logo", "customConfig.paymentMethods.icon"]);
 export type RenewletExportMissingAssetReference = z.infer<typeof renewletExportMissingAssetReferenceSchema>;
@@ -169,13 +172,13 @@ export const renewletExportMissingAssetSchema = z.object({
 }).strict();
 export type RenewletExportMissingAsset = z.infer<typeof renewletExportMissingAssetSchema>;
 
-export const renewletExportManifestV1Schema = z.object({
+export const renewletExportManifestV2Schema = z.object({
   kind: z.literal("renewlet-export"),
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(RENEWLET_EXPORT_SCHEMA_VERSION),
   exportedAt: z.string(),
   subscriptions: z.number().int().nonnegative(),
   assets: z.number().int().nonnegative(),
   // manifest 只做 ZIP 审计；导入恢复仍以 data.json 为事实源，缺失资产不能反向驱动写库。
   missingAssets: z.array(renewletExportMissingAssetSchema),
 }).strict();
-export type RenewletExportManifestV1 = z.infer<typeof renewletExportManifestV1Schema>;
+export type RenewletExportManifestV2 = z.infer<typeof renewletExportManifestV2Schema>;
