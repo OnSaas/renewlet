@@ -203,7 +203,7 @@ export function NotificationDingTalkConfigPanel({
             value={settings.dingtalkContentTemplate}
             disabled={disabled}
             onChange={(e) => updateSetting('dingtalkContentTemplate', e.target.value)}
-            className="min-h-[120px] border-border bg-secondary font-mono text-sm"
+            className="min-h-30 border-border bg-secondary font-mono text-sm"
           />
           <p className="text-xs text-muted-foreground">{t("settings.dingtalkTemplateHelp")}</p>
           <Popover open={templateExamplesOpen} onOpenChange={setTemplateExamplesOpen}>

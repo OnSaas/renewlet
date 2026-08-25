@@ -486,7 +486,7 @@ export function TimePicker({
             ariaLabel={t("time.hour")}
           />
           
-          <div className="flex flex-col items-center justify-center h-[200px] px-1">
+          <div className="flex h-50 flex-col items-center justify-center px-1">
             <span className="text-3xl font-bold text-primary">:</span>
           </div>
           
