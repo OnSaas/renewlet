@@ -360,13 +360,27 @@ describe("useSettingsFormController", () => {
     });
   });
 
-  it("rolls back only the locale preview when saving settings fails", async () => {
-    mocks.updateSettingsMutateAsync.mockRejectedValue(new Error("save failed"));
-    const { result } = renderSettingsFormController();
-    const nextPreference = BASE_SETTINGS.localePreference === "zh-CN" ? "en-US" : "zh-CN";
+  it("rolls back only the locale preview to the latest remote baseline when saving settings fails", async () => {
+    const { result, rerender } = renderSettingsFormController();
 
     act(() => {
-      result.current.updateSetting("localePreference", nextPreference);
+      mocks.remoteSettings = {
+        ...BASE_SETTINGS,
+        localePreference: "en-US",
+        recipientEmail: "updated@example.com",
+      };
+      rerender();
+    });
+
+    await waitFor(() => {
+      expect(result.current.settings.localePreference).toBe("en-US");
+      expect(result.current.settings.recipientEmail).toBe("updated@example.com");
+    });
+    expect(result.current.hasUnsavedChanges).toBe(false);
+    mocks.updateSettingsMutateAsync.mockRejectedValue(new Error("save failed"));
+
+    act(() => {
+      result.current.updateSetting("localePreference", "zh-CN");
       result.current.updateSetting("monthlyBudget", "2333");
     });
 
@@ -374,10 +388,11 @@ describe("useSettingsFormController", () => {
       await result.current.handleSaveChanges();
     });
 
-    expect(result.current.settings.localePreference).toBe(BASE_SETTINGS.localePreference);
+    expect(result.current.settings.localePreference).toBe("en-US");
+    expect(result.current.settings.recipientEmail).toBe("updated@example.com");
     expect(result.current.settings.monthlyBudget).toBe("2333");
     expect(result.current.hasUnsavedChanges).toBe(true);
-    expect(mocks.syncRemoteLocalePreference).toHaveBeenLastCalledWith(BASE_SETTINGS.localePreference);
+    expect(mocks.syncRemoteLocalePreference).toHaveBeenLastCalledWith("en-US");
     expect(mocks.commitLocalePreference).not.toHaveBeenCalled();
   });
 
