@@ -546,7 +546,6 @@ export const MESSAGE_KEYS = [
   "import.error.statusInvalid",
   "import.error.subscriptionInvalid",
   "import.error.unrecognizedFile",
-  "import.error.unsupportedRenewletVersion",
   "import.error.wallosTableTooLarge",
   "import.error.workerParseFailed",
   "import.field.wallosDueDate",

@@ -261,7 +261,7 @@ Alternatively, create a replacement D1 database from `renewlet-before-upgrade.sq
 
 Cloud backup snapshots are limited to 16 MiB in both Docker and Cloudflare runtimes. Before upgrading from a version with a larger limit, download or restore every remote snapshot over 16 MiB with the old version.
 
-Current imports and exports accept only `renewlet-export` schema v2. The `renewlet-cloud-backup-snapshot` transport wrapper remains schema v1, but its inner `exportSchemaVersion` must be 2. Restore a Renewlet v1 backup in the old release and export it again before importing it into the current release.
+Imports, browser exports, and cloud backup contents use the stable `renewlet-export` schema v1. The `renewlet-cloud-backup-snapshot` transport wrapper also remains schema v1 and declares `exportSchemaVersion=1` for its inner payload.
 
 ## Optional: Wrangler CLI
 

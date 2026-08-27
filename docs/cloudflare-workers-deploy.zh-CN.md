@@ -261,7 +261,7 @@ pnpm cloudflare:deploy:recover -- --config wrangler.generated.jsonc --maintenanc
 
 Docker 与 Cloudflare 运行面的云备份快照上限统一为 16 MiB。若旧版本曾允许更大快照，升级前必须先用旧版本下载或恢复所有超过 16 MiB 的远端快照。
 
-当前导入导出内容只接受 `renewlet-export` schema v2；云备份的 `renewlet-cloud-backup-snapshot` 传输封装仍是 schema v1，但内部 `exportSchemaVersion` 必须是 2。旧 Renewlet v1 备份需要先在旧版本中恢复并重新导出，不能直接导入当前版本。
+导入、浏览器导出和云备份内容统一使用稳定的 `renewlet-export` schema v1；`renewlet-cloud-backup-snapshot` 传输封装同样保持 schema v1，并通过 `exportSchemaVersion=1` 声明内部载荷。
 
 ## 可选：Wrangler CLI
 

@@ -10,7 +10,7 @@ import (
 
 const (
 	cloudBackupTransportSchemaVersion       = 1
-	renewletExportSchemaVersion             = 2
+	renewletExportSchemaVersion             = 1
 	cloudBackupProviderWebDAV               = "webdav"
 	cloudBackupProviderS3                   = "s3"
 	cloudBackupStatusIdle                   = "idle"

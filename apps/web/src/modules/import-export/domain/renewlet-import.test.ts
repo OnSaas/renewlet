@@ -3,10 +3,13 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_CUSTOM_CONFIG } from "@/types/config";
 import { DEFAULT_SETTINGS, type Subscription } from "@/types/subscription";
 import { assertDateOnly } from "@/lib/time/date-only";
-import { renewletExportV2Schema } from "@/lib/api/schemas/import-export";
+import { renewletExportV1Schema } from "@/lib/api/schemas/import-export";
 import { parseJsonText } from "./wallos-import";
 import { IMPORT_MESSAGE_CODES, subscriptionToExportRow } from "./import-export-model";
 import { buildFromRenewletExport } from "./wallos-import-mapping";
+import { parseImportBytes } from "./wallos-import-worker";
+import v0322ExportJson from "./fixtures/v0.3.22-renewlet-export-v1.json?raw";
+import v0322ExportZipBase64 from "./fixtures/v0.3.22-renewlet-export-v1.zip.base64?raw";
 
 const context = {
   config: DEFAULT_CUSTOM_CONFIG,
@@ -44,6 +47,17 @@ const currentExportSubscription = {
 } satisfies Subscription;
 
 describe("renewlet import", () => {
+  it("previews the immutable v0.3.22 v1 JSON and ZIP samples", async () => {
+    const jsonPrepared = await parseJsonText(v0322ExportJson, context);
+    const zipBytes = Uint8Array.from(atob(v0322ExportZipBase64.trim()), (character) => character.charCodeAt(0));
+    const zipPrepared = await parseImportBytes("v0.3.22-fixture", zipBytes, context);
+
+    for (const prepared of [jsonPrepared, zipPrepared]) {
+      expect(prepared.payload.subscriptions[0]?.name).toBe("v0.3.22 Backup");
+      expect(prepared.payload.settings).toMatchObject({ localePreference: "zh-CN", defaultCurrency: "USD" });
+    }
+  });
+
   it("rejects legacy Renewlet bare subscription arrays", async () => {
     await expect(parseJsonText(JSON.stringify([
       {
@@ -85,16 +99,16 @@ describe("renewlet import", () => {
     }), context)).rejects.toThrow(IMPORT_MESSAGE_CODES.unrecognizedFile);
   });
 
-  it("builds current Renewlet v2 export rows that satisfy schema and keep pinned", () => {
+  it("builds current Renewlet v1 export rows that satisfy schema and keep pinned", () => {
     const row = subscriptionToExportRow(currentExportSubscription);
 
-    const parsed = renewletExportV2Schema.parse({
+    const parsed = renewletExportV1Schema.parse({
       kind: "renewlet-export",
-      schemaVersion: 2,
+      schemaVersion: 1,
       exportedAt: "2026-05-26T00:00:00.000Z",
       data: {
         subscriptions: [row],
-        settings: { localePreference: "auto", defaultCurrency: "USD" },
+        settings: { defaultCurrency: "USD" },
         customConfig: DEFAULT_CUSTOM_CONFIG,
         assets: [],
       },
@@ -104,14 +118,14 @@ describe("renewlet import", () => {
     expect(parsed.data.subscriptions[0]?.pinned).toBe(true);
   });
 
-  it("keeps current Renewlet v2 exports on the schema-backed path", async () => {
+  it("keeps current Renewlet v1 exports on the schema-backed path", async () => {
     const prepared = await parseJsonText(JSON.stringify({
       kind: "renewlet-export",
-      schemaVersion: 2,
+      schemaVersion: 1,
       exportedAt: "2026-05-26T00:00:00.000Z",
       data: {
         subscriptions: [currentExportSubscription],
-        settings: { localePreference: "auto", defaultCurrency: "USD" },
+        settings: { locale: "zh-CN", defaultCurrency: "USD" },
         customConfig: DEFAULT_CUSTOM_CONFIG,
         assets: [],
       },
@@ -125,18 +139,19 @@ describe("renewlet import", () => {
     });
     expect(prepared.payload.subscriptions[0]?.pinned).toBe(true);
     expect(prepared.payload.settings?.defaultCurrency).toBe("USD");
+    expect(prepared.payload.settings?.localePreference).toBe("zh-CN");
     expect(prepared.payload.customConfig?.statuses.some((item) => item.value === "expired")).toBe(true);
     expect(prepared.warnings).toHaveLength(0);
   });
 
   it("stages payment method icons from Renewlet ZIP assets and removes missing ZIP icon paths", () => {
-    const parsed = renewletExportV2Schema.parse({
+    const parsed = renewletExportV1Schema.parse({
       kind: "renewlet-export",
-      schemaVersion: 2,
+      schemaVersion: 1,
       exportedAt: "2026-05-26T00:00:00.000Z",
       data: {
         subscriptions: [currentExportSubscription],
-        settings: { localePreference: "auto", defaultCurrency: "USD" },
+        settings: { defaultCurrency: "USD" },
         customConfig: {
           ...DEFAULT_CUSTOM_CONFIG,
           paymentMethods: [
@@ -165,24 +180,20 @@ describe("renewlet import", () => {
     expect(prepared.payload.customConfig?.paymentMethods[1]).not.toHaveProperty("icon");
   });
 
-  it("rejects Renewlet v1 with an explicit unsupported-version error", async () => {
-    await expect(parseJsonText(JSON.stringify({
+  it("does not overwrite the target preference when a v1 backup has no locale", async () => {
+    const prepared = await parseJsonText(JSON.stringify({
       kind: "renewlet-export",
       schemaVersion: 1,
       exportedAt: "2026-05-26T00:00:00.000Z",
-      data: { subscriptions: [] },
-    }), context)).rejects.toThrow(IMPORT_MESSAGE_CODES.unsupportedRenewletVersion);
-  });
-
-  it("rejects Renewlet v2 settings without localePreference", () => {
-    expect(renewletExportV2Schema.safeParse({
-      kind: "renewlet-export",
-      schemaVersion: 2,
-      exportedAt: "2026-05-26T00:00:00.000Z",
       data: {
-        subscriptions: [currentExportSubscription],
+        subscriptions: [],
         settings: { defaultCurrency: "USD" },
       },
-    }).success).toBe(false);
+    }), {
+      ...context,
+      settings: { ...context.settings, localePreference: "en-US" },
+    });
+
+    expect(prepared.payload.settings).toEqual({ defaultCurrency: "USD" });
   });
 });

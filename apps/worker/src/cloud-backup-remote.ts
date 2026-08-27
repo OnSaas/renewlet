@@ -629,7 +629,7 @@ function manifestName(id: string): string {
 }
 
 export function snapshotId(date: Date): string {
-  return `renewlet-export-v2-${formatSnapshotDate(date)}-${randomHex(4)}`;
+  return `renewlet-export-v1-${formatSnapshotDate(date)}-${randomHex(4)}`;
 }
 
 function formatSnapshotDate(date: Date): string {
@@ -661,8 +661,8 @@ function contentTypeForS3Key(key: string): string {
 }
 
 export function sanitizeDownloadFilename(filename: string): string {
-  const base = filename.split("/").pop()?.trim().replaceAll("\"", "") || "renewlet-export-v2.zip";
-  return base || "renewlet-export-v2.zip";
+  const base = filename.split("/").pop()?.trim().replaceAll("\"", "") || "renewlet-export-v1.zip";
+  return base || "renewlet-export-v1.zip";
 }
 
 function textDecoder(data: Uint8Array): string {

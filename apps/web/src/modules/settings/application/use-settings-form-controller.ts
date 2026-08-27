@@ -346,6 +346,7 @@ export function useSettingsFormController(): SettingsFormController {
     [commitLocalePreference, setTheme, syncRemoteLocalePreference],
   );
 
+  // 保存失败使用完整远端基线驱动预览回滚，因此回调必须依赖整个 savedSettings 快照，不能按当前字段手工拆分。
   const handleSaveChanges = useCallback(async () => {
     if (isSavingSettings || !hasUnsavedChanges) return;
     if (monthlyBudgetError) {

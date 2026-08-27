@@ -277,7 +277,7 @@ export const persistedSettingsBackupSchema = appSettingsSchema.partial().extend(
 }).strict();
 export type PersistedSettingsBackup = z.infer<typeof persistedSettingsBackupSchema>;
 
-// 排他迁移后的数据库记录和 export v2 必须携带语言偏好；其他新字段仍可由版本默认值补齐。
+// 排他迁移后的数据库记录必须携带语言偏好；外部备份使用独立版本契约，其他新字段仍可由默认值补齐。
 export const persistedAppSettingsSchema = persistedSettingsBackupSchema.required({
   localePreference: true,
 });

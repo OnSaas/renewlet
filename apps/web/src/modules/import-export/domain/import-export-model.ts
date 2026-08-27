@@ -1,9 +1,11 @@
 import {
   IMPORT_PREVIEW_MAX_BYTES,
   IMPORT_PREVIEW_SUBSCRIPTION_LIMIT,
+  toRenewletExportSettingsV1,
   type ImportPayload,
   type ImportSubscription,
-  type RenewletExportV2,
+  type RenewletExportSettingsV1,
+  type RenewletExportV1,
 } from "@/lib/api/schemas/import-export";
 import type { AppSettings, BillingCycle, CustomCycleUnit, Subscription } from "@/types/subscription";
 import type { ConfigItem, CustomConfig } from "@/types/config";
@@ -85,7 +87,6 @@ export const IMPORT_MESSAGE_CODES = {
   unknownCycle: "IMPORT_WARNING_WALLOS_UNKNOWN_CYCLE",
   fileTooLarge: "IMPORT_ERROR_FILE_TOO_LARGE",
   unrecognizedFile: "IMPORT_ERROR_UNRECOGNIZED_FILE",
-  unsupportedRenewletVersion: "IMPORT_ERROR_UNSUPPORTED_RENEWLET_VERSION",
   wallosTableTooLarge: "IMPORT_ERROR_WALLOS_TABLE_TOO_LARGE",
   workerParseFailed: "IMPORT_ERROR_WORKER_PARSE_FAILED",
   aiWebsiteSuggested: "IMPORT_WARNING_AI_WEBSITE_SUGGESTED",
@@ -94,15 +95,6 @@ export const IMPORT_MESSAGE_CODES = {
 /** importMessage 用 `|` 串联 code 参数，便于服务端/前端在数组里传递可本地化 warning。 */
 export function importMessage(code: string, ...params: Array<string | number>): string {
   return [code, ...params.map(String)].join("|");
-}
-
-/** 只识别已退休的正式 Renewlet schema 版本，用明确错误阻止它继续落入 Wallos 或通用损坏文件探测。 */
-export function assertSupportedRenewletExportVersion(value: unknown): void {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return;
-  const record = value as Record<string, unknown>;
-  if (record["kind"] === "renewlet-export" && record["schemaVersion"] === 1) {
-    throw new Error(IMPORT_MESSAGE_CODES.unsupportedRenewletVersion);
-  }
 }
 
 const SECRET_SETTING_KEYS = new Set<keyof AppSettings>([
@@ -136,14 +128,15 @@ const SECRET_SETTING_KEYS = new Set<keyof AppSettings>([
   "pushplusToken",
 ]);
 
-type RenewletExportSubscription = RenewletExportV2["data"]["subscriptions"][number];
+type RenewletExportSubscription = RenewletExportV1["data"]["subscriptions"][number];
 
 /**
  * sanitizeSettingsForExport 移除默认不应进入备份的通知和账号 secret。
  *
  * includeSecrets 只由用户显式选择触发；普通备份不能意外携带通知、Webhook、PushPlus 等凭证。
+ * 返回前统一投影为稳定 v1 settings，避免浏览器导出泄漏当前内部字段形状。
  */
-export function sanitizeSettingsForExport(settings: AppSettings, includeSecrets: boolean): Partial<AppSettings> {
+export function sanitizeSettingsForExport(settings: AppSettings, includeSecrets: boolean): RenewletExportSettingsV1 {
   const entries = Object.entries(settings).filter(([key]) => includeSecrets || !SECRET_SETTING_KEYS.has(key as keyof AppSettings));
   const sanitized = Object.fromEntries(entries) as Partial<AppSettings>;
   if (!includeSecrets && sanitized.aiRecognition) {
@@ -153,7 +146,7 @@ export function sanitizeSettingsForExport(settings: AppSettings, includeSecrets:
       apiKey: "",
     };
   }
-  return sanitized;
+  return toRenewletExportSettingsV1(sanitized);
 }
 
 /**

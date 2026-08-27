@@ -1,7 +1,7 @@
 import {
   RENEWLET_EXPORT_SCHEMA_VERSION,
-  renewletExportManifestV2Schema,
-  renewletExportV2Schema,
+  renewletExportManifestV1Schema,
+  renewletExportV1Schema,
   type RenewletExportAsset,
   type RenewletExportMissingAsset,
   type RenewletExportMissingAssetReason,
@@ -26,7 +26,7 @@ import type {
 } from "./renewlet-export-worker-contract";
 
 /**
- * exportRenewletBackup 生成 Renewlet v2 ZIP 备份。
+ * exportRenewletBackup 生成 Renewlet v1 ZIP 备份。
  *
  * data.json 是正式互导契约，manifest.json 只服务人工检查；私有资产会带认证读取后放入 assets/，
  * settings secret 默认剔除，只有用户显式选择时才进入备份。
@@ -103,7 +103,7 @@ export async function exportRenewletBackup(options: {
   };
 
   const exportedAt = new Date().toISOString();
-  const data = renewletExportV2Schema.parse({
+  const data = renewletExportV1Schema.parse({
     kind: "renewlet-export",
     schemaVersion: RENEWLET_EXPORT_SCHEMA_VERSION,
     exportedAt,
@@ -115,7 +115,7 @@ export async function exportRenewletBackup(options: {
       assets,
     },
   });
-  const manifest = renewletExportManifestV2Schema.parse({
+  const manifest = renewletExportManifestV1Schema.parse({
     kind: data.kind,
     schemaVersion: data.schemaVersion,
     exportedAt: data.exportedAt,
@@ -137,7 +137,7 @@ export async function exportRenewletBackup(options: {
     ...(execution.onProgress ? { onProgress: execution.onProgress } : {}),
   });
   const blob = new Blob([result.buffer], { type: "application/zip" });
-  downloadFile(blob, `renewlet-export-v2-${exportedAt.slice(0, 10)}.zip`);
+  downloadFile(blob, `renewlet-export-v1-${exportedAt.slice(0, 10)}.zip`);
 }
 
 type PrivateAssetReference = {

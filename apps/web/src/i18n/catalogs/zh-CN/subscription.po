@@ -1921,12 +1921,7 @@ msgstr "无法优化这张图片，请换一张更小且清晰的截图。"
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:464
 msgid "import.error.unrecognizedFile"
-msgstr "无法识别导入文件，请选择 Renewlet v2 导出或 Wallos 导出/备份。"
-
-#. js-lingui-explicit-id
-#: src/i18n/descriptors/subscription.ts:467
-msgid "import.error.unsupportedRenewletVersion"
-msgstr "不支持 Renewlet v1 备份，请使用升级前的版本导出 v2 后再导入。"
+msgstr "无法识别导入文件，请选择 Renewlet v1 导出或 Wallos 导出/备份。"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:624

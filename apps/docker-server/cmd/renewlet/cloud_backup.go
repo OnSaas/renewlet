@@ -565,7 +565,7 @@ func snapshotFromManifest(provider string, manifest cloudBackupSnapshotManifest)
 }
 
 func cloudBackupSnapshotID(exportedAt time.Time) string {
-	return "renewlet-export-v2-" + exportedAt.Format("20060102T150405Z") + "-" + randomHex(4)
+	return "renewlet-export-v1-" + exportedAt.Format("20060102T150405Z") + "-" + randomHex(4)
 }
 
 func randomHex(bytesLen int) string {
@@ -579,7 +579,7 @@ func randomHex(bytesLen int) string {
 func sanitizeDownloadFilename(filename string) string {
 	filename = path.Base(strings.TrimSpace(filename))
 	if filename == "." || filename == "/" || filename == "" {
-		return "renewlet-export-v2.zip"
+		return "renewlet-export-v1.zip"
 	}
 	return strings.ReplaceAll(filename, `"`, "")
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renewletExportManifestV2Schema, renewletExportV2Schema } from "@/lib/api/schemas/import-export";
+import { renewletExportManifestV1Schema, renewletExportV1Schema } from "@/lib/api/schemas/import-export";
 import { assertDateOnly } from "@/lib/time/date-only";
 import type { RunWorkerJobOptions } from "@/lib/workers/run-worker-job";
 import { DEFAULT_CUSTOM_CONFIG, type CustomConfig } from "@/types/config";
@@ -119,7 +119,7 @@ describe("exportRenewletBackup", () => {
     }]);
     expect(exportMocks.downloadFile).toHaveBeenCalledWith(
       expect.objectContaining({ type: "application/zip" }),
-      expect.stringMatching(/^renewlet-export-v2-\d{4}-\d{2}-\d{2}\.zip$/),
+      expect.stringMatching(/^renewlet-export-v1-\d{4}-\d{2}-\d{2}\.zip$/),
     );
   });
 });
@@ -136,8 +136,8 @@ function readWorkerEntries() {
   return {
     entries,
     transfer: options.transfer,
-    data: renewletExportV2Schema.parse(JSON.parse(dataJson)),
-    manifest: renewletExportManifestV2Schema.parse(JSON.parse(manifestJson)),
+    data: renewletExportV1Schema.parse(JSON.parse(dataJson)),
+    manifest: renewletExportManifestV1Schema.parse(JSON.parse(manifestJson)),
   };
 }
 

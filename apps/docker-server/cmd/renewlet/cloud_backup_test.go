@@ -347,7 +347,7 @@ func TestCloudBackupRemoteTargetForProviderDoesNotInspectOtherProvider(t *testin
 }
 
 func TestDownloadCloudBackupSnapshotFromTargetsFallsBackAndAggregatesRawFailures(t *testing.T) {
-	id := "renewlet-export-v2-20260609T000000Z-abcd1234"
+	id := "renewlet-export-v1-20260609T000000Z-abcd1234"
 	content := []byte("renewlet")
 	s3 := &fakeCloudBackupRemoteClient{
 		downloadContent:  content,
@@ -381,7 +381,7 @@ func TestDownloadCloudBackupSnapshotFromTargetsFallsBackAndAggregatesRawFailures
 }
 
 func TestDeleteCloudBackupSnapshotFromTargetsRequiresProviderForAmbiguousMatches(t *testing.T) {
-	id := "renewlet-export-v2-20260609T000000Z-abcd1234"
+	id := "renewlet-export-v1-20260609T000000Z-abcd1234"
 	manifest := cloudBackupManifestForTest(id, []byte("renewlet"))
 	webdav := &fakeCloudBackupRemoteClient{listManifests: []cloudBackupSnapshotManifest{manifest}}
 	s3 := &fakeCloudBackupRemoteClient{listManifests: []cloudBackupSnapshotManifest{manifest}}
@@ -401,7 +401,7 @@ func TestDeleteCloudBackupSnapshotFromTargetsRequiresProviderForAmbiguousMatches
 }
 
 func TestDeleteCloudBackupSnapshotFromTargetsDeletesOnlyUniqueMatch(t *testing.T) {
-	id := "renewlet-export-v2-20260609T000000Z-abcd1234"
+	id := "renewlet-export-v1-20260609T000000Z-abcd1234"
 	webdav := &fakeCloudBackupRemoteClient{listManifests: []cloudBackupSnapshotManifest{cloudBackupManifestForTest(id, []byte("renewlet"))}}
 	s3 := &fakeCloudBackupRemoteClient{}
 

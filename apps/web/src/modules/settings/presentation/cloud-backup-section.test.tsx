@@ -474,8 +474,8 @@ describe("CloudBackupSection", () => {
   it("requires credentials before creating snapshots and routes restore through the controller", async () => {
     const user = userEvent.setup();
     const snapshot = snapshotFixture({
-      id: "renewlet-export-v2-20260609T000000Z-abcd1234",
-      filename: "renewlet-export-v2-20260609T000000Z-abcd1234.zip",
+      id: "renewlet-export-v1-20260609T000000Z-abcd1234",
+      filename: "renewlet-export-v1-20260609T000000Z-abcd1234.zip",
       createdAt: "2026-06-09T00:00:00.000Z",
       sizeBytes: 1024,
     });
@@ -490,7 +490,7 @@ describe("CloudBackupSection", () => {
 
     rerender(<CloudBackupSection controller={controller} />);
     expect(screen.getAllByText("WebDAV").length).toBeGreaterThan(0);
-    await user.click(screen.getByRole("button", { name: "恢复「renewlet-export-v2-20260609T000000Z-abcd1234.zip」" }));
+    await user.click(screen.getByRole("button", { name: "恢复「renewlet-export-v1-20260609T000000Z-abcd1234.zip」" }));
 
     expect(restoreSnapshot).toHaveBeenCalledWith(snapshot);
   });
@@ -498,12 +498,12 @@ describe("CloudBackupSection", () => {
   it("shows only snapshots for the selected provider and keeps row actions scoped", async () => {
     const user = userEvent.setup();
     const webdavSnapshot = snapshotFixture({
-      id: "renewlet-export-v2-20260609T080000Z-webdav",
+      id: "renewlet-export-v1-20260609T080000Z-webdav",
       filename: "renewlet-webdav.zip",
       sha256: "b".repeat(64),
     });
     const s3Snapshot = snapshotFixture({
-      id: "renewlet-export-v2-20260609T081000Z-s3",
+      id: "renewlet-export-v1-20260609T081000Z-s3",
       filename: "renewlet-s3.zip",
       provider: "s3",
       createdAt: "2026-06-09T08:10:00.000Z",

@@ -1,4 +1,9 @@
-import { importPayloadSchema, type ImportSubscription, type RenewletExportV2 } from "@/lib/api/schemas/import-export";
+import {
+  fromRenewletExportSettingsV1,
+  importPayloadSchema,
+  type ImportSubscription,
+  type RenewletExportV1,
+} from "@/lib/api/schemas/import-export";
 import { getIntlCurrencySymbol, SUPPORTED_EXCHANGE_RATE_CURRENCIES } from "@/lib/currency-data";
 import type { CustomConfig } from "@/types/config";
 import { DISABLED_REMINDER_DAYS, INHERIT_REMINDER_DAYS, MAX_REMINDER_DAYS, type AppSettings } from "@/types/subscription";
@@ -95,11 +100,11 @@ const WALLOS_AUDIT_FIELDS = [
 ] as const;
 
 export function buildFromRenewletExport(
-  data: RenewletExportV2,
+  data: RenewletExportV1,
   context: ImportBuildBaseContext,
   assetFiles = new Map<string, ImportAssetSource>(),
 ): PreparedImport {
-  // Renewlet v2 备份中的资产路径必须先转为本地待上传资产，不能直接把 ZIP 内路径写回订阅 logo。
+  // Renewlet v1 备份中的资产路径必须先转为本地待上传资产，不能直接把 ZIP 内路径写回订阅 logo。
   const warnings: string[] = [];
   const assets: ImportAssetRef[] = [];
   const subscriptions = data.data.subscriptions.map((subscription, index) => {
@@ -139,11 +144,12 @@ export function buildFromRenewletExport(
       },
     };
   });
+  // v1 缺少 locale 表示“不覆盖目标账号语言”，转换结果必须保持局部 settings patch 语义。
   return {
     payload: importPayloadSchema.parse({
       source: "renewlet",
       subscriptions,
-      settings: data.data.settings,
+      settings: fromRenewletExportSettingsV1(data.data.settings),
       customConfig: prepareRenewletExportCustomConfig(data.data.customConfig, assetFiles, assets),
       exchangeRateSnapshots: data.data.exchangeRateSnapshots,
     }),
@@ -153,10 +159,10 @@ export function buildFromRenewletExport(
 }
 
 function prepareRenewletExportCustomConfig(
-  config: RenewletExportV2["data"]["customConfig"],
+  config: RenewletExportV1["data"]["customConfig"],
   assetFiles: Map<string, ImportAssetSource>,
   assets: ImportAssetRef[],
-): RenewletExportV2["data"]["customConfig"] {
+): RenewletExportV1["data"]["customConfig"] {
   if (!config) return undefined;
   return {
     ...config,

@@ -264,6 +264,13 @@ func cloudBackupExportSettings(app core.App, user *core.Record) (map[string]inte
 		ai["baseUrl"] = ""
 		ai["apiKey"] = ""
 	}
+	// Go 无法复用 shared Zod helper，必须镜像同一 v1 投影：auto 省略，明确偏好才写入旧 locale。
+	// 缺失 locale 的导入会保留目标账号偏好，不能在导出端把 auto 固化为某个实际语言。
+	localePreference, _ := out["localePreference"].(string)
+	delete(out, "localePreference")
+	if localePreference == string(localeZhCN) || localePreference == string(localeEnUS) {
+		out["locale"] = localePreference
+	}
 	return out, true, nil
 }
 

@@ -7,7 +7,6 @@ const IMPORT_MESSAGE_KEYS: Record<string, MessageKey> = {
   IMPORT_CONFIDENCE_INVALID: "import.error.confidenceInvalid",
   IMPORT_ERROR_FILE_TOO_LARGE: "import.fileTooLarge",
   IMPORT_ERROR_UNRECOGNIZED_FILE: "import.error.unrecognizedFile",
-  IMPORT_ERROR_UNSUPPORTED_RENEWLET_VERSION: "import.error.unsupportedRenewletVersion",
   IMPORT_ERROR_WALLOS_TABLE_TOO_LARGE: "import.error.wallosTableTooLarge",
   IMPORT_ERROR_WORKER_PARSE_FAILED: "import.error.workerParseFailed",
   IMPORT_KEY_REQUIRED: "import.error.keyRequired",

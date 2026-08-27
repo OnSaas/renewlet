@@ -1921,12 +1921,7 @@ msgstr "This image could not be optimized. Choose a smaller, clear screenshot."
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:464
 msgid "import.error.unrecognizedFile"
-msgstr "Import file is not recognized. Choose a Renewlet v2 export or a Wallos export/backup."
-
-#. js-lingui-explicit-id
-#: src/i18n/descriptors/subscription.ts:467
-msgid "import.error.unsupportedRenewletVersion"
-msgstr "Renewlet v1 backups are not supported. Use the pre-upgrade version to create a v2 export, then import it again."
+msgstr "Import file is not recognized. Choose a Renewlet v1 export or a Wallos export/backup."
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:624
