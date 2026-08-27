@@ -684,6 +684,7 @@ function checkReleaseBranchWorkflowTriggers() {
   const workflows = [
     { path: ".github/workflows/ci.yml", name: "CI" },
     { path: ".github/workflows/build-smoke.yml", name: "Build Smoke" },
+    { path: ".github/workflows/playwright-e2e.yml", name: "Playwright E2E" },
   ];
 
   // main/release push 不跑分支质量门；合并前看 PR，发布看 tag，避免稳定版合入后和 Release Publish 重复。
@@ -723,6 +724,13 @@ function checkReleaseBranchWorkflowTriggers() {
 
   if (!readFileSync(join(repoRoot, ".github/workflows/build-smoke.yml"), "utf8").includes("workflow_dispatch:")) {
     throw new Error("Build Smoke must keep workflow_dispatch for manual no-secret build verification.");
+  }
+
+  const playwrightWorkflow = readFileSync(join(repoRoot, ".github/workflows/playwright-e2e.yml"), "utf8");
+  for (const trigger of ["  schedule:", "  workflow_dispatch:"]) {
+    if (!playwrightWorkflow.includes(trigger)) {
+      throw new Error(`Playwright E2E must keep ${trigger.trim()} for main monitoring and manual verification.`);
+    }
   }
 }
 
