@@ -35,6 +35,7 @@ import { checkCloudflareMigrationSafety } from "./check-cloudflare-migration-saf
 import { checkCustomHeadHTMLDeployContract } from "./check-custom-head-html-deploy-contract.mjs";
 import { checkDockerBuildContract } from "./check-docker-build-contract.mjs";
 import { checkSyncRenewletUpstream } from "./check-deploy-sync-upstream.mjs";
+import { checkWorkflowContracts } from "./check-workflow-contracts.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const deployScript = join(repoRoot, "deploy/docker-deploy.sh");
@@ -675,65 +676,6 @@ function checkCloudflareWorkflowBuildMetadata() {
   }
 }
 
-function workflowTriggerBlock(content, trigger) {
-  const match = new RegExp(`^  ${trigger}:\\n(?<body>(?:    .*(?:\\n|$))*)`, "m").exec(content);
-  return match?.groups?.body ?? "";
-}
-
-function checkReleaseBranchWorkflowTriggers() {
-  const workflows = [
-    { path: ".github/workflows/ci.yml", name: "CI" },
-    { path: ".github/workflows/build-smoke.yml", name: "Build Smoke" },
-    { path: ".github/workflows/playwright-e2e.yml", name: "Playwright E2E" },
-  ];
-
-  // main/release push 不跑分支质量门；合并前看 PR，发布看 tag，避免稳定版合入后和 Release Publish 重复。
-  for (const workflow of workflows) {
-    const content = readFileSync(join(repoRoot, workflow.path), "utf8");
-    const pullRequestBlock = workflowTriggerBlock(content, "pull_request");
-    const pushBlock = workflowTriggerBlock(content, "push");
-
-    for (const snippet of ["      - dev", "      - main", '      - "release/**"']) {
-      if (!pullRequestBlock.includes(snippet)) {
-        throw new Error(`${workflow.name} pull_request trigger must keep branch snippet: ${snippet.trim()}`);
-      }
-    }
-    for (const snippet of ["      - dev"]) {
-      if (!pushBlock.includes(snippet)) {
-        throw new Error(`${workflow.name} push trigger must keep branch snippet: ${snippet.trim()}`);
-      }
-    }
-    for (const blockedBranch of ["      - main", "release/"]) {
-      if (pushBlock.includes(blockedBranch)) {
-        throw new Error(`${workflow.name} push trigger must not include ${blockedBranch.trim()}; release checks run on PR and tag workflows.`);
-      }
-    }
-  }
-
-  const releaseWorkflow = readFileSync(join(repoRoot, ".github/workflows/release-publish.yml"), "utf8");
-  for (const snippet of [
-    "Validate stable tag source",
-    "github.repository == 'zhiyingzzhou/renewlet' && steps.version.outputs.is-stable == 'true'",
-    "git fetch origin main:refs/remotes/origin/main",
-    "git merge-base --is-ancestor \"$TAG_SHA\" \"$MAIN_SHA\"",
-  ]) {
-    if (!releaseWorkflow.includes(snippet)) {
-      throw new Error(`release-publish.yml must keep stable tag source guard: ${snippet}`);
-    }
-  }
-
-  if (!readFileSync(join(repoRoot, ".github/workflows/build-smoke.yml"), "utf8").includes("workflow_dispatch:")) {
-    throw new Error("Build Smoke must keep workflow_dispatch for manual no-secret build verification.");
-  }
-
-  const playwrightWorkflow = readFileSync(join(repoRoot, ".github/workflows/playwright-e2e.yml"), "utf8");
-  for (const trigger of ["  schedule:", "  workflow_dispatch:"]) {
-    if (!playwrightWorkflow.includes(trigger)) {
-      throw new Error(`Playwright E2E must keep ${trigger.trim()} for main monitoring and manual verification.`);
-    }
-  }
-}
-
 function checkRuntimeReleaseSecretPathRemoved() {
   const removedHelper = join(repoRoot, "scripts/write-cloudflare-worker-secrets-file.mjs");
   const removedRuntimeReleaseSecretEnv = ["RENEWLET", "GITHUB", "TOKEN"].join("_");
@@ -786,7 +728,7 @@ checkCloudflareFreshD1Migrations();
 checkCloudflareDeployButtonVars();
 checkCloudflareDeployButtonVersionFallback();
 checkCloudflareWorkflowBuildMetadata();
-checkReleaseBranchWorkflowTriggers();
+checkWorkflowContracts(repoRoot);
 checkRuntimeReleaseSecretPathRemoved();
 checkSyncRenewletUpstream(repoRoot);
 checkComposeConfig();

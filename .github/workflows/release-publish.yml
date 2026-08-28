@@ -194,20 +194,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Generate Docker Hub overview
-        # Docker Hub Overview 没有 GitHub 仓库上下文；同步前必须把 README 相对链接改成外站可访问的绝对 URL。
-        run: node scripts/dockerhub-overview.mjs --ref "${GITHUB_SHA}" --output tmp/dockerhub/README.md --check
-
-      - name: Update Docker Hub overview
-        # docker push 只写镜像 manifest；仓库 Overview 是独立元数据，必须随官方发布显式同步。
-        uses: peter-evans/dockerhub-description@v5
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: zhiyingzzhou/renewlet
-          short-description: Self-hosted subscription ledger and renewal reminders
-          readme-filepath: ./tmp/dockerhub/README.md
-
   cloudflare-check:
     needs:
       - metadata
