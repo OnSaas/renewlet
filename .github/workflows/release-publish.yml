@@ -194,20 +194,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Generate Docker Hub overview
-        # Docker Hub Overview 没有 GitHub 仓库上下文；同步前必须把 README 相对链接改成外站可访问的绝对 URL。
-        run: node scripts/dockerhub-overview.mjs --ref "${GITHUB_SHA}" --output tmp/dockerhub/README.md --check
-
-      - name: Update Docker Hub overview
-        # docker push 只写镜像 manifest；仓库 Overview 是独立元数据，必须随官方发布显式同步。
-        uses: peter-evans/dockerhub-description@v5
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: zhiyingzzhou/renewlet
-          short-description: Self-hosted subscription ledger and renewal reminders
-          readme-filepath: ./tmp/dockerhub/README.md
-
   cloudflare-check:
     needs:
       - metadata
@@ -341,7 +327,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     concurrency:
       # 不同 stable tag 也可能指向同一生产 D1；生产 migration 与 Worker 覆盖必须跨 tag 串行完成。
       group: production-cloudflare-${{ github.repository }}
@@ -351,6 +337,7 @@ jobs:
       name: production-cloudflare
     env:
       CI_WRANGLER_CONFIG: wrangler.generated.jsonc
+      CI_WRANGLER_MAINTENANCE_CONFIG: wrangler.maintenance.generated.jsonc
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       WORKER_NAME: ${{ secrets.WORKER_NAME }}
@@ -398,25 +385,8 @@ jobs:
       - name: Build Cloudflare assets
         run: pnpm build:cloudflare
 
-      # 生产恢复点属于本次发布证据，必须在 migration/backfill 对 D1 产生写入前捕获。
-      - name: Capture D1 Time Travel checkpoint
-        id: d1-checkpoint
-        run: pnpm exec tsx scripts/cloudflare-d1-checkpoint.ts capture --config "$CI_WRANGLER_CONFIG"
-
-      - name: Apply D1 migrations
-        run: pnpm cloudflare:migrations:apply --config "$CI_WRANGLER_CONFIG"
-
-      - name: Ensure Cloudflare Queues
-        run: pnpm cloudflare:queues:ensure
-
-      - name: Deploy Worker
-        run: pnpm exec wrangler deploy --config "$CI_WRANGLER_CONFIG"
-
-      - name: Report manual D1 recovery command
-        if: ${{ failure() && steps.d1-checkpoint.outputs.bookmark != '' }}
-        env:
-          D1_TIME_TRAVEL_BOOKMARK: ${{ steps.d1-checkpoint.outputs.bookmark }}
-        run: pnpm exec tsx scripts/cloudflare-d1-checkpoint.ts recovery-hint --config "$CI_WRANGLER_CONFIG"
+      - name: Deploy Renewlet through the exclusive migration orchestrator
+        run: pnpm deploy -- --config "$CI_WRANGLER_CONFIG" --maintenance-config "$CI_WRANGLER_MAINTENANCE_CONFIG"
 
   fork-notice:
     needs: metadata

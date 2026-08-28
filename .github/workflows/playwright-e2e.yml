@@ -1,7 +1,15 @@
 name: Playwright E2E
 
-# nightly 跑完整 Playwright，release tag 只跑 release smoke；两条线分开，避免发布阻断门被长套件 flaky 放大。
+# schedule 固定观察默认分支 main；dev push 与相关 PR 前置守门，main/release push 不重复跑。
 on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - "release/**"
+  push:
+    branches:
+      - dev
   schedule:
     - cron: "37 18 * * *"
   workflow_dispatch:
