@@ -676,3 +676,18 @@ msgstr "黄"
 #. js-lingui-explicit-id
 msgid "locale.auto"
 msgstr "跟随当前设备"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/common.ts:6
+msgid "exchangeRates.refreshing"
+msgstr "刷新中..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/common.ts:7
+msgid "exchangeRates.updated"
+msgstr "最新汇率数据已获取"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/common.ts:8
+msgid "exchangeRates.failedWithFallback"
+msgstr "汇率获取失败，当前使用备用汇率。{error}"

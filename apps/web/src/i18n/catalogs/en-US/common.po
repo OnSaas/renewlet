@@ -676,3 +676,18 @@ msgstr "Yellow"
 #. js-lingui-explicit-id
 msgid "locale.auto"
 msgstr "Follow this device"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/common.ts:6
+msgid "exchangeRates.refreshing"
+msgstr "Refreshing..."
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/common.ts:7
+msgid "exchangeRates.updated"
+msgstr "Latest exchange-rate data fetched"
+
+#. js-lingui-explicit-id
+#: src/i18n/descriptors/common.ts:8
+msgid "exchangeRates.failedWithFallback"
+msgstr "Could not fetch exchange rates. Fallback rates are currently being used. {error}"

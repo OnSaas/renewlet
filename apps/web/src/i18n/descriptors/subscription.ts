@@ -591,7 +591,6 @@ export const messages = [
   msg({ id: "statistics.title", message: "统计分析" }),
   msg({ id: "statistics.ratesUpdatedAt", message: "(汇率更新于 {date})" }),
   msg({ id: "statistics.refreshRates", message: "刷新汇率" }),
-  msg({ id: "statistics.ratesError", message: "汇率获取失败，使用备用汇率。{error}" }),
   msg({ id: "statistics.overview", message: "总体统计" }),
   msg({ id: "statistics.personalCostBasis", message: "按我的份额统计" }),
   msg({ id: "statistics.activeSubscriptions", message: "活跃订阅" }),

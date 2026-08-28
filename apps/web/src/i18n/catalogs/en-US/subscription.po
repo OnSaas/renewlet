@@ -2309,11 +2309,6 @@ msgid "dashboard.ratesLoading"
 msgstr "Loading rates..."
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/subscription.ts:592
-msgid "statistics.ratesError"
-msgstr "Could not fetch exchange rates. Fallback rates are being used. {error}"
-
-#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:405
 msgid "import.wallosGuideDbNote"
 msgstr "No Logo files"

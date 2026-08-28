@@ -1962,11 +1962,6 @@ msgid "settings.builtInIconIndexUpToDate"
 msgstr "Already up to date"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/settings.ts:636
-msgid "settings.ratesUpdatedDescription"
-msgstr "Latest exchange-rate data has been fetched."
-
-#. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:551
 msgid "settings.cloudBackupRestoreReadyResult"
 msgstr "Opened the import preview; review the create, replace, and skip items before applying the restore."
@@ -2567,11 +2562,6 @@ msgid "settings.builtInIconIndexRefreshing"
 msgstr "Updating..."
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/settings.ts:573
-msgid "settings.ratesUpdating"
-msgstr "Updating..."
-
-#. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:129
 msgid "settings.builtInIconIndexBadge.refreshFailed"
 msgstr "Update failed"
@@ -2962,11 +2952,6 @@ msgid "settings.exchange"
 msgstr "Exchange rates and reporting currency"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/settings.ts:635
-msgid "settings.ratesUpdated"
-msgstr "Exchange rates updated"
-
-#. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:575
 msgid "settings.ratesWarning"
 msgstr "Rates were updated. {currencies} is temporarily filled from {sources}."
@@ -2980,11 +2965,6 @@ msgstr "Rate source"
 #: src/i18n/descriptors/settings.ts:640
 msgid "settings.exchangeRateProviderSaved"
 msgstr "Rate source saved"
-
-#. js-lingui-explicit-id
-#: src/i18n/descriptors/settings.ts:574
-msgid "settings.ratesError"
-msgstr "Could not fetch exchange rates. Fallback rates are being used. {error}"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:248

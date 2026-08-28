@@ -1962,11 +1962,6 @@ msgid "settings.builtInIconIndexUpToDate"
 msgstr "已是最新版本"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/settings.ts:636
-msgid "settings.ratesUpdatedDescription"
-msgstr "已获取最新汇率数据"
-
-#. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:551
 msgid "settings.cloudBackupRestoreReadyResult"
 msgstr "已进入导入预览；确认新增、替换和跳过项后再应用恢复。"
@@ -2567,11 +2562,6 @@ msgid "settings.builtInIconIndexRefreshing"
 msgstr "更新中..."
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/settings.ts:573
-msgid "settings.ratesUpdating"
-msgstr "更新中..."
-
-#. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:129
 msgid "settings.builtInIconIndexBadge.refreshFailed"
 msgstr "更新失败"
@@ -2962,11 +2952,6 @@ msgid "settings.exchange"
 msgstr "汇率与统计货币"
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/settings.ts:635
-msgid "settings.ratesUpdated"
-msgstr "汇率已更新"
-
-#. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:575
 msgid "settings.ratesWarning"
 msgstr "汇率已更新，{currencies} 暂用 {sources} 补齐。"
@@ -2980,11 +2965,6 @@ msgstr "汇率来源"
 #: src/i18n/descriptors/settings.ts:640
 msgid "settings.exchangeRateProviderSaved"
 msgstr "汇率来源已保存"
-
-#. js-lingui-explicit-id
-#: src/i18n/descriptors/settings.ts:574
-msgid "settings.ratesError"
-msgstr "汇率获取失败，当前使用备用汇率。{error}"
 
 #. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:248

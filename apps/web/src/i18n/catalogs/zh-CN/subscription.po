@@ -2309,11 +2309,6 @@ msgid "dashboard.ratesLoading"
 msgstr "汇率加载中..."
 
 #. js-lingui-explicit-id
-#: src/i18n/descriptors/subscription.ts:592
-msgid "statistics.ratesError"
-msgstr "汇率获取失败，使用备用汇率。{error}"
-
-#. js-lingui-explicit-id
 #: src/i18n/descriptors/subscription.ts:405
 msgid "import.wallosGuideDbNote"
 msgstr "没有 Logo 文件"
