@@ -9,12 +9,12 @@ import {
 import { moneyToNumber } from "@renewlet/shared/money";
 import {
   DEFAULT_SUBSCRIPTION_ADVANCED_FILTERS,
+  SUBSCRIPTION_SORT_OPTIONS,
   SUBSCRIPTION_PAYMENT_METHOD_NONE_VALUE,
   buildSubscriptionListFilters,
   filterSubscriptions,
   filterSubscriptionsByListFilters,
   hasActiveSubscriptionAdvancedFilters,
-  hasActiveSubscriptionControls,
   hasActiveSubscriptionFilters,
   sortSubscriptions,
   type SubscriptionFilterState,
@@ -69,6 +69,7 @@ function subscription(overrides: SubscriptionOverrides = {}): Subscription {
 function sortIds(subscriptions: Subscription[], sortOption: SubscriptionSortOption) {
   return sortSubscriptions(subscriptions, {
     sortOption,
+    today: assertDateOnly("2026-01-01"),
     defaultCurrency: "CNY",
     convert,
     locale: "en-US",
@@ -107,6 +108,38 @@ describe("subscription sorting", () => {
     ]);
   });
 
+  it("groups effective active subscriptions before every inactive status inside each pinned group", () => {
+    const subscriptions = [
+      subscription({ id: "regular-paused", status: "paused", name: "A" }),
+      subscription({ id: "regular-active", status: "active", name: "Z" }),
+      subscription({ id: "pinned-cancelled", status: "cancelled", pinned: true, name: "A" }),
+      subscription({ id: "pinned-trial", status: "trial", pinned: true, name: "Z" }),
+      subscription({ id: "legacy-overdue", status: "active", nextBillingDate: assertDateOnly("2025-12-31") }),
+      subscription({ id: "explicit-expired-future", status: "expired", nextBillingDate: assertDateOnly("2027-01-01") }),
+    ];
+
+    expect(sortIds(subscriptions, "name_asc")).toEqual([
+      "pinned-trial",
+      "pinned-cancelled",
+      "regular-active",
+      "regular-paused",
+      "legacy-overdue",
+      "explicit-expired-future",
+    ]);
+    const groupRank = new Map([
+      ["pinned-trial", 0],
+      ["pinned-cancelled", 1],
+      ["regular-active", 2],
+      ["regular-paused", 3],
+      ["legacy-overdue", 3],
+      ["explicit-expired-future", 3],
+    ]);
+    for (const sortOption of SUBSCRIPTION_SORT_OPTIONS) {
+      const ranks = sortIds(subscriptions, sortOption).map((id) => groupRank.get(id));
+      expect(ranks, sortOption).toEqual([...ranks].sort((left, right) => (left ?? 0) - (right ?? 0)));
+    }
+  });
+
   it("sorts by renewal date while preserving tie order", () => {
     const subscriptions = [
       subscription({ id: "later", nextBillingDate: assertDateOnly("2026-04-01") }),
@@ -116,6 +149,44 @@ describe("subscription sorting", () => {
 
     expect(sortIds(subscriptions, "renewal_asc")).toEqual(["soon-1", "soon-2", "later"]);
     expect(sortIds(subscriptions, "renewal_desc")).toEqual(["later", "soon-1", "soon-2"]);
+  });
+
+  it("uses the next trial attention date and keeps permanent buyouts null-last in both directions", () => {
+    const subscriptions = [
+      subscription({
+        id: "trial",
+        status: "trial",
+        trialEndDate: assertDateOnly("2026-01-05"),
+        nextBillingDate: assertDateOnly("2026-02-01"),
+      }),
+      subscription({
+        id: "trial-past-end",
+        status: "trial",
+        trialEndDate: assertDateOnly("2025-12-20"),
+        nextBillingDate: assertDateOnly("2026-01-10"),
+      }),
+      subscription({
+        id: "fixed-term",
+        billingCycle: "one-time",
+        oneTimeTermCount: 1,
+        oneTimeTermUnit: "year",
+        nextBillingDate: assertDateOnly("2026-03-01"),
+      }),
+      subscription({ id: "buyout", billingCycle: "one-time", nextBillingDate: assertDateOnly("2099-01-01") }),
+    ];
+
+    expect(sortIds(subscriptions, "renewal_asc")).toEqual([
+      "trial",
+      "trial-past-end",
+      "fixed-term",
+      "buyout",
+    ]);
+    expect(sortIds(subscriptions, "renewal_desc")).toEqual([
+      "fixed-term",
+      "trial-past-end",
+      "trial",
+      "buyout",
+    ]);
   });
 
   it("sorts by monthly cost after currency conversion and cycle normalization", () => {
@@ -177,16 +248,15 @@ describe("subscription filter state", () => {
     selectedTags: [],
   };
 
-  it("keeps sort separate from filtered-count state but includes it in clearable controls", () => {
+  it("detects basic and advanced filters without treating sorting as a filter", () => {
     expect(hasActiveSubscriptionFilters(emptyFilters)).toBe(false);
     expect(hasActiveSubscriptionAdvancedFilters(DEFAULT_SUBSCRIPTION_ADVANCED_FILTERS)).toBe(false);
-    expect(hasActiveSubscriptionControls(emptyFilters, "default")).toBe(false);
-    expect(hasActiveSubscriptionControls(emptyFilters, "monthly_cost_desc")).toBe(true);
-    expect(hasActiveSubscriptionControls(emptyFilters, "default", {
+    expect(hasActiveSubscriptionAdvancedFilters({
       ...DEFAULT_SUBSCRIPTION_ADVANCED_FILTERS,
       pinnedFilter: "yes",
     })).toBe(true);
 
+    expect(hasActiveSubscriptionFilters({ ...emptyFilters, searchQuery: "   " })).toBe(false);
     expect(hasActiveSubscriptionFilters({ ...emptyFilters, searchQuery: "cloud" })).toBe(true);
     expect(hasActiveSubscriptionFilters({ ...emptyFilters, selectedCategories: ["finance"] })).toBe(true);
   });

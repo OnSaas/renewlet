@@ -19,7 +19,10 @@ import type {
 import { compareMoney } from "@renewlet/shared/money";
 import { SUBSCRIPTION_PAYMENT_METHOD_NONE } from "@renewlet/shared/schemas/subscriptions";
 import { DISABLED_REMINDER_DAYS, INHERIT_REMINDER_DAYS } from "@renewlet/shared/runtime";
-import { getEffectiveSubscriptionStatus } from "./subscription-status";
+import {
+  getEffectiveSubscriptionStatus,
+  isEffectivelyInactiveSubscription,
+} from "./subscription-status";
 
 export interface SubscriptionFilterState {
   searchQuery: string;
@@ -82,6 +85,7 @@ export type SubscriptionRenewalFilter = (typeof SUBSCRIPTION_RENEWAL_FILTERS)[nu
 
 export interface SubscriptionSortContext {
   sortOption: SubscriptionSortOption;
+  today: DateOnly | string;
   defaultCurrency: string;
   convert: (amount: number | string, from: string, to: string) => number;
   locale?: Locale;
@@ -209,38 +213,77 @@ function comparePinnedFirst(left: SubscriptionCollectionItem, right: Subscriptio
   return left.pinned ? -1 : 1;
 }
 
-/** 按指定选项对订阅排序；置顶分组永远优先，相同排序值保持传入顺序，避免列表无意义跳动。 */
+function nextAttentionDate(
+  subscription: SubscriptionCollectionItem,
+  today: DateOnly | string,
+  inactive: boolean,
+): DateOnly | string | null {
+  if (inactive) return subscription.nextBillingDate;
+  if (subscription.billingCycle === "one-time" && !subscription.oneTimeTermCount) return null;
+  if (subscription.status !== "trial") return subscription.nextBillingDate;
+
+  const candidates = [subscription.trialEndDate, subscription.nextBillingDate]
+    .filter((date): date is DateOnly => date !== undefined && compareDateOnly(date, today) >= 0);
+  return candidates.reduce<DateOnly | string | null>(
+    (earliest, date) => earliest === null || compareDateOnly(date, earliest) < 0 ? date : earliest,
+    null,
+  );
+}
+
+function compareNullableDateOnly(
+  left: DateOnly | string | null,
+  right: DateOnly | string | null,
+  direction: 1 | -1,
+): number {
+  if (left === null) return right === null ? 0 : 1;
+  if (right === null) return -1;
+  return compareDateOnly(left, right) * direction;
+}
+
+/** 按指定选项对订阅排序；相同排序值保持传入顺序，避免列表无意义跳动。 */
 export function sortSubscriptions<T extends SubscriptionCollectionItem>(
   subscriptions: readonly T[],
-  { sortOption, defaultCurrency, convert, locale = DEFAULT_LOCALE }: SubscriptionSortContext,
+  { sortOption, today, defaultCurrency, convert, locale = DEFAULT_LOCALE }: SubscriptionSortContext,
 ): T[] {
-  if (sortOption === "default") {
-    return Array.from(subscriptions).sort((left, right) => comparePinnedFirst(left, right));
-  }
-
   const direction = getSortDirection(sortOption);
-  const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
-  const decorated = subscriptions.map((subscription, index) => ({
-    subscription,
-    index,
-    monthlyCost:
-      sortOption === "monthly_cost_asc" || sortOption === "monthly_cost_desc"
-        ? calculateMonthlyCost(subscription, defaultCurrency, convert)
-        : null,
-  }));
+  const sortsByAttentionDate = sortOption === "renewal_asc" || sortOption === "renewal_desc";
+  const collator = sortOption === "name_asc" || sortOption === "name_desc"
+    ? new Intl.Collator(locale, { sensitivity: "base", numeric: true })
+    : null;
+  const decorated = subscriptions.map((subscription, index) => {
+    const inactive = isEffectivelyInactiveSubscription(subscription, today);
+    return {
+      subscription,
+      index,
+      inactive,
+      attentionDate: sortsByAttentionDate ? nextAttentionDate(subscription, today, inactive) : null,
+      monthlyCost:
+        sortOption === "monthly_cost_asc" || sortOption === "monthly_cost_desc"
+          ? calculateMonthlyCost(subscription, defaultCurrency, convert)
+          : null,
+    };
+  });
 
   return decorated
     .sort((left, right) => {
       const pinnedComparison = comparePinnedFirst(left.subscription, right.subscription);
       if (pinnedComparison !== 0) return pinnedComparison;
 
+      // 置顶是用户的人工覆盖意图；只在同一置顶组内按生命周期分组，不能把置顶的非活跃项压到未置顶项之后。
+      if (left.inactive !== right.inactive) return left.inactive ? 1 : -1;
+
       let comparison = 0;
 
       switch (sortOption) {
+        case "default":
+          break;
         case "renewal_asc":
         case "renewal_desc":
-          comparison = compareDateOnly(left.subscription.nextBillingDate, right.subscription.nextBillingDate);
-          break;
+          return compareNullableDateOnly(
+            left.attentionDate,
+            right.attentionDate,
+            direction,
+          ) || left.index - right.index;
         case "monthly_cost_asc":
         case "monthly_cost_desc":
           comparison = (left.monthlyCost ?? 0) - (right.monthlyCost ?? 0);
@@ -251,7 +294,7 @@ export function sortSubscriptions<T extends SubscriptionCollectionItem>(
           break;
         case "name_asc":
         case "name_desc":
-          comparison = collator.compare(left.subscription.name, right.subscription.name);
+          comparison = collator?.compare(left.subscription.name, right.subscription.name) ?? 0;
           break;
       }
 
@@ -264,7 +307,7 @@ export function sortSubscriptions<T extends SubscriptionCollectionItem>(
 /** 判断当前是否存在任何筛选条件。 */
 export function hasActiveSubscriptionFilters(filters: SubscriptionFilterState): boolean {
   return Boolean(
-    filters.searchQuery ||
+    filters.searchQuery.trim() ||
       filters.selectedCategories.length > 0 ||
       filters.statusFilter !== "all" ||
       filters.renewalFilter !== "all" ||
@@ -284,15 +327,6 @@ export function hasActiveSubscriptionAdvancedFilters(filters: SubscriptionAdvanc
       filters.reminderModeFilter !== "all" ||
       filters.repeatReminderFilter !== "all",
   );
-}
-
-/** 判断当前筛选条控件是否偏离默认状态（包含排序）。 */
-export function hasActiveSubscriptionControls(
-  filters: SubscriptionFilterState,
-  sortOption: SubscriptionSortOption,
-  advancedFilters: SubscriptionAdvancedFilterState = DEFAULT_SUBSCRIPTION_ADVANCED_FILTERS,
-): boolean {
-  return hasActiveSubscriptionFilters(filters) || hasActiveSubscriptionAdvancedFilters(advancedFilters) || sortOption !== "default";
 }
 
 function booleanFilterToQuery(value: SubscriptionBooleanFilter): boolean | undefined {

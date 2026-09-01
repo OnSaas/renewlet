@@ -12,7 +12,7 @@ import {
 } from "@renewlet/shared/schemas/public-status";
 import { customConfigSchema, type ApiCustomConfig } from "@renewlet/shared/schemas/custom-config";
 import type { ApiSubscription } from "@renewlet/shared/schemas/subscriptions";
-import { getCustomConfig, getSettings, intToBool, newId, nowIso, SUBSCRIPTION_COLUMNS, toApiSubscription } from "./db";
+import { getCustomConfig, getSettings, intToBool, newId, nowIso, toApiSubscription } from "./db";
 import { randomToken } from "./crypto";
 import { requireAuth } from "./auth";
 import { HttpError, ok, readJson, requestLocale, successJson } from "./http";
@@ -21,6 +21,7 @@ import { calendarFeedBuiltInCategoryLabelKey } from "./calendar-feed-built-in-la
 import { getExchangeRatePublicBasis } from "./exchange-rate-snapshots";
 import { requestOrigin } from "./request-origin";
 import type { AssetRow, Env, PublicStatusPageRow, SubscriptionRow } from "./types";
+import { publicStatusSubscriptionQueryPlan } from "./subscription-list-filters";
 
 const PUBLIC_STATUS_LIMIT = 500;
 const publicStatusTokenPattern = /^[A-Za-z0-9_-]{43}$/;
@@ -85,8 +86,8 @@ export async function readPublicStatus(request: Request, env: Env, token: string
   const settings = await getSettings(env, page.user_id);
   // 公开状态页属于访客界面；分类标签跟随本次请求，不继承页面 owner 的账号内容语言。
   const resolver = await newPublicStatusCategoryResolver(env, page.user_id, locale);
-  const { rows, truncated } = await listPublicStatusSubscriptions(env, page.user_id);
   const today = todayDateOnly(settings.timezone);
+  const { rows, truncated } = await listPublicStatusSubscriptions(env, page.user_id, today);
   const showPrices = intToBool(page.show_prices);
   const response = publicStatusPayloadSchema.parse({
     page: {
@@ -169,15 +170,10 @@ async function getPublicStatusPageByToken(env: Env, token: string): Promise<Publ
   `).bind(token).first<PublicStatusPageRow>();
 }
 
-async function listPublicStatusSubscriptions(env: Env, userId: string): Promise<{ rows: SubscriptionRow[]; truncated: boolean }> {
-  // 公开页顺序跟订阅列表默认口径一致；created/id 只参与内部排序，不能进入公开 allowlist。
-  const result = await env.DB.prepare(`
-    SELECT ${SUBSCRIPTION_COLUMNS}
-    FROM subscriptions
-    WHERE user_id = ? AND public_hidden = 0
-    ORDER BY pinned DESC, created_at DESC, id DESC
-    LIMIT ?
-  `).bind(userId, PUBLIC_STATUS_LIMIT + 1).all<SubscriptionRow>();
+async function listPublicStatusSubscriptions(env: Env, userId: string, today: string): Promise<{ rows: SubscriptionRow[]; truncated: boolean }> {
+  // 公开页复用私有默认集合顺序，但响应仍只经过公开 allowlist 投影。
+  const plan = publicStatusSubscriptionQueryPlan(userId, today, PUBLIC_STATUS_LIMIT + 1);
+  const result = await env.DB.prepare(plan.sql).bind(...plan.params).all<SubscriptionRow>();
   const rows = result.results.slice(0, PUBLIC_STATUS_LIMIT);
   return { rows, truncated: result.results.length > PUBLIC_STATUS_LIMIT };
 }

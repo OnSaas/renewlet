@@ -113,7 +113,7 @@ const DEFAULT_BADGE_COLOR = "hsl(var(--primary))";
 const CARD_ACTION_MENU_CONTENT_CLASSNAME = "pointer-events-auto w-max min-w-40";
 const CARD_ACTION_MENU_ITEM_CLASSNAME = "gap-2.5 px-2.5 py-2 text-sm whitespace-nowrap";
 
-type SubscriptionCardMetaTone = "muted" | "warning" | "destructive";
+type SubscriptionCardMetaTone = "muted" | "warning";
 
 type SubscriptionCardMetaItem = {
   key: string;
@@ -127,7 +127,6 @@ type SubscriptionCardMetaItem = {
 const metaToneClassNames = {
   muted: "text-muted-foreground",
   warning: "text-warning",
-  destructive: "text-destructive",
 } satisfies Record<SubscriptionCardMetaTone, string>;
 
 function SubscriptionCardMetaToken({ item }: { item: SubscriptionCardMetaItem }) {
@@ -234,8 +233,9 @@ function SubscriptionCardComponent({
   // 卡片是用户最先看到的状态入口，必须用有效状态，避免旧 active/trial 过期数据同时显示“活跃”和“即将续费”。
   const effectiveStatus = getEffectiveSubscriptionStatus(subscription, today);
   const isExpired = effectiveStatus === "expired";
+  const isInactive = isExpired || effectiveStatus === "paused" || effectiveStatus === "cancelled";
   // 这里是展示提示窗口，不等同于 Cron 通知窗口；不要把两者的阈值混用。
-  const isRenewingSoon = !isExpired && !isBuyout && daysUntilRenewal <= 7 && daysUntilRenewal >= 0;
+  const isRenewingSoon = !isInactive && !isBuyout && daysUntilRenewal <= 7 && daysUntilRenewal >= 0;
   const isTrialEndingSoon = !isExpired && subscription.status === 'trial' && daysUntilTrialEnd !== null &&
     daysUntilTrialEnd <= 3 && daysUntilTrialEnd >= 0;
   const billingDateText = isBuyout && subscription.startDate
@@ -266,7 +266,7 @@ function SubscriptionCardComponent({
       ? t("subscription.card.renewsToday")
       : t("subscription.card.renewsInDays", { days: daysUntilRenewal });
   })();
-  const billingStatusTone: SubscriptionCardMetaTone = isExpired ? "destructive" : isRenewingSoon ? "warning" : "muted";
+  const billingStatusTone: SubscriptionCardMetaTone = isRenewingSoon ? "warning" : "muted";
   const paymentConfig = subscription.paymentMethod ? paymentMethodByValue.get(subscription.paymentMethod) : undefined;
   const paymentMethodLabel = subscription.paymentMethod
     ? paymentConfig
@@ -350,7 +350,7 @@ function SubscriptionCardComponent({
       className={cn(
         "group relative h-full overflow-hidden rounded-xl border border-border bg-card p-5 shadow-card transition-all duration-300 hover:bg-card-hover",
         onViewDetails && "cursor-pointer",
-        isExpired && "border-destructive/40",
+        isInactive && "border-muted bg-muted/20 hover:bg-muted/30",
         isRenewingSoon && "border-warning/40",
         isTrialEndingSoon && "animate-pulse-glow"
       )}

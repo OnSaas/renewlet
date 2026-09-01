@@ -12,7 +12,8 @@
  * - 页面保留视图模式和布局，不承载业务规则。
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/header';
 import { BackToTopFloatButton } from '@/components/back-to-top-float-button';
 import { SubscriptionGrid } from '@/components/subscription-grid';
@@ -68,7 +69,8 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { useSubscriptionDetailDialog } from '@/hooks/use-subscription-detail-dialog';
 import { useSubscriptionCalendarDialog } from '@/hooks/use-subscription-calendar-dialog';
 import { useManagedCurrencyOptions } from '@/hooks/use-managed-currency-options';
-import { todayDateOnlyInTimeZone } from '@/lib/time/date-only';
+import { useZonedToday } from '@/hooks/use-zoned-today';
+import { syncSubscriptionCollectionBoundary } from '@/hooks/subscription-query-cache';
 import {
   SubscriptionTagFilterDrawer,
   SubscriptionTagFilterPopover,
@@ -100,12 +102,19 @@ const RENEWAL_FILTER_LABEL_KEYS: Record<SubscriptionRenewalFilter, MessageKey> =
 
 /** 订阅列表页组件。 */
 const Subscriptions = () => {
+  const settingsQuery = useSettingsEnvelope();
+  const timeZone = settingsQuery.data?.settings.timezone ?? "UTC";
+  const today = useZonedToday(timeZone);
+  const queryClient = useQueryClient();
+  const collectionBoundary = settingsQuery.data ? `${timeZone}:${today}` : null;
+  useEffect(() => {
+    if (collectionBoundary) void syncSubscriptionCollectionBoundary(queryClient, collectionBoundary);
+  }, [collectionBoundary, queryClient]);
+
   const subscriptionsQuery = useInfiniteSubscriptions();
   const subscriptions = subscriptionsQuery.subscriptions ?? EMPTY_SUBSCRIPTIONS;
   const facetsQuery = useSubscriptionFacets();
   const { fetchNextPage } = subscriptionsQuery;
-  const settingsQuery = useSettingsEnvelope();
-  const timeZone = settingsQuery.data?.settings.timezone ?? "UTC";
   const defaultCurrency = settingsQuery.data?.settings.defaultCurrency ?? "CNY";
   const exchangeRateProvider = settingsQuery.data?.settings.exchangeRateProvider;
   const inheritedReminderDays = settingsQuery.data?.settings.notificationReminderDays ?? DEFAULT_NOTIFICATION_REMINDER_DAYS;
@@ -155,7 +164,7 @@ const Subscriptions = () => {
     selectSubscriptionsForExport,
     subscriptionListFilters,
     hasActiveFilters,
-    hasActiveControls,
+    needsCollectionIndex,
     toggleCategory,
     clearSelectedCategories,
     toggleTag,
@@ -164,20 +173,22 @@ const Subscriptions = () => {
     defaultCurrency,
     convert,
     locale,
-    timeZone,
+    today,
     availableTags: facetsQuery.data?.tags ?? [],
   });
-  const indexQuery = useSubscriptionIndex(subscriptionListFilters, hasActiveControls);
+  const indexQuery = useSubscriptionIndex(subscriptionListFilters, needsCollectionIndex);
   const indexedSubscriptions = indexQuery.data?.subscriptions ?? EMPTY_SUBSCRIPTIONS;
-  const displaySourceSubscriptions = hasActiveControls ? indexedSubscriptions : subscriptions;
+  const displaySourceSubscriptions = needsCollectionIndex ? indexedSubscriptions : subscriptions;
   // index 已经是全库筛选真相源；客户端只应用用户选择的排序，不再读取轻量 DTO 中不存在的详情字段。
   const filteredSubscriptions = useMemo(
-    () => hasActiveControls ? sortSubscriptionsForDisplay(displaySourceSubscriptions) : localFilteredSubscriptions,
-    [displaySourceSubscriptions, hasActiveControls, localFilteredSubscriptions, sortSubscriptionsForDisplay],
+    () => needsCollectionIndex ? sortSubscriptionsForDisplay(displaySourceSubscriptions) : localFilteredSubscriptions,
+    [displaySourceSubscriptions, localFilteredSubscriptions, needsCollectionIndex, sortSubscriptionsForDisplay],
   );
-  const isDisplayPending = hasActiveControls && indexQuery.isPending;
-  const displayError = hasActiveControls ? indexQuery.error : subscriptionsQuery.error;
-  const retryDisplayQuery = hasActiveControls ? indexQuery.refetch : subscriptionsQuery.refetch;
+  const isDisplayPending = needsCollectionIndex && indexQuery.isPending;
+  const displayError = needsCollectionIndex ? indexQuery.error : subscriptionsQuery.error;
+  const retryDisplayQuery = needsCollectionIndex ? indexQuery.refetch : subscriptionsQuery.refetch;
+  const displayedTotal = needsCollectionIndex ? (indexQuery.data?.total ?? 0) : subscriptionsQuery.total;
+  const unfilteredTotal = hasActiveFilters ? facetsQuery.data?.total : undefined;
   const {
     editingSubscription,
     editingCollectionItem,
@@ -212,8 +223,7 @@ const Subscriptions = () => {
   const settings = settingsQuery.data?.settings ?? DEFAULT_SETTINGS;
   const priceReferenceCurrency = resolveSubscriptionPriceReferenceCurrency(settings);
   const { exportToJSON, exportToJSONWithSecrets, exportToCSV, exporting } =
-    useSubscriptionExport(config, settings, locale, selectSubscriptionsForExport, timeZone, convert);
-  const today = useMemo(() => todayDateOnlyInTimeZone(new Date(), timeZone), [timeZone]);
+    useSubscriptionExport(config, settings, locale, selectSubscriptionsForExport, today, convert);
   const {
     detailDialogOpen,
     selectedDetailSubscription,
@@ -287,8 +297,8 @@ const Subscriptions = () => {
           <div>
             <h1 className="text-2xl font-bold text-foreground">{t("subscriptions.title")}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {t("subscriptions.count", { count: filteredSubscriptions.length })}
-              {hasActiveFilters && ` ${t("subscriptions.filteredCount", { count: displaySourceSubscriptions.length })}`}
+              {t("subscriptions.count", { count: displayedTotal })}
+              {unfilteredTotal !== undefined && ` ${t("subscriptions.filteredCount", { count: unfilteredTotal })}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -443,7 +453,7 @@ const Subscriptions = () => {
                 billingCycleOptions={billingCycleOptions}
                 paymentMethodOptions={paymentMethodFilterOptions}
                 currencyOptions={currencyFilterOptions}
-                hasActiveControls={hasActiveControls}
+                hasActiveFilters={hasActiveFilters}
                 onClearFilters={clearFilters}
                 tagTestId="mobile-selected-tags"
                 advancedTestId="mobile-selected-advanced-filters"
@@ -549,7 +559,7 @@ const Subscriptions = () => {
                 billingCycleOptions={billingCycleOptions}
                 paymentMethodOptions={paymentMethodFilterOptions}
                 currencyOptions={currencyFilterOptions}
-                hasActiveControls={hasActiveControls}
+                hasActiveFilters={hasActiveFilters}
                 onClearFilters={clearFilters}
                 tagTestId="desktop-selected-tags"
                 advancedTestId="desktop-selected-advanced-filters"
@@ -615,7 +625,7 @@ const Subscriptions = () => {
               onAddToCalendar={calendarDialog.show}
               onPrefetchDetails={handlePrefetchSubscription}
             />
-            {!hasActiveControls && subscriptionsQuery.hasNextPage && (
+            {!needsCollectionIndex && subscriptionsQuery.hasNextPage && (
               <div className="mt-6 flex justify-center [overflow-anchor:none]" data-testid="subscriptions-load-more-row">
                 <Button
                   type="button"

@@ -109,7 +109,7 @@ func TestPublicStatusPageLifecycleAndPublicRoute(t *testing.T) {
 	if len(subscriptions) != 3 {
 		t.Fatalf("expected exactly three visible subscriptions, got %#v", subscriptions)
 	}
-	if names := publicStatusTestSubscriptionNames(subscriptions); strings.Join(names, ",") != "Pinned Plan,Legacy Overdue,Visible Plan" {
+	if names := publicStatusTestSubscriptionNames(subscriptions); strings.Join(names, ",") != "Pinned Plan,Visible Plan,Legacy Overdue" {
 		t.Fatalf("public subscriptions should follow list default order, got %#v", names)
 	}
 	item := publicStatusTestSubscriptionByName(t, subscriptions, "Visible Plan")

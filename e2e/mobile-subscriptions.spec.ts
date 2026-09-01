@@ -175,12 +175,14 @@ test("mobile subscription card keeps date metadata naturally on the first availa
   await expect(page.getByRole("heading", { name: "订阅列表" })).toBeVisible();
 
   const subscriptionName = uniqueE2EName(testInfo, "Netflix Pro");
+  const now = Date.now();
+  const dateOnlyFromNow = (days: number) => new Date(now + days * 86_400_000).toISOString().slice(0, 10);
   await createSubscriptionLayoutRecord(page, {
     name: subscriptionName,
     category: "hosting_domains",
     paymentMethod: "google_pay",
-    startDate: "2026-02-20",
-    nextBillingDate: "2026-05-31",
+    startDate: dateOnlyFromNow(-30),
+    nextBillingDate: dateOnlyFromNow(30),
   });
   await page.reload();
 

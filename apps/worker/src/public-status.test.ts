@@ -132,12 +132,18 @@ class PublicStatusTestStatement {
   }
 
   async all<T>(): Promise<D1Result<T>> {
-    if (this.sql.includes("FROM subscriptions")) {
-      const [userId, limit] = this.values as [string, number];
+    if (this.sql.includes("INNER JOIN subscriptions AS sub")) {
+      const [today, userId, limit] = this.values as [string, string, number];
+      const inactive = (row: SubscriptionRow) => {
+        if (row.status === "expired" || row.status === "paused" || row.status === "cancelled") return 1;
+        if (row.billing_cycle === "one-time" && !row.one_time_term_count) return 0;
+        return (row.status === "active" || row.status === "trial") && row.next_billing_date < today ? 1 : 0;
+      };
       const rows = this.state.subscriptions
         .filter((row) => row.user_id === userId && row.public_hidden === 0)
         .sort((left, right) => (
           right.pinned - left.pinned
+          || inactive(left) - inactive(right)
           || right.created_at.localeCompare(left.created_at)
           || right.id.localeCompare(left.id)
         ))
@@ -343,7 +349,7 @@ describe("public status worker handlers", () => {
     expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
     expect(data.page.showPrices).toBe(false);
     expect(data.page).not.toHaveProperty("currency");
-    expect(data.subscriptions.map((item) => item["name"])).toEqual(["Pinned Plan", "Legacy Overdue", "Later Plan", "Visible Plan"]);
+    expect(data.subscriptions.map((item) => item["name"])).toEqual(["Pinned Plan", "Later Plan", "Visible Plan", "Legacy Overdue"]);
     expect(data.subscriptions.some((item) => item["name"] === "Hidden Plan")).toBe(false);
     expect(data.subscriptions.find((item) => item["name"] === "Legacy Overdue")).toMatchObject({ status: "expired" });
     expect(data.subscriptions[0]).toEqual(expect.objectContaining({

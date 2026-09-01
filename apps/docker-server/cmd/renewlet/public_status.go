@@ -18,8 +18,7 @@ import (
 )
 
 const (
-	publicStatusSubscriptionLimit    = 500
-	publicStatusSubscriptionPageSize = 500
+	publicStatusSubscriptionLimit = 500
 )
 
 // publicStatusPageStatus 是登录用户设置页看到的公开展示页状态。
@@ -307,30 +306,21 @@ func buildPublicStatusResponse(app core.App, request *http.Request, page *core.R
 func listPublicStatusSubscriptions(app core.App, request *http.Request, page *core.Record, resolver publicStatusCategoryResolver, today string) ([]publicStatusSubscriptionView, bool, error) {
 	userID := page.GetString("user")
 	token := page.GetString("token")
-	items := []publicStatusSubscriptionView{}
-	for offset := 0; ; offset += publicStatusSubscriptionPageSize {
-		// 公开页顺序跟订阅列表默认口径一致；created/id 只参与内部排序，不能进入公开 allowlist。
-		rows, err := app.FindRecordsByFilter(
-			"subscriptions",
-			"user = {:user} && publicHidden = false",
-			"-pinned,-created,-id",
-			publicStatusSubscriptionPageSize,
-			offset,
-			dbx.Params{"user": userID},
-		)
-		if err != nil {
-			return nil, false, err
-		}
-		for _, row := range rows {
-			items = append(items, publicStatusSubscriptionFromRecord(request, token, row, resolver, page.GetBool("showPrices"), today))
-			if len(items) > publicStatusSubscriptionLimit {
-				return items[:publicStatusSubscriptionLimit], true, nil
-			}
-		}
-		if len(rows) < publicStatusSubscriptionPageSize {
-			return items, false, nil
-		}
+	publicHidden := false
+	// 公开页复用私有默认集合顺序，但不复用私有 cursor；created/id 仍只参与内部排序，不能进入公开 allowlist。
+	rows, err := listSubscriptionRecordsInDefaultOrder(app, userID, today, publicStatusSubscriptionLimit, &publicHidden)
+	if err != nil {
+		return nil, false, err
 	}
+	truncated := len(rows) > publicStatusSubscriptionLimit
+	if truncated {
+		rows = rows[:publicStatusSubscriptionLimit]
+	}
+	items := make([]publicStatusSubscriptionView, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, publicStatusSubscriptionFromRecord(request, token, row, resolver, page.GetBool("showPrices"), today))
+	}
+	return items, truncated, nil
 }
 
 func publicStatusSubscriptionFromRecord(request *http.Request, token string, row *core.Record, resolver publicStatusCategoryResolver, showPrices bool, today string) publicStatusSubscriptionView {

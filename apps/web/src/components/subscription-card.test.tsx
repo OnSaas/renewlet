@@ -550,9 +550,10 @@ describe("SubscriptionCard", () => {
     const expiredDateText = screen.getByText("已过期 3 天");
     const card = statusBadge?.closest(".group");
 
-    expect(statusBadge).toHaveClass("bg-destructive/10", "text-destructive", "border-destructive/20");
-    expect(expiredDateText.closest("div")).toHaveClass("text-destructive");
-    expect(card).toHaveClass("border-destructive/40");
+    expect(statusBadge).toHaveClass("bg-muted", "text-muted-foreground", "border-muted");
+    expect(expiredDateText.closest("div")).toHaveClass("text-muted-foreground");
+    expect(card).toHaveClass("border-muted", "bg-muted/20");
+    expect(card).not.toHaveClass("border-destructive/40");
     expectMetaFlowItemsInOrder("开始: 2026/5/15", "到期: 2026/5/15", "已过期 3 天");
   });
 
@@ -564,6 +565,15 @@ describe("SubscriptionCard", () => {
     expectMetaFlowItemsInOrder("开始: 2026/5/15", "到期: 2026/5/12");
     expect(within(metaFlow).queryByText("-6 天后续费")).not.toBeInTheDocument();
     expect(within(metaFlow).queryByText("已过期 6 天")).not.toBeInTheDocument();
+  });
+
+  it("keeps future inactive subscriptions neutral instead of applying renewal warning", () => {
+    renderSubscriptionCard({ status: "paused", nextBillingDate: assertDateOnly("2026-05-20") });
+
+    const card = screen.getByTestId("subscription-card");
+    expect(card).toHaveClass("border-muted", "bg-muted/20");
+    expect(card).not.toHaveClass("border-warning/40");
+    expect(screen.queryByText("2 天后续费")).not.toBeInTheDocument();
   });
 
   it("does not render relative renewal days for overdue cancelled subscriptions", () => {
