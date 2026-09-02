@@ -6,7 +6,7 @@
  * - 纯函数便于后续补单测，避免搜索/标签/排序逻辑散落在列表页 JSX 中。
  */
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
-import { toMonthlyAmount } from "@/lib/subscription-billing";
+import { isOneTimeBuyout, isOneTimeFixedTerm, toMonthlyAmount } from "@/lib/subscription-billing";
 import { assertDateOnly, compareDateOnly, type DateOnly } from "@/lib/time/date-only";
 import type { SubscriptionListFilters } from "@/services/subscription-service";
 import type {
@@ -28,7 +28,7 @@ export interface SubscriptionFilterState {
   searchQuery: string;
   selectedCategories: Category[];
   statusFilter: SubscriptionStatus | "all";
-  renewalFilter: SubscriptionRenewalFilter;
+  paymentTypeFilter: SubscriptionPaymentTypeFilter;
   selectedTags: string[];
 }
 
@@ -80,8 +80,14 @@ export const SUBSCRIPTION_SORT_OPTIONS = [
 /** 订阅列表排序选项。 */
 export type SubscriptionSortOption = (typeof SUBSCRIPTION_SORT_OPTIONS)[number];
 
-export const SUBSCRIPTION_RENEWAL_FILTERS = ["all", "auto", "manual", "one-time"] as const;
-export type SubscriptionRenewalFilter = (typeof SUBSCRIPTION_RENEWAL_FILTERS)[number];
+export const SUBSCRIPTION_PAYMENT_TYPE_FILTERS = [
+  "all",
+  "auto",
+  "manual",
+  "one-time-buyout",
+  "one-time-fixed-term",
+] as const;
+export type SubscriptionPaymentTypeFilter = (typeof SUBSCRIPTION_PAYMENT_TYPE_FILTERS)[number];
 
 export interface SubscriptionSortContext {
   sortOption: SubscriptionSortOption;
@@ -123,13 +129,16 @@ export function filterSubscriptions(
       return false;
     }
 
-    if (filters.renewalFilter === "one-time" && subscription.billingCycle !== "one-time") {
+    if (filters.paymentTypeFilter === "one-time-buyout" && !isOneTimeBuyout(subscription)) {
       return false;
     }
-    if (filters.renewalFilter === "auto" && (subscription.billingCycle === "one-time" || !subscription.autoRenew)) {
+    if (filters.paymentTypeFilter === "one-time-fixed-term" && !isOneTimeFixedTerm(subscription)) {
       return false;
     }
-    if (filters.renewalFilter === "manual" && (subscription.billingCycle === "one-time" || subscription.autoRenew)) {
+    if (filters.paymentTypeFilter === "auto" && (subscription.billingCycle === "one-time" || !subscription.autoRenew)) {
+      return false;
+    }
+    if (filters.paymentTypeFilter === "manual" && (subscription.billingCycle === "one-time" || subscription.autoRenew)) {
       return false;
     }
 
@@ -168,7 +177,7 @@ export function filterSubscriptionsByListFilters(
     searchQuery: filters?.q ?? "",
     selectedCategories: filters?.category ?? [],
     statusFilter: filters?.status ?? "all",
-    renewalFilter: filters?.renewal ?? "all",
+    paymentTypeFilter: filters?.paymentType ?? "all",
     selectedTags: filters?.tag ?? [],
   }, context);
 
@@ -176,6 +185,7 @@ export function filterSubscriptionsByListFilters(
     if (!matchesOptionalValues(filters?.billingCycle, subscription.billingCycle)) return false;
     if (!matchesPaymentMethod(filters?.paymentMethod, subscription.paymentMethod)) return false;
     if (!matchesOptionalValues(filters?.currency, subscription.currency)) return false;
+    if ((filters?.nextBillingFrom || filters?.nextBillingTo) && isOneTimeBuyout(subscription)) return false;
     if (filters?.nextBillingFrom && subscription.nextBillingDate < filters.nextBillingFrom) return false;
     if (filters?.nextBillingTo && subscription.nextBillingDate > filters.nextBillingTo) return false;
     if (filters?.pinned !== undefined && subscription.pinned !== filters.pinned) return false;
@@ -196,7 +206,8 @@ function calculateMonthlyCost(
   subscription: SubscriptionCollectionItem,
   defaultCurrency: string,
   convert: (amount: number | string, from: string, to: string) => number,
-): number {
+): number | null {
+  if (isOneTimeBuyout(subscription)) return null;
   const amountInDefault = convert(subscription.price, subscription.currency, defaultCurrency);
   return toMonthlyAmount(
     amountInDefault,
@@ -218,8 +229,8 @@ function nextAttentionDate(
   today: DateOnly | string,
   inactive: boolean,
 ): DateOnly | string | null {
+  if (isOneTimeBuyout(subscription)) return null;
   if (inactive) return subscription.nextBillingDate;
-  if (subscription.billingCycle === "one-time" && !subscription.oneTimeTermCount) return null;
   if (subscription.status !== "trial") return subscription.nextBillingDate;
 
   const candidates = [subscription.trialEndDate, subscription.nextBillingDate]
@@ -238,6 +249,12 @@ function compareNullableDateOnly(
   if (left === null) return right === null ? 0 : 1;
   if (right === null) return -1;
   return compareDateOnly(left, right) * direction;
+}
+
+function compareNullableNumber(left: number | null, right: number | null, direction: 1 | -1): number {
+  if (left === null) return right === null ? 0 : 1;
+  if (right === null) return -1;
+  return (left - right) * direction;
 }
 
 /** 按指定选项对订阅排序；相同排序值保持传入顺序，避免列表无意义跳动。 */
@@ -286,8 +303,7 @@ export function sortSubscriptions<T extends SubscriptionCollectionItem>(
           ) || left.index - right.index;
         case "monthly_cost_asc":
         case "monthly_cost_desc":
-          comparison = (left.monthlyCost ?? 0) - (right.monthlyCost ?? 0);
-          break;
+          return compareNullableNumber(left.monthlyCost, right.monthlyCost, direction) || left.index - right.index;
         case "price_asc":
         case "price_desc":
           comparison = compareMoney(left.subscription.price, right.subscription.price);
@@ -310,7 +326,7 @@ export function hasActiveSubscriptionFilters(filters: SubscriptionFilterState): 
     filters.searchQuery.trim() ||
       filters.selectedCategories.length > 0 ||
       filters.statusFilter !== "all" ||
-      filters.renewalFilter !== "all" ||
+      filters.paymentTypeFilter !== "all" ||
       filters.selectedTags.length > 0,
   );
 }
@@ -345,7 +361,7 @@ export function buildSubscriptionListFilters(
   if (filters.selectedCategories.length > 0) query.category = filters.selectedCategories;
   if (filters.selectedTags.length > 0) query.tag = filters.selectedTags;
   if (filters.statusFilter !== "all") query.status = filters.statusFilter;
-  if (filters.renewalFilter !== "all") query.renewal = filters.renewalFilter;
+  if (filters.paymentTypeFilter !== "all") query.paymentType = filters.paymentTypeFilter;
   if (advancedFilters.selectedBillingCycles.length > 0) query.billingCycle = advancedFilters.selectedBillingCycles;
   if (advancedFilters.selectedPaymentMethods.length > 0) query.paymentMethod = advancedFilters.selectedPaymentMethods;
   if (advancedFilters.selectedCurrencies.length > 0) query.currency = advancedFilters.selectedCurrencies;

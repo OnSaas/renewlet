@@ -111,18 +111,28 @@ describe.each(subscriptionReadPerformanceScenarios)("Worker collection read budg
       expect(boundedPage.rows).toHaveLength(scenario.expected.total);
       expect(database.readQueries).toBe(scenario.operationBudget.listReadQueries);
 
-      const plan = subscriptionCollectionPageQueryPlan(
-        "subscription-perf-owner",
+      const queryPlanFilters = [
         {},
-        "2026-08-17",
-        scenario.size + 1,
-      );
-      const details = db.prepare(`EXPLAIN QUERY PLAN ${plan.sql}`)
-        .all(...(plan.params as SQLInputValue[])) as Array<{ detail: string }>;
-      expect(details.some(({ detail }) => /SEARCH idx\b/u.test(detail))).toBe(true);
-      expect(details.some(({ detail }) => /SEARCH sub\b/u.test(detail))).toBe(true);
-      expect(details.some(({ detail }) => /SCAN idx\b/u.test(detail))).toBe(false);
-      expect(details.some(({ detail }) => /SCAN sub\b/u.test(detail))).toBe(false);
+        { paymentType: "auto" as const },
+        { paymentType: "manual" as const },
+        { paymentType: "one-time-buyout" as const },
+        { paymentType: "one-time-fixed-term" as const },
+      ];
+      for (const filters of queryPlanFilters) {
+        const plan = subscriptionCollectionPageQueryPlan(
+          "subscription-perf-owner",
+          filters,
+          "2026-08-17",
+          scenario.size + 1,
+        );
+        const details = db.prepare(`EXPLAIN QUERY PLAN ${plan.sql}`)
+          .all(...(plan.params as SQLInputValue[])) as Array<{ detail: string }>;
+        const label = filters.paymentType ?? "default";
+        expect(details.some(({ detail }) => /SEARCH idx\b/u.test(detail)), label).toBe(true);
+        expect(details.some(({ detail }) => /SEARCH sub\b/u.test(detail)), label).toBe(true);
+        expect(details.some(({ detail }) => /SCAN (?:idx|subscription_list_index)\b/u.test(detail)), label).toBe(false);
+        expect(details.some(({ detail }) => /SCAN (?:sub|subscriptions)\b/u.test(detail)), label).toBe(false);
+      }
     } finally {
       db.close();
     }
@@ -169,7 +179,7 @@ describe("Worker collection SQL limits", () => {
         currency: Array.from({ length: 50 }, (_, index) => `C${String(index).padStart(2, "0")}`),
         paymentMethod: Array.from({ length: 200 }, (_, index) => `payment-${index}`),
         status: "active" as const,
-        renewal: "auto" as const,
+        paymentType: "auto" as const,
         nextBillingFrom: "2026-01-01" as const,
         nextBillingTo: "2026-12-31" as const,
         pinned: true,

@@ -326,6 +326,15 @@ export async function putCustomConfig(env: Env, userId: string, config: unknown)
   return config;
 }
 
+function apiOneTimeTermFields(row: Pick<SubscriptionRow, "one_time_term_count" | "one_time_term_unit">) {
+  // D1 历史 NULL/非正服务期都表示买断；必须在 DTO 总入口收敛，避免非法数量穿过 shared 正整数契约。
+  if (row.one_time_term_count === null || row.one_time_term_count <= 0 || !row.one_time_term_unit) return {};
+  return {
+    oneTimeTermCount: row.one_time_term_count,
+    oneTimeTermUnit: row.one_time_term_unit,
+  };
+}
+
 export function toApiSubscriptionCollectionItem(row: SubscriptionCollectionRow): ApiSubscriptionCollectionItem {
   // cost_sharing_json 是 D1 唯一持久化形态，出站必须重新过 shared schema，防止 Worker 与 Docker costSharing 漂移。
   const costSharing = parseJsonObject(row.cost_sharing_json ?? "{}");
@@ -338,7 +347,7 @@ export function toApiSubscriptionCollectionItem(row: SubscriptionCollectionRow):
     billingCycle: row.billing_cycle,
     ...(row.custom_days === null ? {} : { customDays: row.custom_days }),
     ...(row.custom_cycle_unit === null ? {} : { customCycleUnit: row.custom_cycle_unit }),
-    ...(row.one_time_term_count && row.one_time_term_unit ? { oneTimeTermCount: row.one_time_term_count, oneTimeTermUnit: row.one_time_term_unit } : {}),
+    ...apiOneTimeTermFields(row),
     category: row.category,
     status: row.status,
     pinned: intToBool(row.pinned),
@@ -386,9 +395,7 @@ export function toPublicApiSubscription(row: SubscriptionRow) {
     billingCycle: row.billing_cycle,
     ...(row.custom_days === null ? {} : { customDays: row.custom_days }),
     ...(row.custom_cycle_unit === null ? {} : { customCycleUnit: row.custom_cycle_unit }),
-    ...(row.one_time_term_count && row.one_time_term_unit
-      ? { oneTimeTermCount: row.one_time_term_count, oneTimeTermUnit: row.one_time_term_unit }
-      : {}),
+    ...apiOneTimeTermFields(row),
     category: row.category,
     status: row.status,
     pinned: intToBool(row.pinned),

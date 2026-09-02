@@ -161,26 +161,33 @@ func TestSubscriptionDerivedStatePerformanceBudget(t *testing.T) {
 
 func assertSubscriptionProjectionQueryPlan(t *testing.T, app core.App, userID string) {
 	t.Helper()
-	base := subscriptionProjectionBaseQuery(userID, subscriptionListQuery{})
-	base.params["today"] = "2026-08-17"
-	plan := buildSubscriptionProjectionPagePlan(base, 51, nil, subscriptionProjectionExactPage, 0)
-	if strings.Contains(plan.SQL, "search_text_lower") || strings.Contains(plan.SQL, "next_billing_date AS") {
-		t.Fatalf("subscription page CTE must materialize only pagination keys:\n%s", plan.SQL)
-	}
 	var rows []struct {
 		Detail string `db:"detail"`
 	}
-	if err := app.DB().NewQuery("EXPLAIN QUERY PLAN " + plan.SQL).Bind(plan.Params).All(&rows); err != nil {
-		t.Fatal(err)
+	assertOwnerIndexed := func(query subscriptionListQuery) {
+		base := subscriptionProjectionBaseQuery(userID, query)
+		base.params["today"] = "2026-08-17"
+		plan := buildSubscriptionProjectionPagePlan(base, 51, nil, subscriptionProjectionExactPage, 0)
+		if strings.Contains(plan.SQL, "search_text_lower") || strings.Contains(plan.SQL, "next_billing_date AS") {
+			t.Fatalf("subscription page CTE must materialize only pagination keys:\n%s", plan.SQL)
+		}
+		rows = rows[:0]
+		if err := app.DB().NewQuery("EXPLAIN QUERY PLAN " + plan.SQL).Bind(plan.Params).All(&rows); err != nil {
+			t.Fatal(err)
+		}
+		details := make([]string, 0, len(rows))
+		for _, row := range rows {
+			details = append(details, row.Detail)
+		}
+		joined := strings.Join(details, "\n")
+		if !strings.Contains(joined, "SEARCH idx") || strings.Contains(joined, "SCAN idx") ||
+			strings.Contains(joined, "SCAN subscription_list_index") {
+			t.Fatalf("subscription projection must stay owner-indexed for paymentType=%q:\n%s", query.PaymentType, joined)
+		}
 	}
-	details := make([]string, 0, len(rows))
-	for _, row := range rows {
-		details = append(details, row.Detail)
-	}
-	joined := strings.Join(details, "\n")
-	if !strings.Contains(joined, "SEARCH idx") || strings.Contains(joined, "SCAN idx") ||
-		strings.Contains(joined, "SCAN subscription_list_index") {
-		t.Fatalf("subscription projection must stay owner-indexed:\n%s", joined)
+	assertOwnerIndexed(subscriptionListQuery{})
+	for _, paymentType := range []string{"auto", "manual", "one-time-buyout", "one-time-fixed-term"} {
+		assertOwnerIndexed(subscriptionListQuery{PaymentType: paymentType})
 	}
 
 	factPlan := `SELECT id FROM subscriptions

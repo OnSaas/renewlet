@@ -478,7 +478,7 @@ describe("Subscriptions page sorting", () => {
     expect(searchInput).toHaveAttribute("type", "search");
     expect(searchInput).toHaveAttribute("name", "subscription-search");
     expect(searchInput).toHaveAttribute("enterkeyhint", "search");
-    expect(within(screen.getByTestId("mobile-renewal-sort-row")).getByRole("combobox", { name: "排序" }).compareDocumentPosition(within(screen.getByTestId("mobile-advanced-tag-row")).getByRole("button", { name: "更多筛选" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(within(screen.getByTestId("mobile-payment-type-sort-row")).getByRole("combobox", { name: "排序" }).compareDocumentPosition(within(screen.getByTestId("mobile-advanced-tag-row")).getByRole("button", { name: "更多筛选" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it("keeps the AI add shortcut accessible, compact, and wired to the recognition dialog", async () => {
@@ -639,12 +639,12 @@ describe("Subscriptions page mobile tag filters", () => {
     expect(screen.queryByTestId("desktop-tag-filter")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Security" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("mobile-selected-tags")).not.toBeInTheDocument();
-    const renewalSortRow = screen.getByTestId("mobile-renewal-sort-row");
+    const paymentTypeSortRow = screen.getByTestId("mobile-payment-type-sort-row");
     const advancedTagRow = screen.getByTestId("mobile-advanced-tag-row");
     const mobileSelects = screen.getAllByRole("combobox");
     expect(mobileSelects[0]).toHaveTextContent("所有状态");
-    expect(mobileSelects[1]).toHaveTextContent("所有续订");
-    expect(within(renewalSortRow).getByRole("combobox", { name: "排序" })).toHaveTextContent("默认顺序");
+    expect(mobileSelects[1]).toHaveTextContent("所有付费类型");
+    expect(within(paymentTypeSortRow).getByRole("combobox", { name: "排序" })).toHaveTextContent("默认顺序");
     expect(within(advancedTagRow).getByRole("button", { name: "标签" })).toBeInTheDocument();
     expect(visibleSubscriptionNames()).toEqual(["Tagged Cloud", "Docs Notes", "Design Suite", "Plain Service"]);
     await user.click(within(advancedTagRow).getByRole("button", { name: "标签" }));

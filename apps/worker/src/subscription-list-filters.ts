@@ -296,8 +296,12 @@ function subscriptionListBaseQuery(
   appendSqlJsonArrayCondition(conditions, params, "idx.billing_cycle", query.billingCycle);
   appendSqlJsonArrayCondition(conditions, params, "idx.currency", query.currency);
   appendPaymentMethodCondition(conditions, params, query.paymentMethod);
-  appendRenewalCondition(conditions, query.renewal);
+  appendPaymentTypeCondition(conditions, query.paymentType);
   appendTagCondition(conditions, params, query.tag);
+  if (query.nextBillingFrom || query.nextBillingTo) {
+    // D1 用 NULL 表示长期买断服务期；日期范围只描述真实续费/到期事件，固定服务期仍正常参与。
+    conditions.push("NOT (idx.billing_cycle = 'one-time' AND COALESCE(idx.one_time_term_count, 0) <= 0)");
+  }
   if (query.nextBillingFrom) {
     conditions.push("idx.next_billing_date >= ?");
     params.push(query.nextBillingFrom);
@@ -354,16 +358,20 @@ function appendPaymentMethodCondition(conditions: string[], params: unknown[], v
   conditions.push(`(${parts.join(" OR ")})`);
 }
 
-function appendRenewalCondition(conditions: string[], renewal: SubscriptionsListQuery["renewal"]): void {
-  switch (renewal) {
+function appendPaymentTypeCondition(conditions: string[], paymentType: SubscriptionsListQuery["paymentType"]): void {
+  switch (paymentType) {
     case "auto":
       conditions.push("idx.billing_cycle != 'one-time' AND idx.auto_renew = 1");
       break;
     case "manual":
       conditions.push("idx.billing_cycle != 'one-time' AND idx.auto_renew = 0");
       break;
-    case "one-time":
-      conditions.push("idx.billing_cycle = 'one-time'");
+    case "one-time-buyout":
+      // D1 历史买断可能保存 NULL；COALESCE 后与 Docker 空数字字段落为 0 的分类语义一致。
+      conditions.push("idx.billing_cycle = 'one-time' AND COALESCE(idx.one_time_term_count, 0) <= 0");
+      break;
+    case "one-time-fixed-term":
+      conditions.push("idx.billing_cycle = 'one-time' AND COALESCE(idx.one_time_term_count, 0) > 0");
       break;
   }
 }

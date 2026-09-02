@@ -20,7 +20,7 @@ import {
   type SubscriptionAdvancedFilterState,
   type SubscriptionSortOption,
   type SubscriptionFilterState,
-  type SubscriptionRenewalFilter,
+  type SubscriptionPaymentTypeFilter,
 } from "../domain/subscription-filters";
 
 interface UseSubscriptionFiltersOptions {
@@ -47,19 +47,19 @@ export function useSubscriptionFilters(
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
   const [statusFilter, setStatusFilter] = useState<SubscriptionStatus | "all">("all");
-  const [renewalFilter, setRenewalFilter] = useState<SubscriptionRenewalFilter>("all");
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState<SubscriptionPaymentTypeFilter>("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [advancedFilters, setAdvancedFilters] = useState<SubscriptionAdvancedFilterState>(DEFAULT_SUBSCRIPTION_ADVANCED_FILTERS);
   const [sortOption, setSortOption] = useState<SubscriptionSortOption>("default");
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const filters: SubscriptionFilterState = useMemo(
-    () => ({ searchQuery: deferredSearchQuery, selectedCategories, statusFilter, renewalFilter, selectedTags }),
-    [deferredSearchQuery, renewalFilter, selectedCategories, selectedTags, statusFilter],
+    () => ({ searchQuery: deferredSearchQuery, selectedCategories, statusFilter, paymentTypeFilter, selectedTags }),
+    [deferredSearchQuery, paymentTypeFilter, selectedCategories, selectedTags, statusFilter],
   );
   const activeControlFilters: SubscriptionFilterState = useMemo(
-    () => ({ searchQuery, selectedCategories, statusFilter, renewalFilter, selectedTags }),
-    [renewalFilter, searchQuery, selectedCategories, selectedTags, statusFilter],
+    () => ({ searchQuery, selectedCategories, statusFilter, paymentTypeFilter, selectedTags }),
+    [paymentTypeFilter, searchQuery, selectedCategories, selectedTags, statusFilter],
   );
   const subscriptionListFilters = useMemo(
     () => buildSubscriptionListFilters(filters, advancedFilters),
@@ -115,7 +115,7 @@ export function useSubscriptionFilters(
     setSearchQuery("");
     setSelectedCategories([]);
     setStatusFilter("all");
-    setRenewalFilter("all");
+    setPaymentTypeFilter("all");
     setSelectedTags([]);
     setAdvancedFilters(DEFAULT_SUBSCRIPTION_ADVANCED_FILTERS);
   };
@@ -127,8 +127,8 @@ export function useSubscriptionFilters(
     setSelectedCategories,
     statusFilter,
     setStatusFilter,
-    renewalFilter,
-    setRenewalFilter,
+    paymentTypeFilter,
+    setPaymentTypeFilter,
     sortOption,
     setSortOption,
     selectedTags,

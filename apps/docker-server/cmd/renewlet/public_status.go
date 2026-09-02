@@ -70,6 +70,7 @@ type publicStatusPageView struct {
 	ShowPrices        bool                     `json:"showPrices"`
 	Currency          string                   `json:"currency,omitempty"`
 	ExchangeRateBasis *exchangeRatePublicBasis `json:"exchangeRateBasis,omitempty"`
+	AsOf              string                   `json:"asOf"`
 	GeneratedAt       string                   `json:"generatedAt"`
 	Truncated         bool                     `json:"truncated"`
 }
@@ -82,7 +83,7 @@ type publicStatusSubscriptionView struct {
 	Category         publicStatusCategoryView `json:"category"`
 	Status           string                   `json:"status"`
 	StartDate        *string                  `json:"startDate"`
-	NextBillingDate  string                   `json:"nextBillingDate"`
+	NextBillingDate  *string                  `json:"nextBillingDate"`
 	UpdatedAt        string                   `json:"updatedAt"`
 	Price            *string                  `json:"price,omitempty"`
 	Currency         string                   `json:"currency,omitempty"`
@@ -280,21 +281,24 @@ func buildPublicStatusResponse(app core.App, request *http.Request, page *core.R
 	}
 	// 公开状态页属于访客界面；分类标签跟随本次请求，不继承页面 owner 的账号内容语言。
 	resolver := newPublicStatusCategoryResolver(app, userID, requestLocale(request))
-	today := todayDateOnly(time.Now().UTC(), settings.Timezone)
+	now := time.Now().UTC()
+	today := todayDateOnly(now, settings.Timezone)
 	items, truncated, err := listPublicStatusSubscriptions(app, request, page, resolver, today)
 	if err != nil {
 		return publicStatusResponse{}, err
 	}
 	showPrices := page.GetBool("showPrices")
 	view := publicStatusPageView{
-		Title:       "Renewlet",
-		ShowPrices:  showPrices,
-		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+		Title:      "Renewlet",
+		ShowPrices: showPrices,
+		// AsOf 是 owner 账号时区下的 date-only；匿名前端不得从 UTC GeneratedAt 猜测业务日期。
+		AsOf:        today,
+		GeneratedAt: now.Format(time.RFC3339),
 		Truncated:   truncated,
 	}
 	if showPrices {
 		view.Currency = effectivePublicStatusCurrency(settings)
-		basis := exchangeRatePublicBasisForUser(app, userID, time.Now().UTC())
+		basis := exchangeRatePublicBasisForUser(app, userID, now)
 		view.ExchangeRateBasis = &basis
 	}
 	return publicStatusResponse{
@@ -325,15 +329,18 @@ func listPublicStatusSubscriptions(app core.App, request *http.Request, page *co
 
 func publicStatusSubscriptionFromRecord(request *http.Request, token string, row *core.Record, resolver publicStatusCategoryResolver, showPrices bool, today string) publicStatusSubscriptionView {
 	item := publicStatusSubscriptionView{
-		Name:            row.GetString("name"),
-		Logo:            publicStatusLogoURL(request, token, row.GetString("logo")),
-		Category:        resolver.Category(row.GetString("category")),
-		Status:          publicStatusEffectiveStatus(row, today),
-		StartDate:       nullableStringPointer(row.GetString("startDate")),
-		NextBillingDate: row.GetString("nextBillingDate"),
-		UpdatedAt:       row.GetDateTime("updated").Time().UTC().Format(time.RFC3339),
+		Name:      row.GetString("name"),
+		Logo:      publicStatusLogoURL(request, token, row.GetString("logo")),
+		Category:  resolver.Category(row.GetString("category")),
+		Status:    publicStatusEffectiveStatus(row, today),
+		StartDate: nullableStringPointer(row.GetString("startDate")),
+		UpdatedAt: row.GetDateTime("updated").Time().UTC().Format(time.RFC3339),
+	}
+	if row.GetString("billingCycle") != "one-time" || row.GetInt("oneTimeTermCount") > 0 {
+		item.NextBillingDate = nullableStringPointer(row.GetString("nextBillingDate"))
 	}
 	if showPrices {
+		oneTimeTermCount := row.GetInt("oneTimeTermCount")
 		price := moneyForRecord(row.Get("price"))
 		item.Price = &price
 		item.Currency = row.GetString("currency")
@@ -344,10 +351,8 @@ func publicStatusSubscriptionFromRecord(request *http.Request, token string, row
 		if row.GetString("customCycleUnit") != "" {
 			item.CustomCycleUnit = row.GetString("customCycleUnit")
 		}
-		if row.GetInt("oneTimeTermCount") > 0 {
-			item.OneTimeTermCount = row.GetInt("oneTimeTermCount")
-		}
-		if row.GetString("oneTimeTermUnit") != "" {
+		if oneTimeTermCount > 0 && row.GetString("oneTimeTermUnit") != "" {
+			item.OneTimeTermCount = oneTimeTermCount
 			item.OneTimeTermUnit = row.GetString("oneTimeTermUnit")
 		}
 	}

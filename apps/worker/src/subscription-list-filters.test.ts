@@ -20,7 +20,7 @@ describe("subscription collection query plan", () => {
       paymentMethod: ["paypal"],
       currency: ["USD"],
       status: "active",
-      renewal: "auto",
+      paymentType: "auto",
       nextBillingFrom: "2999-08-01",
       nextBillingTo: "2999-08-31",
       pinned: true,
@@ -67,6 +67,25 @@ describe("subscription collection query plan", () => {
       11,
     ]);
     expect(plan.sql).toContain("ORDER BY idx.pinned DESC, idx.inactive ASC, idx.created_at DESC, idx.subscription_id DESC");
+  });
+
+  it("builds mutually exclusive payment type predicates and excludes buyouts from date ranges", () => {
+    const plans = {
+      auto: subscriptionCollectionPageQueryPlan(USER_ID, { paymentType: "auto" }, "2026-08-18", 51),
+      manual: subscriptionCollectionPageQueryPlan(USER_ID, { paymentType: "manual" }, "2026-08-18", 51),
+      buyout: subscriptionCollectionPageQueryPlan(USER_ID, { paymentType: "one-time-buyout" }, "2026-08-18", 51),
+      fixed: subscriptionCollectionPageQueryPlan(USER_ID, { paymentType: "one-time-fixed-term" }, "2026-08-18", 51),
+      dateRange: subscriptionCollectionPageQueryPlan(USER_ID, {
+        nextBillingFrom: "2026-08-01",
+        nextBillingTo: "2026-08-31",
+      }, "2026-08-18", 51),
+    };
+
+    expect(plans.auto.sql).toContain("idx.billing_cycle != 'one-time' AND idx.auto_renew = 1");
+    expect(plans.manual.sql).toContain("idx.billing_cycle != 'one-time' AND idx.auto_renew = 0");
+    expect(plans.buyout.sql).toContain("idx.billing_cycle = 'one-time' AND COALESCE(idx.one_time_term_count, 0) <= 0");
+    expect(plans.fixed.sql).toContain("idx.billing_cycle = 'one-time' AND COALESCE(idx.one_time_term_count, 0) > 0");
+    expect(plans.dateRange.sql).toContain("NOT (idx.billing_cycle = 'one-time' AND COALESCE(idx.one_time_term_count, 0) <= 0)");
   });
 
   it("keeps cursor parameters out of the exact total CTE", () => {
@@ -124,7 +143,7 @@ describe("subscription collection query plan", () => {
       currency: Array.from({ length: 50 }, (_, index) => `C${String(index).padStart(2, "0")}`),
       paymentMethod: Array.from({ length: 200 }, (_, index) => `payment-${index}`),
       status: "active",
-      renewal: "auto",
+      paymentType: "auto",
       nextBillingFrom: "2026-01-01",
       nextBillingTo: "2026-12-31",
       pinned: true,

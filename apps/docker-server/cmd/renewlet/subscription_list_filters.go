@@ -36,7 +36,7 @@ type subscriptionListQuery struct {
 	PaymentMethods  []string
 	Currencies      []string
 	Status          string
-	Renewal         string
+	PaymentType     string
 	NextBillingFrom string
 	NextBillingTo   string
 	Pinned          *bool
@@ -122,7 +122,7 @@ func parseSubscriptionCollectionFilters(values url.Values, query subscriptionLis
 	if query.Status, err = parseSubscriptionListSingle(values, "status", 40, isValidSubscriptionStatus); err != nil {
 		return subscriptionListQuery{}, err
 	}
-	if query.Renewal, err = parseSubscriptionListSingle(values, "renewal", 20, isSubscriptionListRenewal); err != nil {
+	if query.PaymentType, err = parseSubscriptionListSingle(values, "paymentType", 24, isSubscriptionListPaymentType); err != nil {
 		return subscriptionListQuery{}, err
 	}
 	if query.NextBillingFrom, err = parseSubscriptionListSingle(values, "nextBillingFrom", 10, isValidDateOnly); err != nil {
@@ -151,7 +151,7 @@ func parseSubscriptionCollectionFilters(values url.Values, query subscriptionLis
 
 func isSubscriptionCollectionFilterKey(key string) bool {
 	switch key {
-	case "q", "category", "tag", "billingCycle", "paymentMethod", "currency", "status", "renewal",
+	case "q", "category", "tag", "billingCycle", "paymentMethod", "currency", "status", "paymentType",
 		"nextBillingFrom", "nextBillingTo", "pinned", "publicHidden", "reminderMode", "repeatReminder":
 		return true
 	default:
@@ -276,8 +276,12 @@ func subscriptionProjectionBaseQuery(userID string, query subscriptionListQuery)
 	appendSQLInCondition(&base, "idx.billing_cycle", "billingCycle", query.BillingCycles)
 	appendSQLInCondition(&base, "idx.currency", "currency", query.Currencies)
 	appendSQLPaymentMethodCondition(&base, query.PaymentMethods)
-	appendSQLRenewalCondition(&base, query.Renewal)
+	appendSQLPaymentTypeCondition(&base, query.PaymentType)
 	appendSQLTagCondition(&base, query.Tags)
+	if query.NextBillingFrom != "" || query.NextBillingTo != "" {
+		// PocketBase 投影用 0 表示长期买断服务期；日期范围只筛真实续费/到期事件，不能把购买日占位值算进去。
+		base.conditions = append(base.conditions, "NOT (idx.billing_cycle = 'one-time' AND idx.one_time_term_count <= 0)")
+	}
 	if query.NextBillingFrom != "" {
 		base.conditions = append(base.conditions, "idx.next_billing_date >= {:nextBillingFrom}")
 		base.params["nextBillingFrom"] = query.NextBillingFrom
@@ -448,14 +452,17 @@ func appendSQLPaymentMethodCondition(base *subscriptionProjectionBase, values []
 	base.conditions = append(base.conditions, "("+strings.Join(parts, " OR ")+")")
 }
 
-func appendSQLRenewalCondition(base *subscriptionProjectionBase, renewal string) {
-	switch renewal {
+func appendSQLPaymentTypeCondition(base *subscriptionProjectionBase, paymentType string) {
+	switch paymentType {
 	case "auto":
 		base.conditions = append(base.conditions, "idx.billing_cycle != 'one-time' AND idx.auto_renew = 1")
 	case "manual":
 		base.conditions = append(base.conditions, "idx.billing_cycle != 'one-time' AND idx.auto_renew = 0")
-	case "one-time":
-		base.conditions = append(base.conditions, "idx.billing_cycle = 'one-time'")
+	case "one-time-buyout":
+		// PocketBase 数字字段的空值会落为 0；<= 0 与 Worker D1 的 NULL/历史非正值语义对齐。
+		base.conditions = append(base.conditions, "idx.billing_cycle = 'one-time' AND idx.one_time_term_count <= 0")
+	case "one-time-fixed-term":
+		base.conditions = append(base.conditions, "idx.billing_cycle = 'one-time' AND idx.one_time_term_count > 0")
 	}
 }
 
@@ -592,9 +599,9 @@ func isSubscriptionListCurrency(value string) bool {
 	return true
 }
 
-func isSubscriptionListRenewal(value string) bool {
+func isSubscriptionListPaymentType(value string) bool {
 	switch value {
-	case "auto", "manual", "one-time":
+	case "auto", "manual", "one-time-buyout", "one-time-fixed-term":
 		return true
 	default:
 		return false

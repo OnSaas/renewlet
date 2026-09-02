@@ -189,22 +189,47 @@ describe("subscription sorting", () => {
     ]);
   });
 
+  it("keeps paused and cancelled buyouts out of renewal ordering", () => {
+    const subscriptions = [
+      subscription({ id: "paused-buyout", status: "paused", billingCycle: "one-time", nextBillingDate: assertDateOnly("1900-01-01") }),
+      subscription({ id: "cancelled-recurring", status: "cancelled", nextBillingDate: assertDateOnly("2026-03-01") }),
+      subscription({ id: "cancelled-buyout", status: "cancelled", billingCycle: "one-time", nextBillingDate: assertDateOnly("2099-01-01") }),
+      subscription({ id: "paused-recurring", status: "paused", nextBillingDate: assertDateOnly("2026-02-01") }),
+    ];
+
+    expect(sortIds(subscriptions, "renewal_asc")).toEqual([
+      "paused-recurring",
+      "cancelled-recurring",
+      "paused-buyout",
+      "cancelled-buyout",
+    ]);
+    expect(sortIds(subscriptions, "renewal_desc")).toEqual([
+      "cancelled-recurring",
+      "paused-recurring",
+      "paused-buyout",
+      "cancelled-buyout",
+    ]);
+  });
+
   it("sorts by monthly cost after currency conversion and cycle normalization", () => {
     const subscriptions = [
       subscription({ id: "annual-usd", price: "120", currency: "USD", billingCycle: "annual" }),
       subscription({ id: "monthly-cny", price: "80", currency: "CNY", billingCycle: "monthly" }),
       subscription({ id: "quarterly-cny", price: "180", currency: "CNY", billingCycle: "quarterly" }),
+      subscription({ id: "buyout", price: "1", billingCycle: "one-time" }),
     ];
 
     expect(sortIds(subscriptions, "monthly_cost_desc")).toEqual([
       "monthly-cny",
       "annual-usd",
       "quarterly-cny",
+      "buyout",
     ]);
     expect(sortIds(subscriptions, "monthly_cost_asc")).toEqual([
       "quarterly-cny",
       "annual-usd",
       "monthly-cny",
+      "buyout",
     ]);
   });
 
@@ -244,7 +269,7 @@ describe("subscription filter state", () => {
     searchQuery: "",
     selectedCategories: [],
     statusFilter: "all",
-    renewalFilter: "all",
+    paymentTypeFilter: "all",
     selectedTags: [],
   };
 
@@ -268,7 +293,7 @@ describe("subscription filter state", () => {
         searchQuery: "  cursor  ",
         selectedCategories: ["productivity", "finance"],
         statusFilter: "active",
-        renewalFilter: "auto",
+        paymentTypeFilter: "auto",
         selectedTags: ["Team"],
       },
       {
@@ -287,7 +312,7 @@ describe("subscription filter state", () => {
       category: ["productivity", "finance"],
       tag: ["Team"],
       status: "active",
-      renewal: "auto",
+      paymentType: "auto",
       billingCycle: ["monthly"],
       paymentMethod: ["paypal", "__none"],
       currency: ["USD"],
@@ -376,16 +401,30 @@ describe("subscription filter state", () => {
     expect(active.map((item) => item.id)).toEqual(["active-future"]);
   });
 
-  it("filters by renewal type without relying on color-only status", () => {
+  it("filters the four mutually exclusive payment types", () => {
     const subscriptions = [
       subscription({ id: "auto", billingCycle: "monthly", autoRenew: true }),
       subscription({ id: "manual", billingCycle: "monthly", autoRenew: false }),
-      subscription({ id: "one-time", billingCycle: "one-time", autoRenew: false }),
+      subscription({ id: "buyout", billingCycle: "one-time", autoRenew: false }),
+      subscription({ id: "fixed", billingCycle: "one-time", oneTimeTermCount: 6, oneTimeTermUnit: "month", autoRenew: false }),
     ];
     const context = { today: assertDateOnly("2026-05-18") };
 
-    expect(filterSubscriptions(subscriptions, { ...emptyFilters, renewalFilter: "auto" }, context).map((item) => item.id)).toEqual(["auto"]);
-    expect(filterSubscriptions(subscriptions, { ...emptyFilters, renewalFilter: "manual" }, context).map((item) => item.id)).toEqual(["manual"]);
-    expect(filterSubscriptions(subscriptions, { ...emptyFilters, renewalFilter: "one-time" }, context).map((item) => item.id)).toEqual(["one-time"]);
+    expect(filterSubscriptions(subscriptions, { ...emptyFilters, paymentTypeFilter: "auto" }, context).map((item) => item.id)).toEqual(["auto"]);
+    expect(filterSubscriptions(subscriptions, { ...emptyFilters, paymentTypeFilter: "manual" }, context).map((item) => item.id)).toEqual(["manual"]);
+    expect(filterSubscriptions(subscriptions, { ...emptyFilters, paymentTypeFilter: "one-time-buyout" }, context).map((item) => item.id)).toEqual(["buyout"]);
+    expect(filterSubscriptions(subscriptions, { ...emptyFilters, paymentTypeFilter: "one-time-fixed-term" }, context).map((item) => item.id)).toEqual(["fixed"]);
+  });
+
+  it("excludes buyouts from renewal or expiry date ranges", () => {
+    const subscriptions = [
+      subscription({ id: "buyout", billingCycle: "one-time", startDate: assertDateOnly("2026-05-15"), nextBillingDate: assertDateOnly("2026-05-15") }),
+      subscription({ id: "fixed", billingCycle: "one-time", oneTimeTermCount: 6, oneTimeTermUnit: "month", nextBillingDate: assertDateOnly("2026-05-15") }),
+      subscription({ id: "recurring", nextBillingDate: assertDateOnly("2026-05-15") }),
+    ];
+    expect(filterSubscriptionsByListFilters(subscriptions, {
+      nextBillingFrom: assertDateOnly("2026-05-01"),
+      nextBillingTo: assertDateOnly("2026-05-31"),
+    }, { today: assertDateOnly("2026-05-18") }).map((item) => item.id)).toEqual(["fixed", "recurring"]);
   });
 });

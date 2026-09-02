@@ -60,7 +60,7 @@ import { useSettingsEnvelope } from '@/hooks/use-settings';
 import { useSubscriptionCrud } from '@/modules/subscriptions/application/use-subscription-crud';
 import { useSubscriptionExport } from '@/modules/subscriptions/application/use-subscription-export';
 import { useSubscriptionFilters } from '@/modules/subscriptions/application/use-subscription-filters';
-import { SUBSCRIPTION_PAYMENT_METHOD_NONE_VALUE, type SubscriptionRenewalFilter, type SubscriptionSortOption } from '@/modules/subscriptions/domain/subscription-filters';
+import { SUBSCRIPTION_PAYMENT_METHOD_NONE_VALUE, type SubscriptionPaymentTypeFilter, type SubscriptionSortOption } from '@/modules/subscriptions/domain/subscription-filters';
 import { resolveSubscriptionPriceReferenceCurrency } from '@/modules/subscriptions/domain/subscription-price-reference';
 import { useExchangeRates } from '@/hooks/use-exchange-rates';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -93,11 +93,12 @@ const SORT_OPTION_LABEL_KEYS: Record<SubscriptionSortOption, MessageKey> = {
   name_desc: "subscriptions.sort.nameDesc",
 };
 
-const RENEWAL_FILTER_LABEL_KEYS: Record<SubscriptionRenewalFilter, MessageKey> = {
-  all: "subscriptions.renewalFilter.all",
-  auto: "subscriptions.renewalFilter.auto",
-  manual: "subscriptions.renewalFilter.manual",
-  "one-time": "subscriptions.renewalFilter.oneTime",
+const PAYMENT_TYPE_FILTER_LABEL_KEYS: Record<SubscriptionPaymentTypeFilter, MessageKey> = {
+  all: "subscriptions.paymentTypeFilter.all",
+  auto: "subscriptions.paymentTypeFilter.auto",
+  manual: "subscriptions.paymentTypeFilter.manual",
+  "one-time-buyout": "subscriptions.paymentTypeFilter.buyout",
+  "one-time-fixed-term": "subscriptions.paymentTypeFilter.fixedTerm",
 };
 
 /** 订阅列表页组件。 */
@@ -150,8 +151,8 @@ const Subscriptions = () => {
     setSelectedCategories,
     statusFilter,
     setStatusFilter,
-    renewalFilter,
-    setRenewalFilter,
+    paymentTypeFilter,
+    setPaymentTypeFilter,
     sortOption,
     setSortOption,
     selectedTags,
@@ -239,7 +240,7 @@ const Subscriptions = () => {
     : selectedStatus
       ? label(selectedStatus.labels)
       : statusFilter;
-  const renewalFilterLabel = t(RENEWAL_FILTER_LABEL_KEYS[renewalFilter]);
+  const paymentTypeFilterLabel = t(PAYMENT_TYPE_FILTER_LABEL_KEYS[paymentTypeFilter]);
   const sortOptionLabel = t(SORT_OPTION_LABEL_KEYS[sortOption]);
   const removeSelectedTag = useCallback((tag: string) => {
     setSelectedTags((current) => current.filter((item) => item !== tag));
@@ -390,16 +391,17 @@ const Subscriptions = () => {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3" data-testid="mobile-renewal-sort-row">
-                <Select value={renewalFilter} onValueChange={(v) => setRenewalFilter(v as SubscriptionRenewalFilter)}>
-                  <SelectTrigger className="h-11 min-w-0 border-border bg-secondary" tooltipContent={renewalFilterLabel}>
-                    <SelectValue placeholder={t("subscriptions.renewalFilter.label")} />
+              <div className="grid grid-cols-2 gap-3" data-testid="mobile-payment-type-sort-row">
+                <Select value={paymentTypeFilter} onValueChange={(v) => setPaymentTypeFilter(v as SubscriptionPaymentTypeFilter)}>
+                  <SelectTrigger className="h-11 min-w-0 border-border bg-secondary" tooltipContent={paymentTypeFilterLabel}>
+                    <SelectValue placeholder={t("subscriptions.paymentTypeFilter.label")} />
                   </SelectTrigger>
-                  <SelectContent mobileTitle={t("subscriptions.renewalFilter.label")}>
-                    <SelectItem value="all">{t("subscriptions.renewalFilter.all")}</SelectItem>
-                    <SelectItem value="auto">{t("subscriptions.renewalFilter.auto")}</SelectItem>
-                    <SelectItem value="manual">{t("subscriptions.renewalFilter.manual")}</SelectItem>
-                    <SelectItem value="one-time">{t("subscriptions.renewalFilter.oneTime")}</SelectItem>
+                  <SelectContent mobileTitle={t("subscriptions.paymentTypeFilter.label")}>
+                    <SelectItem value="all">{t("subscriptions.paymentTypeFilter.all")}</SelectItem>
+                    <SelectItem value="auto">{t("subscriptions.paymentTypeFilter.auto")}</SelectItem>
+                    <SelectItem value="manual">{t("subscriptions.paymentTypeFilter.manual")}</SelectItem>
+                    <SelectItem value="one-time-buyout">{t("subscriptions.paymentTypeFilter.buyout")}</SelectItem>
+                    <SelectItem value="one-time-fixed-term">{t("subscriptions.paymentTypeFilter.fixedTerm")}</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -499,15 +501,16 @@ const Subscriptions = () => {
                   </SelectContent>
                 </Select>
 
-                <Select value={renewalFilter} onValueChange={(v) => setRenewalFilter(v as SubscriptionRenewalFilter)}>
-                  <SelectTrigger className={subscriptionFilterLayout.desktopRenewalTrigger} tooltipContent={renewalFilterLabel}>
-                    <SelectValue placeholder={t("subscriptions.renewalFilter.label")} />
+                <Select value={paymentTypeFilter} onValueChange={(v) => setPaymentTypeFilter(v as SubscriptionPaymentTypeFilter)}>
+                  <SelectTrigger className={subscriptionFilterLayout.desktopPaymentTypeTrigger} tooltipContent={paymentTypeFilterLabel}>
+                    <SelectValue placeholder={t("subscriptions.paymentTypeFilter.label")} />
                   </SelectTrigger>
-                  <SelectContent mobileTitle={t("subscriptions.renewalFilter.label")}>
-                    <SelectItem value="all">{t("subscriptions.renewalFilter.all")}</SelectItem>
-                    <SelectItem value="auto">{t("subscriptions.renewalFilter.auto")}</SelectItem>
-                    <SelectItem value="manual">{t("subscriptions.renewalFilter.manual")}</SelectItem>
-                    <SelectItem value="one-time">{t("subscriptions.renewalFilter.oneTime")}</SelectItem>
+                  <SelectContent mobileTitle={t("subscriptions.paymentTypeFilter.label")}>
+                    <SelectItem value="all">{t("subscriptions.paymentTypeFilter.all")}</SelectItem>
+                    <SelectItem value="auto">{t("subscriptions.paymentTypeFilter.auto")}</SelectItem>
+                    <SelectItem value="manual">{t("subscriptions.paymentTypeFilter.manual")}</SelectItem>
+                    <SelectItem value="one-time-buyout">{t("subscriptions.paymentTypeFilter.buyout")}</SelectItem>
+                    <SelectItem value="one-time-fixed-term">{t("subscriptions.paymentTypeFilter.fixedTerm")}</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -608,7 +611,7 @@ const Subscriptions = () => {
             <SubscriptionGrid
               subscriptions={filteredSubscriptions}
               viewMode={viewMode}
-              timeZone={timeZone}
+              today={today}
               inheritedReminderDays={inheritedReminderDays}
               currencyConvert={convert}
               currencyRatesReady={currencyRatesReady}

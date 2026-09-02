@@ -12,6 +12,7 @@ import {
 } from "@renewlet/shared/schemas/public-status";
 import { customConfigSchema, type ApiCustomConfig } from "@renewlet/shared/schemas/custom-config";
 import type { ApiSubscription } from "@renewlet/shared/schemas/subscriptions";
+import { isOneTimeBuyout, isOneTimeFixedTerm } from "@renewlet/shared/subscription-billing";
 import { getCustomConfig, getSettings, intToBool, newId, nowIso, toApiSubscription } from "./db";
 import { randomToken } from "./crypto";
 import { requireAuth } from "./auth";
@@ -86,7 +87,8 @@ export async function readPublicStatus(request: Request, env: Env, token: string
   const settings = await getSettings(env, page.user_id);
   // 公开状态页属于访客界面；分类标签跟随本次请求，不继承页面 owner 的账号内容语言。
   const resolver = await newPublicStatusCategoryResolver(env, page.user_id, locale);
-  const today = todayDateOnly(settings.timezone);
+  const now = new Date();
+  const today = todayDateOnly(settings.timezone, now);
   const { rows, truncated } = await listPublicStatusSubscriptions(env, page.user_id, today);
   const showPrices = intToBool(page.show_prices);
   const response = publicStatusPayloadSchema.parse({
@@ -95,7 +97,9 @@ export async function readPublicStatus(request: Request, env: Env, token: string
       showPrices,
       ...(showPrices ? { currency: effectivePublicStatusCurrency(settings) } : {}),
       ...(showPrices ? { exchangeRateBasis: await getExchangeRatePublicBasis(env, page.user_id) } : {}),
-      generatedAt: nowIso(),
+      // asOf 是 owner 账号时区下的 date-only；匿名前端不得从 UTC generatedAt 猜测业务日期。
+      asOf: today,
+      generatedAt: now.toISOString(),
       truncated,
     },
     subscriptions: rows.map((row) => publicStatusSubscription(row, request, page, resolver, today)),
@@ -193,7 +197,9 @@ function publicStatusSubscription(
     category: resolver.category(subscription.category),
     status: publicStatusEffectiveStatus(subscription, today),
     startDate: subscription.startDate,
-    nextBillingDate: subscription.nextBillingDate,
+    nextBillingDate: isOneTimeBuyout(subscription)
+      ? null
+      : subscription.nextBillingDate,
     updatedAt: subscription.updatedAt ?? nowIso(),
     ...priceFields,
   };
@@ -207,7 +213,7 @@ function publicStatusPriceProjection(subscription: ReturnType<typeof toApiSubscr
     billingCycle: subscription.billingCycle,
     ...(subscription.customDays ? { customDays: subscription.customDays } : {}),
     ...(subscription.customCycleUnit ? { customCycleUnit: subscription.customCycleUnit } : {}),
-    ...(subscription.oneTimeTermCount && subscription.oneTimeTermUnit ? {
+    ...(isOneTimeFixedTerm(subscription) && subscription.oneTimeTermUnit ? {
       oneTimeTermCount: subscription.oneTimeTermCount,
       oneTimeTermUnit: subscription.oneTimeTermUnit,
     } : {}),
@@ -223,7 +229,7 @@ function effectivePublicStatusCurrency(settings: Awaited<ReturnType<typeof getSe
 
 function publicStatusEffectiveStatus(subscription: ApiSubscription, today: string): ApiSubscription["status"] {
   if (subscription.status === "expired") return "expired";
-  if (subscription.billingCycle === "one-time" && !subscription.oneTimeTermCount) return subscription.status;
+  if (isOneTimeBuyout(subscription)) return subscription.status;
   // 公开页是状态面板，沿用站内“有效状态”口径；兼容旧 active/trial 过期数据但不回写 D1。
   if ((subscription.status === "active" || subscription.status === "trial") && subscription.nextBillingDate < today) {
     return "expired";
@@ -231,14 +237,14 @@ function publicStatusEffectiveStatus(subscription: ApiSubscription, today: strin
   return subscription.status;
 }
 
-function todayDateOnly(timezone: string): string {
+function todayDateOnly(timezone: string, now: Date): string {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: timezone,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-    }).formatToParts(new Date());
+    }).formatToParts(now);
     const value = (type: string) => parts.find((part) => part.type === type)?.value;
     const year = value("year");
     const month = value("month");
@@ -247,7 +253,7 @@ function todayDateOnly(timezone: string): string {
   } catch {
     // 用户设置中的时区坏值只影响公开页状态投影；回落 UTC，避免公开 API 因单个设置值不可用而整体 500。
   }
-  return new Date().toISOString().slice(0, 10);
+  return now.toISOString().slice(0, 10);
 }
 
 function publicStatusLogoUrl(request: Request, token: string, logo: string): string {

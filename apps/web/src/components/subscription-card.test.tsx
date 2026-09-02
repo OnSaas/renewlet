@@ -536,11 +536,24 @@ describe("SubscriptionCard", () => {
   it("renders buyout purchase dates without relative renewal days", () => {
     renderSubscriptionCard({ billingCycle: "one-time" });
 
-    const metaFlow = expectMetaFlowItemsInOrder("开始: 2026/5/15", "购买日期: 2026/5/15");
+    const metaFlow = expectMetaFlowItemsInOrder("购买日期: 2026/5/15", "持有日均 $39.75");
 
     expect(within(metaFlow).queryByText("28 天后续费")).not.toBeInTheDocument();
     expect(within(metaFlow).queryByText("到期: 2026/6/15")).not.toBeInTheDocument();
-    expect(within(metaFlow).queryByText(/日均/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("长期有效").length).toBeGreaterThan(0);
+  });
+
+  it("keeps incurred buyout cost visible for paused and cancelled records but hides future purchases", () => {
+    const paused = renderSubscriptionCard({ billingCycle: "one-time", status: "paused" });
+    expect(screen.getByText("持有日均 $39.75")).toBeInTheDocument();
+    paused.unmount();
+
+    const cancelled = renderSubscriptionCard({ billingCycle: "one-time", status: "cancelled" });
+    expect(screen.getByText("持有日均 $39.75")).toBeInTheDocument();
+    cancelled.unmount();
+
+    renderSubscriptionCard({ billingCycle: "one-time", startDate: assertDateOnly("2026-05-19"), nextBillingDate: assertDateOnly("2026-05-19") });
+    expect(screen.queryByText(/持有日均/)).not.toBeInTheDocument();
   });
 
   it("renders overdue active subscriptions with the expired status treatment", () => {
