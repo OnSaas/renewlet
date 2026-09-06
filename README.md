@@ -119,7 +119,7 @@ Common `.env` values:
 | `RENEWLET_DEMO_MODE` | Enables demo mode. `false` by default. |
 | `RENEWLET_CUSTOM_HEAD_HTML` | Optional custom `<head>` content. Empty by default. |
 | `NOTIFICATION_SCHEDULER_ENABLED` | Enables the built-in notification scheduler. `true` by default. |
-| `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | HTTP proxy for the Docker server; lowercase names also work. |
+| `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | Recommended proxy variables for outbound HTTP(S) requests from the Docker server. |
 
 The full Docker environment template is in `.env.example`.
 
@@ -132,6 +132,8 @@ HTTP_PROXY="http://host.docker.internal:7890"
 HTTPS_PROXY="http://host.docker.internal:7890"
 NO_PROXY="localhost,127.0.0.1,.local"
 ```
+
+Use the uppercase names by default. The lowercase alternatives are `http_proxy`, `https_proxy`, and `no_proxy`. Do not set both forms; when both are present, Go uses the uppercase value.
 
 If the proxy runs on the host, use an address the container can reach instead of `localhost` or `127.0.0.1`. Recreate the container after a change:
 

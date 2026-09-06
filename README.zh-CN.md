@@ -119,7 +119,7 @@ docker compose down
 | `RENEWLET_DEMO_MODE` | 是否开启演示模式，默认 `false`。 |
 | `RENEWLET_CUSTOM_HEAD_HTML` | 可选的自定义 `<head>` 内容，默认留空。 |
 | `NOTIFICATION_SCHEDULER_ENABLED` | 是否启用内置通知调度器，默认 `true`。 |
-| `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | Docker 服务端 HTTP 代理；也支持小写变量名。 |
+| `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | Docker 服务端发出 HTTP(S) 请求时推荐使用的代理变量。 |
 
 完整 Docker 环境变量模板见 `.env.example`。
 
@@ -132,6 +132,8 @@ HTTP_PROXY="http://host.docker.internal:7890"
 HTTPS_PROXY="http://host.docker.internal:7890"
 NO_PROXY="localhost,127.0.0.1,.local"
 ```
+
+默认使用大写变量。小写备选名为 `http_proxy`、`https_proxy` 和 `no_proxy`。不要同时配置大小写两组变量；两组同时存在时，Go 优先读取大写值。
 
 代理运行在宿主机时，请填写容器可以访问的地址，不要使用 `localhost` 或 `127.0.0.1`。修改后重新创建容器：
 
