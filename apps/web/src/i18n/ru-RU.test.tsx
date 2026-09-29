@@ -130,6 +130,11 @@ describe("ru-RU labels", () => {
     expect(localizedLabel(userLabels, "ru-RU")).toBe("My card");
   });
 
+  it("does not translate a custom label that collides with an inner built-in text pair", () => {
+    const userLabels: LocalizedLabels = { "zh-CN": "其他", "en-US": "Other" };
+    expect(localizedLabel(userLabels, "ru-RU")).toBe("Other");
+  });
+
   it("derives Russian currency names from Intl", () => {
     const usd = CURRENCY_OPTIONS.find((option) => option.value === "USD");
     expect(usd).toBeDefined();
