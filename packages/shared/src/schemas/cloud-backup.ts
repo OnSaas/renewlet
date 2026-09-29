@@ -44,17 +44,20 @@ export const cloudBackupScheduleTimeSchema = z.string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 export type CloudBackupScheduleTime = z.infer<typeof cloudBackupScheduleTimeSchema>;
 
-const pathPrefixSchema = z.string()
+const createPathPrefixSchema = (fallback: string) => z.string()
   .trim()
   .max(512)
   .refine((value) => !value.includes(".."), "Path must not contain parent directory segments")
-  // Docker Go 和 Worker 都把空远端目录落回默认前缀；否则两个运行面对根目录 MKCOL/PROPFIND 的 SDK 行为会漂移。
-  .transform((value) => value.replace(/^\/+|\/+$/g, "") || cloudBackupDefaultRemotePrefix);
+  .transform((value) => value.replace(/^\/+|\/+$/g, "") || fallback);
+
+// WebDAV 根目录需要 SDK 创建目录；S3 根对象不需要目录占位，因此两种空值语义必须在共同 schema 处分开。
+const webDavPathSchema = createPathPrefixSchema(cloudBackupDefaultRemotePrefix);
+const s3PrefixSchema = createPathPrefixSchema("");
 
 export const cloudBackupWebDavConfigSchema = z.object({
   url: z.string().trim().url().refine((value) => value.startsWith("https://"), "WebDAV URL must use HTTPS"),
   username: z.string().trim().max(256).optional().default(""),
-  path: pathPrefixSchema.optional().default(cloudBackupDefaultRemotePrefix),
+  path: webDavPathSchema.optional().default(cloudBackupDefaultRemotePrefix),
 }).strict();
 export type CloudBackupWebDavConfig = z.infer<typeof cloudBackupWebDavConfigSchema>;
 
@@ -63,7 +66,7 @@ const cloudBackupS3ConfigObjectSchema = z.object({
   // SigV4 的 credential scope 包含 signing region；S3-compatible endpoint 没有通用 discovery 标准，不能再静默猜默认值。
   region: z.string().trim().min(1, "S3 signing region is required").max(64),
   bucket: z.string().trim().min(1).max(128),
-  prefix: pathPrefixSchema.optional().default(cloudBackupDefaultRemotePrefix),
+  prefix: s3PrefixSchema.optional().default(cloudBackupDefaultRemotePrefix),
   accessKeyId: z.string().trim().max(256).optional().default(""),
 }).strict();
 

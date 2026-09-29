@@ -1547,6 +1547,11 @@ msgid "settings.cloudBackupPathHelp"
 msgstr "Enter a directory prefix only. Do not include .. or a filename."
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:501
+msgid "settings.cloudBackupS3PrefixHelp"
+msgstr "You can leave this empty to use the bucket root; a dedicated bucket is recommended. Enter a directory prefix only; do not include .. or a filename."
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:783
 msgid "settings.discordWebhookHelp"
 msgstr "Only official Discord Webhook URLs are supported. Sending disables @everyone, user, and role mentions."

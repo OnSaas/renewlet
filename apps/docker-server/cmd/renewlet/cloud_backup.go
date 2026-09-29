@@ -106,10 +106,15 @@ func (settings *cloudBackupS3Settings) NormalizeAndValidate() error {
 	settings.Endpoint = strings.TrimSpace(settings.Endpoint)
 	settings.Region = strings.TrimSpace(settings.Region)
 	settings.Bucket = strings.TrimSpace(settings.Bucket)
-	if strings.Contains(strings.TrimSpace(settings.Prefix), "..") {
+	prefix := cloudBackupDefaultRemotePrefix
+	if settings.Prefix != nil {
+		prefix = strings.TrimSpace(*settings.Prefix)
+	}
+	if strings.Contains(prefix, "..") {
 		return errors.New("CLOUD_BACKUP_S3_PREFIX_INVALID")
 	}
-	settings.Prefix = normalizeCloudBackupPrefix(settings.Prefix, "renewlet")
+	prefix = normalizeCloudBackupPrefix(prefix, "")
+	settings.Prefix = &prefix
 	settings.AccessKeyID = strings.TrimSpace(settings.AccessKeyID)
 	parsed, err := url.Parse(settings.Endpoint)
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {

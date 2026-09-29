@@ -174,7 +174,7 @@ export function CloudBackupConnectionForm({
             <FormField
               id="cloudBackupS3Prefix"
               label={t("settings.cloudBackupS3Prefix")}
-              description={t("settings.cloudBackupPathHelp")}
+              description={t("settings.cloudBackupS3PrefixHelp")}
               className="sm:max-w-xl"
               descriptionClassName="leading-5"
             >

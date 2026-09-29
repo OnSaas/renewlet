@@ -309,9 +309,10 @@ export class S3CloudBackupClient implements CloudBackupRemoteClient {
         client: this.client,
         command: new ListObjectsV2Command({
           Bucket: this.settings.bucket,
-          Prefix: prefix,
           MaxKeys: 1000,
           EncodingType: "url",
+          // 根目录不发送空 Prefix，避免兼容服务对 prefix= 的处理差异；非空值保持现有命名空间边界。
+          ...(prefix ? { Prefix: prefix } : {}),
           ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
         }),
         secrets: this.secretValues(),

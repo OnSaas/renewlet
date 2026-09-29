@@ -49,6 +49,7 @@ vi.mock("@/i18n/I18nProvider", () => ({
         "settings.cloudBackupS3RegionHelp": "必填；按存储服务商 S3 API 文档填写 signing region，R2/Tigris 通常为 auto。",
         "settings.cloudBackupS3Bucket": "Bucket",
         "settings.cloudBackupS3Prefix": "Prefix",
+        "settings.cloudBackupS3PrefixHelp": "可留空，留空时直接使用 Bucket 根目录；建议使用专用 Bucket。只填写目录前缀，不要包含 .. 或文件名。",
         "settings.cloudBackupS3AccessKey": "Access Key",
         "settings.cloudBackupS3Secret": "Secret Key",
         "settings.cloudBackupPathHelp": "只填写目录前缀，不要包含 .. 或文件名。",

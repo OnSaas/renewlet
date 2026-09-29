@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -14,6 +15,10 @@ import (
 	"testing"
 	"time"
 )
+
+func cloudBackupStringPtr(value string) *string {
+	return &value
+}
 
 // 云备份后端测试覆盖 provider 级策略、write-only credential 和 manifest 校验，避免 WebDAV/S3 运行面漂移。
 func TestCloudBackupConfigValidationRejectsUnsafeRemotePaths(t *testing.T) {
@@ -28,11 +33,50 @@ func TestCloudBackupConfigValidationRejectsUnsafeRemotePaths(t *testing.T) {
 	s3 := cloudBackupS3Settings{
 		Endpoint:    "https://storage.example.com",
 		Bucket:      "renewlet",
-		Prefix:      "snapshots/..",
+		Prefix:      cloudBackupStringPtr("snapshots/.."),
 		AccessKeyID: "access",
 	}
 	if err := s3.NormalizeAndValidate(); err == nil {
 		t.Fatal("expected S3 parent prefix to be rejected")
+	}
+}
+
+func TestCloudBackupS3PrefixPreservesExplicitRootAndDefaultsMissingValue(t *testing.T) {
+	var missing cloudBackupS3Settings
+	if err := json.Unmarshal([]byte(`{"endpoint":"https://storage.example.com","bucket":"renewlet","region":"auto"}`), &missing); err != nil {
+		t.Fatal(err)
+	}
+	if err := missing.NormalizeAndValidate(); err != nil {
+		t.Fatal(err)
+	}
+	if missing.Prefix == nil || *missing.Prefix != "renewlet" {
+		t.Fatalf("missing prefix = %#v, want renewlet", missing.Prefix)
+	}
+
+	empty := cloudBackupS3Settings{Endpoint: "https://storage.example.com", Bucket: "renewlet", Region: "auto", Prefix: cloudBackupStringPtr("")}
+	if err := empty.NormalizeAndValidate(); err != nil {
+		t.Fatal(err)
+	}
+	if empty.Prefix == nil || *empty.Prefix != "" {
+		t.Fatalf("explicit empty prefix = %#v, want empty string", empty.Prefix)
+	}
+
+	data, err := json.Marshal(empty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"prefix":""`) {
+		t.Fatalf("serialized empty prefix missing: %s", data)
+	}
+	var roundTrip cloudBackupS3Settings
+	if err := json.Unmarshal(data, &roundTrip); err != nil {
+		t.Fatal(err)
+	}
+	if err := roundTrip.NormalizeAndValidate(); err != nil {
+		t.Fatal(err)
+	}
+	if roundTrip.Prefix == nil || *roundTrip.Prefix != "" {
+		t.Fatalf("round-tripped prefix = %#v, want empty string", roundTrip.Prefix)
 	}
 }
 
@@ -101,7 +145,7 @@ func TestCloudBackupConfigValidationRequiresExplicitS3SigningRegion(t *testing.T
 		Endpoint:    "https://storage.example.com",
 		Region:      "",
 		Bucket:      "renewlet",
-		Prefix:      "snapshots",
+		Prefix:      cloudBackupStringPtr("snapshots"),
 		AccessKeyID: "access",
 	}
 	if err := s3.NormalizeAndValidate(); err == nil || err.Error() != "CLOUD_BACKUP_S3_REGION_REQUIRED" {
@@ -130,7 +174,7 @@ func TestCloudBackupConfigDTORedactsCredential(t *testing.T) {
 			cloudBackupProviderS3: {
 				UserID:     "usr_cloud",
 				Provider:   cloudBackupProviderS3,
-				S3:         &cloudBackupS3Settings{Endpoint: "https://storage.example.com", Region: "auto", Bucket: "renewlet", AccessKeyID: "access"},
+				S3:         &cloudBackupS3Settings{Endpoint: "https://storage.example.com", Region: "auto", Bucket: "renewlet", Prefix: cloudBackupStringPtr("renewlet"), AccessKeyID: "access"},
 				Credential: cloudBackupStoredCredential{S3SecretAccessKey: "plain-secret"},
 				Policy:     cloudBackupPolicy{ScheduleFrequency: "weekly", ScheduleTime: "04:30", ScheduleWeekday: "friday", Retention: 9},
 				LastStatus: cloudBackupStatusSuccess,
@@ -167,7 +211,7 @@ func TestCloudBackupUpdateMergesBothProviderConfigsAndWriteOnlyCredentials(t *te
 	nextS3 := targetFromCloudBackupUpdate("usr_cloud", cloudBackupConfigUpdateRequest{
 		Provider: cloudBackupProviderS3,
 		WebDAV:   &cloudBackupWebDAVSettings{URL: "https://dav.example.com/remote.php/dav/files/ignored", Username: "ignored", Path: "ignored"},
-		S3:       &cloudBackupS3Settings{Endpoint: "https://storage.example.com", Region: "us-east-1", Bucket: "renewlet", Prefix: "snapshots", AccessKeyID: "access"},
+		S3:       &cloudBackupS3Settings{Endpoint: "https://storage.example.com", Region: "us-east-1", Bucket: "renewlet", Prefix: cloudBackupStringPtr("snapshots"), AccessKeyID: "access"},
 		Credentials: &cloudBackupCredentialPayload{
 			WebDAVPassword:    &ignoredWebDAVSecret,
 			S3SecretAccessKey: &s3Secret,
@@ -193,7 +237,7 @@ func TestCloudBackupUpdateMergesBothProviderConfigsAndWriteOnlyCredentials(t *te
 	backToWebDAV := targetFromCloudBackupUpdate("usr_cloud", cloudBackupConfigUpdateRequest{
 		Provider: cloudBackupProviderWebDAV,
 		WebDAV:   &cloudBackupWebDAVSettings{URL: "https://dav.example.com/remote.php/dav/files/bob", Username: "bob", Path: "renewlet"},
-		S3:       &cloudBackupS3Settings{Endpoint: "https://storage.example.com", Region: "us-east-1", Bucket: "ignored", Prefix: "ignored", AccessKeyID: "ignored"},
+		S3:       &cloudBackupS3Settings{Endpoint: "https://storage.example.com", Region: "us-east-1", Bucket: "ignored", Prefix: cloudBackupStringPtr("ignored"), AccessKeyID: "ignored"},
 		Credentials: &cloudBackupCredentialPayload{
 			WebDAVPassword:    &emptyWebDAVSecret,
 			S3SecretAccessKey: &ignoredS3Secret,
@@ -325,7 +369,7 @@ func TestCloudBackupRemoteTargetForProviderDoesNotInspectOtherProvider(t *testin
 			cloudBackupProviderS3: {
 				UserID:     "usr_cloud",
 				Provider:   cloudBackupProviderS3,
-				S3:         &cloudBackupS3Settings{Endpoint: "https://storage.example.com", Region: "auto", Bucket: "renewlet", AccessKeyID: "access"},
+				S3:         &cloudBackupS3Settings{Endpoint: "https://storage.example.com", Region: "auto", Bucket: "renewlet", Prefix: cloudBackupStringPtr("renewlet"), AccessKeyID: "access"},
 				Credential: cloudBackupStoredCredential{},
 				Policy:     defaultCloudBackupPolicy(),
 				LastStatus: cloudBackupStatusIdle,

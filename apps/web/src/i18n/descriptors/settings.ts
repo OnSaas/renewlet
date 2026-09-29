@@ -1,4 +1,3 @@
-// settings domain 聚合账号、主题、通知、日历 Feed 和系统更新文案，配合保存草稿状态机统一维护。
 import { msg } from "@lingui/core/macro";
 export const messages = [
   msg({ id: "settings.title", message: "系统配置" }),
@@ -498,6 +497,7 @@ export const messages = [
   msg({ id: "settings.cloudBackupS3RegionHelp", message: "必填；按存储服务商 S3 API 文档填写 signing region，R2/Tigris 通常为 auto。" }),
   msg({ id: "settings.cloudBackupS3Bucket", message: "Bucket" }),
   msg({ id: "settings.cloudBackupS3Prefix", message: "Prefix" }),
+  msg({ id: "settings.cloudBackupS3PrefixHelp", message: "可留空，留空时直接使用 Bucket 根目录；建议使用专用 Bucket。只填写目录前缀，不要包含 .. 或文件名。" }),
   msg({ id: "settings.cloudBackupS3AccessKey", message: "Access Key" }),
   msg({ id: "settings.cloudBackupS3Secret", message: "Secret Key" }),
   msg({ id: "settings.cloudBackupPathHelp", message: "只填写目录前缀，不要包含 .. 或文件名。" }),

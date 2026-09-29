@@ -13,6 +13,7 @@ const (
 	renewletExportSchemaVersion             = 1
 	cloudBackupProviderWebDAV               = "webdav"
 	cloudBackupProviderS3                   = "s3"
+	cloudBackupDefaultRemotePrefix          = "renewlet"
 	cloudBackupStatusIdle                   = "idle"
 	cloudBackupStatusSuccess                = "success"
 	cloudBackupStatusFailed                 = "failed"
@@ -75,11 +76,12 @@ type cloudBackupWebDAVSettings struct {
 }
 
 type cloudBackupS3Settings struct {
-	Endpoint    string `json:"endpoint"`
-	Region      string `json:"region"`
-	Bucket      string `json:"bucket"`
-	Prefix      string `json:"prefix,omitempty"`
-	AccessKeyID string `json:"accessKeyId,omitempty"`
+	Endpoint string `json:"endpoint"`
+	Region   string `json:"region"`
+	Bucket   string `json:"bucket"`
+	// nil 表示旧配置或请求未提供 Prefix；非 nil 的空字符串表示用户明确选择 Bucket 根目录。
+	Prefix      *string `json:"prefix,omitempty"`
+	AccessKeyID string  `json:"accessKeyId,omitempty"`
 	// 旧配置可能带 addressingStyle；NormalizeAndValidate 会清空它，S3 SDK 寻址只按协议级 endpoint 形态推断。
 	AddressingStyle string `json:"addressingStyle,omitempty"`
 }

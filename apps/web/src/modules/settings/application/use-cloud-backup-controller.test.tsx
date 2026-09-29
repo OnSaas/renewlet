@@ -107,6 +107,7 @@ function createConfig(overrides: {
   provider?: CloudBackupConfig["provider"];
   webdavPolicy?: CloudBackupPolicy;
   s3Policy?: CloudBackupPolicy;
+  s3Prefix?: string;
   updatedAt?: string | null;
 } = {}): CloudBackupConfig {
   const provider = overrides.provider ?? "webdav";
@@ -121,7 +122,7 @@ function createConfig(overrides: {
       endpoint: "https://account.r2.cloudflarestorage.com",
       region: "auto",
       bucket: "renewlet",
-      prefix: "renewlet",
+      prefix: overrides.s3Prefix ?? "renewlet",
       accessKeyId: "access",
     },
     credentialSet: true,
@@ -168,6 +169,7 @@ describe("useCloudBackupController provider drafts", () => {
         provider: payload.provider,
         webdavPolicy: payload.provider === "webdav" ? payload.policy : current.policyByProvider.webdav,
         s3Policy: payload.provider === "s3" ? payload.policy : current.policyByProvider.s3,
+        s3Prefix: payload.provider === "s3" ? payload.s3?.prefix ?? "renewlet" : current.s3?.prefix ?? "renewlet",
         updatedAt: "2026-06-09T00:10:00.000Z",
       });
       mocks.config = next;
@@ -276,6 +278,20 @@ describe("useCloudBackupController provider drafts", () => {
     expect(s3Payload.s3).not.toHaveProperty("addressingStyle");
     expect(s3Payload.credentials).toEqual({ s3SecretAccessKey: "s3-secret" });
     expect(s3Payload.webdav).toBeUndefined();
+  });
+
+  it("keeps an explicitly empty S3 prefix through draft sync and save", async () => {
+    mocks.config = createConfig({ provider: "s3", s3Prefix: "" });
+    const { result } = await renderController();
+
+    expect(result.current.form.s3Prefix).toBe("");
+    await act(async () => {
+      await result.current.saveConfig();
+    });
+
+    const payload = mocks.updateConfigMutateAsync.mock.calls[0]?.[0] as CloudBackupConfigUpdate;
+    expect(payload.s3?.prefix).toBe("");
+    expect(result.current.form.s3Prefix).toBe("");
   });
 
   it("blocks S3 save and test when signing region is empty", async () => {

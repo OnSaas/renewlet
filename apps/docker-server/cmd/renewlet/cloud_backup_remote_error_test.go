@@ -32,7 +32,7 @@ func TestS3CloudBackupListIncludesRawResponseText(t *testing.T) {
 		Endpoint:    server.URL,
 		Region:      "us-east-1",
 		Bucket:      "renewlet",
-		Prefix:      "snapshots",
+		Prefix:      cloudBackupStringPtr("snapshots"),
 		AccessKeyID: "access-key",
 	}, "secret-key")
 
@@ -109,7 +109,7 @@ func TestS3CloudBackupAddressingStyles(t *testing.T) {
 				Endpoint:    tt.endpoint,
 				Region:      "us-east-1",
 				Bucket:      "renewlet",
-				Prefix:      "snapshots",
+				Prefix:      cloudBackupStringPtr("snapshots"),
 				AccessKeyID: "access-key",
 			}, "secret-key")
 			client.capture = &s3ProviderResponseCapture{}
@@ -134,6 +134,35 @@ func TestS3CloudBackupAddressingStyles(t *testing.T) {
 	}
 }
 
+func TestS3CloudBackupRootPrefixOmitsListPrefixParameter(t *testing.T) {
+	var gotQuery string
+	transport := cloudBackupRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		gotQuery = request.URL.RawQuery
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Header:     http.Header{"Content-Type": []string{"application/xml"}},
+			Body:       io.NopCloser(strings.NewReader(`<?xml version="1.0"?><ListBucketResult></ListBucketResult>`)),
+			Request:    request,
+		}, nil
+	})
+	client := newS3CloudBackupClient(cloudBackupS3Settings{
+		Endpoint:    "https://example.com",
+		Region:      "us-east-1",
+		Bucket:      "renewlet",
+		Prefix:      cloudBackupStringPtr(""),
+		AccessKeyID: "access-key",
+	}, "secret-key")
+	client.client = newS3SDKClient(client.settings, client.secret, &http.Client{Transport: transport})
+
+	if _, err := client.List(context.Background()); err != nil {
+		t.Fatalf("expected root list to succeed: %v", err)
+	}
+	if strings.Contains(gotQuery, "prefix=") {
+		t.Fatalf("root list unexpectedly constrained by prefix: %q", gotQuery)
+	}
+}
+
 func TestS3CloudBackupUsesExplicitSigningRegion(t *testing.T) {
 	var gotAuthorization string
 	transport := cloudBackupRoundTripFunc(func(request *http.Request) (*http.Response, error) {
@@ -150,7 +179,7 @@ func TestS3CloudBackupUsesExplicitSigningRegion(t *testing.T) {
 		Endpoint:    "https://example.com",
 		Region:      "auto",
 		Bucket:      "renewlet",
-		Prefix:      "snapshots",
+		Prefix:      cloudBackupStringPtr("snapshots"),
 		AccessKeyID: "access-key",
 	}, "secret-key")
 	client.client = newS3SDKClient(client.settings, client.secret, &http.Client{Transport: transport})
@@ -200,7 +229,7 @@ func TestS3CloudBackupTestIncludesListProbe(t *testing.T) {
 		Endpoint:    "https://example.com",
 		Region:      "us-east-1",
 		Bucket:      "renewlet",
-		Prefix:      "snapshots",
+		Prefix:      cloudBackupStringPtr("snapshots"),
 		AccessKeyID: "access-key",
 	}, "secret-key")
 	capture := &s3ProviderResponseCapture{}
@@ -259,7 +288,7 @@ func TestS3CloudBackupLocalNetworkErrorUsesRedactedRequestContext(t *testing.T) 
 		Endpoint:    "https://cloud-storage.example.com",
 		Region:      "ap-shanghai",
 		Bucket:      "cloud-storage-1234567890",
-		Prefix:      "snapshots",
+		Prefix:      cloudBackupStringPtr("snapshots"),
 		AccessKeyID: "access-key",
 	}, "secret-key")
 	capture := &s3ProviderResponseCapture{}

@@ -108,7 +108,7 @@ describe("cloud backup schemas", () => {
     });
   });
 
-  it("normalizes empty remote prefixes to the same default as the Go runtime", () => {
+  it("keeps an explicit empty S3 prefix at the bucket root while preserving defaults", () => {
     const webdav = cloudBackupConfigUpdateSchema.parse({
       provider: "webdav",
       webdav: {
@@ -127,9 +127,32 @@ describe("cloud backup schemas", () => {
       },
       policy: cloudBackupPolicySchema.parse({}),
     });
+    const rootSlashS3 = cloudBackupConfigUpdateSchema.parse({
+      provider: "s3",
+      s3: {
+        endpoint: "https://storage.example.com",
+        bucket: "renewlet",
+        region: "auto",
+        prefix: "/",
+      },
+      policy: cloudBackupPolicySchema.parse({}),
+    });
 
     expect(webdav.webdav?.path).toBe("renewlet");
-    expect(s3.s3?.prefix).toBe("renewlet");
+    expect(s3.s3?.prefix).toBe("");
+    expect(rootSlashS3.s3?.prefix).toBe("");
+
+    const defaultS3 = cloudBackupConfigUpdateSchema.parse({
+      provider: "s3",
+      s3: {
+        endpoint: "https://storage.example.com",
+        bucket: "renewlet",
+        region: "auto",
+      },
+      policy: cloudBackupPolicySchema.parse({}),
+    });
+
+    expect(defaultS3.s3?.prefix).toBe("renewlet");
   });
 
   it("validates provider-level policy and create requests", () => {
@@ -208,7 +231,6 @@ describe("cloud backup schemas", () => {
           endpoint: "https://storage.example.com",
           region: "us-east-1",
           bucket: "renewlet",
-          prefix: "snapshots",
           accessKeyId: "access",
         },
         credentialSet: true,
@@ -233,7 +255,7 @@ describe("cloud backup schemas", () => {
         },
         updatedAt: null,
       },
-    })).data.config.s3?.bucket).toBe("renewlet");
+    })).data.config.s3?.prefix).toBe("renewlet");
 
     expect(cloudBackupConfigResponseSchema.safeParse(success({
       config: {

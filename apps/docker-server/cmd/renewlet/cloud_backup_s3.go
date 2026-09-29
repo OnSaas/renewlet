@@ -181,7 +181,10 @@ func (client *s3CloudBackupClient) Delete(ctx context.Context, id string) error 
 }
 
 func (client *s3CloudBackupClient) key(filename string) string {
-	prefix := strings.Trim(client.settings.Prefix, "/")
+	prefix := ""
+	if client.settings.Prefix != nil {
+		prefix = strings.Trim(*client.settings.Prefix, "/")
+	}
 	filename = strings.Trim(filename, "/")
 	if prefix == "" {
 		return filename
@@ -225,11 +228,15 @@ func cloudBackupS3UsePathStyle(parsed *url.URL, hostname string) bool {
 
 func (client *s3CloudBackupClient) listObjects(ctx context.Context, prefix string) ([]string, error) {
 	const pageSize int32 = 1000
-	paginator := s3.NewListObjectsV2Paginator(client.client, &s3.ListObjectsV2Input{
+	input := &s3.ListObjectsV2Input{
 		Bucket:  aws.String(client.settings.Bucket),
-		Prefix:  aws.String(prefix),
 		MaxKeys: aws.Int32(pageSize),
-	})
+	}
+	// 空 Prefix 省略查询参数，避免把根目录语义依赖到兼容服务对 prefix= 的处理；非空值仍带尾斜杠隔离命名空间。
+	if prefix != "" {
+		input.Prefix = aws.String(prefix)
+	}
+	paginator := s3.NewListObjectsV2Paginator(client.client, input)
 	keys := []string{}
 	for paginator.HasMorePages() {
 		var page *s3.ListObjectsV2Output

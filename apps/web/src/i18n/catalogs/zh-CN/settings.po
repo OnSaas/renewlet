@@ -1547,6 +1547,11 @@ msgid "settings.cloudBackupPathHelp"
 msgstr "只填写目录前缀，不要包含 .. 或文件名。"
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:501
+msgid "settings.cloudBackupS3PrefixHelp"
+msgstr "可留空，留空时直接使用 Bucket 根目录；建议使用专用 Bucket。只填写目录前缀，不要包含 .. 或文件名。"
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:783
 msgid "settings.discordWebhookHelp"
 msgstr "只支持 Discord 官方 Webhook URL，发送时会禁止 @everyone、用户和角色提及。"

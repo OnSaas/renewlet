@@ -17,12 +17,12 @@ function s3Client(endpoint: string, bucket: string): S3CloudBackupClient {
   return s3ClientWithRegion(endpoint, bucket, "ap-shanghai");
 }
 
-function s3ClientWithRegion(endpoint: string, bucket: string, region: string): S3CloudBackupClient {
+function s3ClientWithRegion(endpoint: string, bucket: string, region: string, prefix = "snapshots"): S3CloudBackupClient {
   return new S3CloudBackupClient({
     endpoint,
     region,
     bucket,
-    prefix: "snapshots",
+    prefix,
     accessKeyId: "access-key",
   }, "secret-key");
 }
@@ -69,6 +69,15 @@ describe("S3CloudBackupClient endpoint addressing", () => {
 
     expect(calls.some((call) => call.includes("https://renewlet.storage.example.com/") && call.includes("list-type=2"))).toBe(true);
     expect(calls.every((call) => !call.includes("https://storage.example.com/renewlet"))).toBe(true);
+  });
+
+  it("omits ListObjectsV2 Prefix for an explicit bucket-root configuration", async () => {
+    const calls = stubS3ListSuccess();
+
+    await s3ClientWithRegion("https://storage.example.com", "renewlet", "auto", "").list();
+
+    expect(calls[0]).toContain("https://renewlet.storage.example.com/");
+    expect(calls[0]).not.toContain("prefix=");
   });
 
   it("uses path-style addressing only for local network shaped endpoints", async () => {
@@ -186,9 +195,11 @@ describe("S3CloudBackupClient endpoint addressing", () => {
       ].join(""), { status: 200 });
     }));
 
-    await s3Client("https://storage.example.com", "renewlet").list();
+    await s3ClientWithRegion("https://storage.example.com", "renewlet", "auto", "").list();
 
     expect(calls).toHaveLength(2);
+    expect(calls[0]).not.toContain("prefix=");
+    expect(calls[1]).not.toContain("prefix=");
     expect(calls[1]).toContain("continuation-token=same-token");
   });
 });

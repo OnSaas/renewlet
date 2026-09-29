@@ -19,6 +19,7 @@ vi.mock("@/i18n/I18nProvider", () => ({
       "settings.cloudBackupS3RegionHelp": "Region 说明",
       "settings.cloudBackupS3Bucket": "Bucket",
       "settings.cloudBackupS3Prefix": "Prefix",
+      "settings.cloudBackupS3PrefixHelp": "可留空，使用 Bucket 根目录",
       "settings.cloudBackupS3AccessKey": "Access Key",
       "settings.cloudBackupS3Secret": "Secret Key",
       "settings.cloudBackupPathHelp": "路径说明",
@@ -80,6 +81,7 @@ describe("cloud backup form layout", () => {
     const s3RegionRow = screen.getByLabelText("Region").closest('[data-slot="form-field-row"]');
     expect(s3RegionRow).toHaveAttribute("data-align-at", "sm");
     expect(s3RegionRow).toHaveAttribute("data-tracks", "3");
+    expect(screen.getByText("可留空，使用 Bucket 根目录")).toBeInTheDocument();
   });
 
   it("uses one shared control row for the backup policy fields", () => {

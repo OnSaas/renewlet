@@ -1547,6 +1547,11 @@ msgid "settings.cloudBackupPathHelp"
 msgstr "Укажите только префикс каталога, без .. и имени файла."
 
 #. js-lingui-explicit-id
+#: src/i18n/descriptors/settings.ts:501
+msgid "settings.cloudBackupS3PrefixHelp"
+msgstr "Можно оставить пустым, чтобы использовать корень Bucket; рекомендуется выделенный Bucket. Укажите только префикс каталога, без .. и имени файла."
+
+#. js-lingui-explicit-id
 #: src/i18n/descriptors/settings.ts:783
 msgid "settings.discordWebhookHelp"
 msgstr "Поддерживаются только официальные Discord Webhook URL. При отправке упоминания @everyone, пользователей и ролей отключаются."

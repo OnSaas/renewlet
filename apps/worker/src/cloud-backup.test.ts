@@ -7,6 +7,7 @@ import {
   deleteCloudBackup,
   downloadCloudBackup,
   listCloudBackups,
+  readCloudBackupConfig,
   runDueCloudBackups,
   testCloudBackupConfig,
   updateCloudBackupConfig,
@@ -182,6 +183,7 @@ function cloudBackupRow(provider: "webdav" | "s3", overrides: Partial<CloudBacku
 function s3CloudBackupRow(overrides: Partial<{
   endpoint: string;
   bucket: string;
+  prefix: string;
 }> = {}): CloudBackupTargetRow {
   return cloudBackupRow("s3", {
     config_json: JSON.stringify({
@@ -189,7 +191,7 @@ function s3CloudBackupRow(overrides: Partial<{
         endpoint: overrides.endpoint ?? "https://r2.example.com",
         region: "auto",
         bucket: overrides.bucket ?? "renewlet",
-        prefix: "snapshots",
+        prefix: overrides.prefix ?? "snapshots",
         accessKeyId: "access-key",
       },
     }),
@@ -361,7 +363,7 @@ describe("Cloudflare cloud backup", () => {
           endpoint: "https://r2.example.com",
           region: "auto",
           bucket: "renewlet",
-          prefix: "snapshots",
+          prefix: "",
           accessKeyId: "access",
         },
         credentials: { webdavPassword: "ignored-webdav-secret", s3SecretAccessKey: "s3-secret" },
@@ -388,10 +390,21 @@ describe("Cloudflare cloud backup", () => {
     expect(JSON.stringify(rows.find((row) => row.provider === "s3"))).not.toContain("ignored-webdav-secret");
     expect(body.config.credentialSetByProvider).toEqual({ webdav: true, s3: true });
     expect(body.config.s3).not.toHaveProperty("addressingStyle");
+    expect(body.config.s3).toMatchObject({ prefix: "" });
+    expect(rows.find((row) => row.provider === "s3")?.config_json).toContain('"prefix":""');
     expect(body.config.policyByProvider.webdav).toMatchObject({ scheduleTime: "02:15", retention: 5 });
     expect(body.config.policyByProvider.s3).toMatchObject({ scheduleTime: "04:30", scheduleWeekday: "friday", retention: 9 });
   });
-
+  it("defaults a legacy D1 S3 row without prefix in memory without rewriting the row", async () => {
+    const rows = [cloudBackupRow("s3", { config_json: JSON.stringify({ s3: {
+      endpoint: "https://r2.example.com", region: "auto", bucket: "renewlet", accessKeyId: "access-key",
+    } }) })];
+    const originalConfig = rows[0]!.config_json;
+    const response = await readCloudBackupConfig(authorizedRequest("/api/app/cloud-backup/config"), fakeEnvForRows(rows));
+    const body = await readSuccessData<{ config: { s3?: { prefix: string } } }>(response);
+    expect(body.config.s3?.prefix).toBe("renewlet");
+    expect(rows[0]!.config_json).toBe(originalConfig);
+  });
   it("creates manual snapshots only for the requested provider", async () => {
     const rows = [cloudBackupRow("webdav"), s3CloudBackupRow()];
     const env = fakeEnvForRows(rows);

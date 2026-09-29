@@ -1204,6 +1204,7 @@ export const MESSAGE_KEYS = [
   "settings.cloudBackupS3Bucket",
   "settings.cloudBackupS3Endpoint",
   "settings.cloudBackupS3Prefix",
+  "settings.cloudBackupS3PrefixHelp",
   "settings.cloudBackupS3Region",
   "settings.cloudBackupS3RegionHelp",
   "settings.cloudBackupS3Secret",
