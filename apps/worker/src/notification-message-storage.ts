@@ -15,12 +15,15 @@ export function splitNotificationJobMessage(result: unknown): { metadata: string
   return { metadata: JSON.stringify({ ...metadata, messageChunkCount: parts.length }), parts };
 }
 
-export function notificationMessageStatements(env: Env, jobId: string, parts: string[]): D1PreparedStatement[] {
-  const statements = [env.DB.prepare("DELETE FROM notification_job_messages WHERE job_id = ?").bind(jobId)];
+export function notificationMessageStatements(env: Env, claim: NotificationJobRow, parts: string[]): D1PreparedStatement[] {
+  const ownership = "EXISTS (SELECT 1 FROM notification_jobs WHERE id = ? AND user_id = ? AND status = ? AND attempts = ? AND updated_at = ?)";
+  const identity = [claim.id, claim.user_id, claim.status, claim.attempts, claim.updated_at];
+  // 只保护最终UPDATE不足以保护快照；DELETE/INSERT必须在同一batch内通过相同身份检查。
+  const statements = [env.DB.prepare(`DELETE FROM notification_job_messages WHERE job_id = ? AND ${ownership}`).bind(claim.id, ...identity)];
   // 单批最多 16 段，包含转义也不接近 D1 单值限制；调用者与最终状态放进同一次 batch。
   for (let start = 0; start < parts.length; start += 16) {
     statements.push(env.DB.prepare(`INSERT INTO notification_job_messages (job_id, chunk_index, content)
-      SELECT ?, ? + CAST(key AS INTEGER), value FROM json_each(?)`).bind(jobId, start, JSON.stringify(parts.slice(start, start + 16))));
+      SELECT ?, ? + CAST(key AS INTEGER), value FROM json_each(?) WHERE ${ownership}`).bind(claim.id, start, JSON.stringify(parts.slice(start, start + 16)), ...identity));
   }
   return statements;
 }

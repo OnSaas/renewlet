@@ -548,7 +548,7 @@ describe("Cloudflare notifications", () => {
     expect(result.channels.failed.map((failure) => failure.channel)).toEqual(["telegram"]);
   });
 
-  it("retries only failed channels for failed cron jobs", async () => {
+  it.each(["failed", "sending"] as const)("preserves successful channels when retrying %s cron jobs", async (status) => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-09T08:01:00.000Z"));
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0 }), { status: 200 }));
@@ -556,7 +556,7 @@ describe("Cloudflare notifications", () => {
     let markSendingParams: unknown[] | null = null;
     let finalizeParams: unknown[] | null = null;
     const existing = notificationJobRow({
-      status: "failed",
+      status,
       attempts: 1,
       result_json: JSON.stringify({
         source: "cron",
@@ -566,7 +566,7 @@ describe("Cloudflare notifications", () => {
           failed: [{ channel: "telegram", error: "old telegram failure" }],
         },
       }),
-      updated_at: "2026-01-09T08:00:00.000Z",
+      updated_at: "2026-01-09T07:00:00.000Z",
     });
     const env = fakeEnv(({ sql, params, method }) => {
       if (method === "all" && sql.includes("FROM subscription_scheduler_state AS scheduler")) return d1All([{ user_id: "usr_due" }]);

@@ -158,21 +158,22 @@ export async function notificationHistory(request: Request, env: Env): Promise<R
 export async function runScheduledNotifications(env: Env): Promise<void> {
   const startedAt = performance.now();
   const now = new Date();
-  const seenUserIds = new Set<string>();
+  let afterUserId = "";
   let subscriptionCount = 0;
   let batchCount = 0;
   try {
     for (;;) {
       let users: Array<{ user_id: string }>;
       try {
-      // failed/fresh sending 会故意留在 due-index 内；查询时排除本 tick 已处理用户，避免第一页失败用户饿住后续 due 用户。
-        users = await listNotificationDueUsers(env, now, CRON_USER_PAGE_SIZE, [...seenUserIds]);
+        // failed/fresh sending 保留到期状态；游标只用不变的账号ID，避免重扫和排除列表突破D1参数上限。
+        users = await listNotificationDueUsers(env, now, CRON_USER_PAGE_SIZE, afterUserId);
       } catch (error) {
         logScheduledNotificationError({ phase: "list_due_users", error });
         throw scheduledRuntimeError(error);
       }
-      if (users.length === 0) break;
-      for (const user of users) seenUserIds.add(user.user_id);
+      const lastUser = users.at(-1);
+      if (!lastUser) break;
+      afterUserId = lastUser.user_id;
       // Cron 运行在 Worker 平台限额内；分页加固定并发避免一次 tick 把 D1/通知 provider 打满。
       await runBounded(users, CRON_USER_CONCURRENCY, async (user) => {
         try {
@@ -330,7 +331,7 @@ async function runCronForUser(
   if (existingJob?.status === "failed" && existingJob.attempts >= NOTIFICATION_MAX_RETRIES) return "settled";
 
   const message = buildDueMessageForSchedule(schedule, now, settings, subscriptions, true, locale);
-  const previousChannels = existingJob?.status === "failed" ? readJobChannels(existingJob) : emptyJobChannels();
+  const previousChannels = readJobChannels(existingJob);
   const retryChannels = channelsToSend(existingJob, previousChannels, settings.enabledChannels);
   const finalReason = settings.enabledChannels.length === 0
     ? "no_enabled_channels"
@@ -353,8 +354,8 @@ async function runCronForUser(
       message,
       channels: emptyJobChannels(),
     });
-    await finalizeNotificationJob(env, existingJob, userId, schedule, "skipped", attempts, null, result);
-    return "settled";
+    const finalized = await finalizeNotificationJob(env, existingJob, userId, schedule, "skipped", attempts, null, result);
+    return finalized ? "settled" : "keep_due";
   }
 
   if (noRetryableChannels) {
@@ -371,8 +372,8 @@ async function runCronForUser(
       message,
       channels,
     });
-    await finalizeNotificationJob(env, existingJob, userId, schedule, "sent", existingJob?.attempts ?? 0, null, result);
-    return "settled";
+    const finalized = await finalizeNotificationJob(env, existingJob, userId, schedule, "sent", existingJob?.attempts ?? 0, null, result);
+    return finalized ? "settled" : "keep_due";
   }
 
   let activeJob = existingJob;
@@ -402,8 +403,8 @@ async function runCronForUser(
     message,
     channels,
   });
-  await finalizeNotificationJob(env, activeJob, userId, schedule, status, activeJob.attempts, lastErrorFromChannels(channels), result);
-  return status === "failed" ? "keep_due" : "settled";
+  const finalized = await finalizeNotificationJob(env, activeJob, userId, schedule, status, activeJob.attempts, lastErrorFromChannels(channels), result);
+  return finalized && status === "sent" ? "settled" : "keep_due";
 }
 
 type SettingsPatch = z.infer<typeof settingsUpdateBodySchema>;

@@ -79,13 +79,14 @@ export async function createNotificationJob(
   };
 }
 
-export async function markNotificationJobSending(env: Env, row: NotificationJobRow, attempts: number): Promise<NotificationJobRow> {
+export async function markNotificationJobSending(env: Env, row: NotificationJobRow, attempts: number): Promise<NotificationJobRow | null> {
   const timestamp = nowIso();
-  // failed/stale sending 接管时先清空 last_error；最终失败摘要只由本次发送结果重新生成。
-  await env.DB.prepare(`
+  // failed/stale sending 必须仍匹配读取时的身份；丢失抢占权的执行者不能调用外部渠道。
+  const result = await env.DB.prepare(`
     UPDATE notification_jobs SET status = 'sending', attempts = ?, last_error = NULL, updated_at = ?
-    WHERE user_id = ? AND id = ?
-  `).bind(attempts, timestamp, row.user_id, row.id).run();
+    WHERE user_id = ? AND id = ? AND status = ? AND attempts = ? AND updated_at = ?
+  `).bind(attempts, timestamp, row.user_id, row.id, row.status, row.attempts, row.updated_at).run();
+  if (result.meta.changes !== 1) return null;
   return { ...row, status: "sending", attempts, last_error: null, updated_at: timestamp };
 }
 
@@ -98,24 +99,26 @@ export async function finalizeNotificationJob(
   attempts: number,
   error: string | null,
   result: unknown,
-): Promise<void> {
+): Promise<boolean> {
   let target = row;
   if (!target) {
-    // skipped 也需要历史行，否则用户只能看到“没有发送”，看不到本轮 Cron 已检查过。
-    const created = await createNotificationJob(env, userId, schedule, status, Math.max(1, attempts));
+    // 最终快照提交前先保留可接管的sending；中断不能留下永久终态却没有正文的任务。
+    const created = await createNotificationJob(env, userId, schedule, "sending", Math.max(1, attempts));
+    if (!created.created) return false;
     target = created.row;
   }
   const timestamp = nowIso();
   const persistedResult = stripNotificationFailureDetails(result);
   if (!target || target.user_id !== userId) throw new Error("Notification job owner mismatch");
   const snapshot = splitNotificationJobMessage(persistedResult);
-  // finalize 按调度唯一键更新而不是只按 id，确保 INSERT OR IGNORE 抢占后的同一窗口仍能幂等落最终态。
+  // 最终态和每条消息写入都核对同一接管身份；旧执行者不能覆盖新一轮成功渠道或正文。
   const finalize = env.DB.prepare(`
     UPDATE notification_jobs SET status = ?, attempts = ?, last_error = ?, result_json = ?, updated_at = ?
-    WHERE user_id = ? AND scheduled_local_date = ? AND scheduled_local_time = ? AND time_zone = ?
-  `).bind(status, Math.max(0, attempts), error, snapshot.metadata, timestamp, userId, schedule.scheduledLocalDate, schedule.scheduledLocalTime, schedule.timeZone);
+    WHERE user_id = ? AND id = ? AND status = ? AND attempts = ? AND updated_at = ?
+  `).bind(status, Math.max(0, attempts), error, snapshot.metadata, timestamp, userId, target.id, target.status, target.attempts, target.updated_at);
   // D1 batch 统一提交消息与最终态；失败时保留上次完整快照和渠道记录，不能部分替换。
-  await env.DB.batch([...notificationMessageStatements(env, target.id, snapshot.parts), finalize]);
+  const results = await env.DB.batch([...notificationMessageStatements(env, target, snapshot.parts), finalize]);
+  return results.at(-1)?.meta.changes === 1;
 }
 
 function stripNotificationFailureDetails(result: unknown): unknown {
@@ -162,10 +165,11 @@ export function readJobChannels(row: NotificationJobRow | null): JobChannels {
 }
 
 export function channelsToSend(existing: NotificationJobRow | null, previous: JobChannels, enabled: Channel[]): Channel[] {
-  if (existing?.status !== "failed") return uniqueValidChannels(enabled);
-  // 失败重试只发上次失败且仍启用的渠道，已成功渠道不应因为重试收到重复提醒。
+  // failed接管后可能停在sending；已持久化的成功记录跨接管保留，不能因中断而重发。
+  const succeeded = new Set(previous.succeeded);
+  if (existing?.status !== "failed") return uniqueValidChannels(enabled.filter((channel) => !succeeded.has(channel)));
   const enabledSet = new Set(enabled);
-  return uniqueValidChannels(previous.failed.map((failure) => failure.channel).filter((channel) => enabledSet.has(channel)));
+  return uniqueValidChannels(previous.failed.map((failure) => failure.channel).filter((channel) => enabledSet.has(channel) && !succeeded.has(channel)));
 }
 
 export function mergeChannelResults(previous: JobChannels, summary: SendSummary, enabled: Channel[]): JobChannels {

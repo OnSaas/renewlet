@@ -283,10 +283,10 @@ func runNotificationCron(app core.App, options notificationCronOptions) (notific
 	options = resolveCronOptions(options)
 	results := []notificationCronUserResult{}
 	if !options.Force {
-		seenUserIDs := map[string]struct{}{}
+		afterUserID := ""
 		for {
-			// failed/fresh sending 会故意留在 due-index 内；SQL 层排除本 tick 已处理用户，避免第一页失败用户饿住后续 due 用户。
-			userIDs, err := listNotificationDueUserIDsExcluding(app, options.Now, notificationCronPageSize, seenUserIDs)
+			// 账号ID游标与处理结果无关；failed/fresh sending保留due时也只在本轮处理一次。
+			userIDs, err := listNotificationDueUserIDs(app, options.Now, notificationCronPageSize, afterUserID)
 			if err != nil {
 				return notificationCronResult{}, err
 			}
@@ -294,7 +294,7 @@ func runNotificationCron(app core.App, options notificationCronOptions) (notific
 				return summarizeCronResult(options, results), nil
 			}
 			for _, userID := range userIDs {
-				seenUserIDs[userID] = struct{}{}
+				afterUserID = userID
 				row, err := notificationSettingsRecordForUser(app, userID)
 				if err != nil {
 					if _, refreshErr := refreshSubscriptionSchedulerStateWithOptions(app, userID, subscriptionSchedulerRefreshOptions{Now: options.Now}); refreshErr != nil {
@@ -434,8 +434,8 @@ func processNotificationCronUser(app core.App, options notificationCronOptions, 
 		finalReason = "no_due_items"
 	}
 	previousChannels := jobChannels{}
-	if existingJob != nil && existingJob.GetString("status") == notificationStatusFailed {
-		// 失败任务只重试失败渠道，已成功渠道不再重复推送。
+	if existingJob != nil {
+		// failed接管中断后仍保留旧成功记录；stale sending不能因此重发已成功渠道。
 		previousChannels = readJobChannels(existingJob)
 	}
 	channelsToSend := channelsToSend(existingJob, previousChannels, settings.EnabledChannels)
@@ -454,8 +454,14 @@ func processNotificationCronUser(app core.App, options notificationCronOptions, 
 			if !created {
 				return notificationCronUserResult{UserID: userID, Action: "skipped", Reason: "job_already_exists"}, nil
 			}
-		} else if err := markNotificationJobSending(app, existingJob, attempts+1); err != nil {
-			return notificationCronUserResult{}, err
+		} else {
+			existingJob, err = markNotificationJobSending(app, existingJob, attempts+1)
+			if err != nil {
+				return notificationCronUserResult{}, err
+			}
+			if existingJob == nil {
+				return notificationCronUserResult{UserID: userID, Action: "skipped", Reason: "claim_lost"}, nil
+			}
 		}
 	}
 
@@ -473,8 +479,10 @@ func processNotificationCronUser(app core.App, options notificationCronOptions, 
 	if finalReason != "" {
 		// 即使没有可发送内容也写入 skipped job，前端历史才能解释“本次 cron 已检查但无提醒”。
 		result := createJobResult(finalReason, schedule.localScheduleOccurrence, settings, contentLocale, due, options, jobChannels{})
-		if err := finalizeNotificationJob(app, existingJob, userID, schedule, notificationStatusSkipped, "", result); err != nil {
+		if finalized, err := finalizeNotificationJob(app, existingJob, userID, schedule, notificationStatusSkipped, "", result); err != nil {
 			return notificationCronUserResult{}, err
+		} else if !finalized {
+			return notificationCronUserResult{UserID: userID, Action: "skipped", Reason: "claim_lost"}, nil
 		}
 		if err := refreshNotificationSettledDerivedState(app, userID, settings, schedule.localScheduleOccurrence, options); err != nil {
 			return notificationCronUserResult{}, err
@@ -485,8 +493,10 @@ func processNotificationCronUser(app core.App, options notificationCronOptions, 
 	if noRetryableChannels {
 		channels := mergeChannelResults(previousChannels, sendSummary{}, settings.EnabledChannels)
 		result := createJobResult("", schedule.localScheduleOccurrence, settings, contentLocale, due, options, channels)
-		if err := finalizeNotificationJob(app, existingJob, userID, schedule, notificationStatusSent, "", result); err != nil {
+		if finalized, err := finalizeNotificationJob(app, existingJob, userID, schedule, notificationStatusSent, "", result); err != nil {
 			return notificationCronUserResult{}, err
+		} else if !finalized {
+			return notificationCronUserResult{UserID: userID, Action: "skipped", Reason: "claim_lost"}, nil
 		}
 		if err := refreshNotificationSettledDerivedState(app, userID, settings, schedule.localScheduleOccurrence, options); err != nil {
 			return notificationCronUserResult{}, err
@@ -509,8 +519,10 @@ func processNotificationCronUser(app core.App, options notificationCronOptions, 
 		lastError = strings.Join(parts, " | ")
 	}
 	result := createJobResult(reason, schedule.localScheduleOccurrence, settings, contentLocale, due, options, channels)
-	if err := finalizeNotificationJob(app, existingJob, userID, schedule, status, lastError, result); err != nil {
+	if finalized, err := finalizeNotificationJob(app, existingJob, userID, schedule, status, lastError, result); err != nil {
 		return notificationCronUserResult{}, err
+	} else if !finalized {
+		return notificationCronUserResult{UserID: userID, Action: "skipped", Reason: "claim_lost"}, nil
 	}
 	action := "sent"
 	if status == notificationStatusFailed {

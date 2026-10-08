@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { runScheduledNotifications } from "./notifications";
 import { listNotificationDueUsers } from "./subscription-scheduler-state";
 import type { Env } from "./types";
+import { notificationSenders } from "./notification-channel-send";
+import { subscriptionRow } from "./subscription-d1-test-support";
 
 vi.mock("./smtp", () => ({
   notificationSmtpConfig: () => {
@@ -75,10 +77,43 @@ function schedulerState(repeatReminderCount: number) {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("Cloudflare notification scheduler gate", () => {
-  it("pages past retained due users by excluding users already handled in the same tick", async () => {
+  it.each(["claim", "finalize", "skip"])("keeps the due state after losing the %s race", async (phase) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-09T08:00:00.000Z"));
+    const sender = vi.spyOn(notificationSenders, "webhook").mockResolvedValue(undefined);
+    let dueWrites = 0;
+    let finalizations = 0;
+    const env = fakeEnv(({ sql, method }) => {
+      if (method === "all" && sql.includes("FROM subscription_scheduler_state AS scheduler")) return d1All([{ user_id: "usr_due" }]);
+      if (method === "first" && sql.includes("SELECT settings_json FROM settings")) return { settings_json: JSON.stringify(settings({ enabledChannels: phase === "skip" ? [] : ["webhook"] })) };
+      if (method === "first" && sql.includes("FROM subscription_scheduler_state")) return { ...schedulerState(0), auto_renew_count: 0 };
+      if (method === "all" && sql.includes("FROM subscriptions")) return d1All([subscriptionRow("sub_due", { user_id: "usr_due", start_date: "2026-01-01", next_billing_date: "2026-01-10", reminder_days: 1 })]);
+      if (method === "first" && sql.includes("FROM notification_jobs")) return {
+        id: "job_due", user_id: "usr_due", status: "failed", attempts: 1,
+        scheduled_local_date: "2026-01-09", scheduled_local_time: "08:00", time_zone: "UTC", scheduled_instant_utc: "2026-01-09T08:00:00Z",
+        created_at: "2026-01-09T08:00:00Z", updated_at: "2026-01-09T08:00:00Z", last_error: "old failure",
+        result_json: JSON.stringify({ source: "cron", channels: { attempted: ["webhook"], succeeded: [], failed: [{ channel: "webhook", error: "old failure" }] } }),
+      };
+      if (method === "run" && sql.includes("SET status = 'sending'")) return d1Run(phase === "claim" ? 0 : 1);
+      if (method === "run" && sql.includes("notification_job_messages")) return d1Run(0);
+      if (method === "run" && sql.includes("UPDATE notification_jobs")) { finalizations++; return d1Run(0); }
+      if (method === "run" && sql.includes("subscription_scheduler_state")) { dueWrites++; return d1Run(1); }
+      if (method === "first" && sql.includes("SUM(CASE WHEN auto_renew")) return { auto_renew_count: 0, repeat_reminder_count: 0 };
+      throw new Error(`unexpected ${method} query: ${sql}`);
+    });
+    const error = vi.spyOn(console, "error");
+    await runScheduledNotifications(env);
+    expect(error).not.toHaveBeenCalled();
+    expect(sender).toHaveBeenCalledTimes(phase === "finalize" ? 1 : 0);
+    expect(finalizations).toBe(phase === "claim" ? 0 : 1);
+    expect(dueWrites).toBe(0);
+  });
+
+  it("pages past retained due users with an immutable account cursor", async () => {
     const queries: FakeD1Query[] = [];
     const env = fakeEnv((query) => {
       queries.push(query);
@@ -88,10 +123,10 @@ describe("Cloudflare notification scheduler gate", () => {
       throw new Error(`unexpected ${query.method} query: ${query.sql}`);
     });
 
-    const users = await listNotificationDueUsers(env, new Date("2026-01-09T08:00:00.000Z"), 1, ["usr_retained"]);
+    const users = await listNotificationDueUsers(env, new Date("2026-01-09T08:00:00.000Z"), 1, "usr_retained");
 
     expect(users).toEqual([{ user_id: "usr_later" }]);
-    expect(queries[0]?.sql).toContain("scheduler.user_id NOT IN (?)");
+    expect(queries[0]?.sql).toContain("users.id > ?");
     expect(queries[0]?.params).toEqual(["2026-01-09T08:00:00Z", "2026-01-09T08:00:00Z", "usr_retained", 1]);
   });
 

@@ -299,13 +299,8 @@ export async function listAutoRenewDueUsers(env: Env, now: Date, limit: number):
   return result.results;
 }
 
-export async function listNotificationDueUsers(env: Env, now: Date, limit: number, excludeUserIds: readonly string[] = []): Promise<Array<{ user_id: string }>> {
+export async function listNotificationDueUsers(env: Env, now: Date, limit: number, afterUserId = ""): Promise<Array<{ user_id: string }>> {
   const nowUtc = toRfc3339Seconds(now);
-  const uniqueExcludeUserIds = [...new Set(excludeUserIds.map((id) => id.trim()).filter(Boolean))].sort();
-  // exclude 来自本 tick 已处理集合，仍必须绑定为 SQL 参数，不能拼接到查询文本里当作可信 id。
-  const excludeClause = uniqueExcludeUserIds.length > 0
-    ? `AND scheduler.user_id NOT IN (${uniqueExcludeUserIds.map(() => "?").join(", ")})`
-    : "";
   // daily/repeat 共用一个用户队列；单用户内仍以日常提醒优先，保持旧调度语义不因索引拆分而变成双发送。
   const result = await env.DB.prepare(`
     SELECT scheduler.user_id
@@ -320,15 +315,10 @@ export async function listNotificationDueUsers(env: Env, now: Date, limit: numbe
           AND (scheduler.next_repeat_notification_due_at_utc IS NULL OR scheduler.next_repeat_notification_due_at_utc <= ?)
         )
       )
-      ${excludeClause}
-    ORDER BY
-      min(
-        COALESCE(scheduler.next_daily_notification_due_at_utc, '0000-01-01T00:00:00Z'),
-        COALESCE(scheduler.next_repeat_notification_due_at_utc, '9999-12-31T23:59:59Z')
-      ) ASC,
-      scheduler.user_id ASC
+      AND users.id > ?
+    ORDER BY users.id ASC
     LIMIT ?
-  `).bind(nowUtc, nowUtc, ...uniqueExcludeUserIds, limit).all<{ user_id: string }>();
+  `).bind(nowUtc, nowUtc, afterUserId, limit).all<{ user_id: string }>();
   return result.results;
 }
 
