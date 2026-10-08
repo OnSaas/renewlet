@@ -29,6 +29,7 @@ const budgets = {
   route: { gzip: 400000, brotli: 345000 },
 };
 const forbiddenStartupModules = [
+  ["Passkey SDK", (id) => id.includes("node_modules/@simplewebauthn/browser/")],
   ["Recharts", (id) => id.includes("node_modules/recharts/")],
   ["JSZip", (id) => id.includes("node_modules/jszip/")],
   ["sql.js", (id) => id.includes("node_modules/sql.js/")],
