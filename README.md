@@ -1,5 +1,7 @@
 # Renewlet
 
+[![Deploy to Railyard](https://app.railyard.run/deploy/badge)](https://app.railyard.run/deploy?repo=https://github.com/zhiyingzzhou/renewlet)
+
 <p align="center">
   <img src="./apps/web/public/logo.svg" alt="Renewlet" width="320">
 </p>
