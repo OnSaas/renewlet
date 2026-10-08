@@ -20,6 +20,11 @@ vi.mock("@/i18n/I18nProvider", () => ({
       "settings.cloudBackupS3Bucket": "Bucket",
       "settings.cloudBackupS3Prefix": "Prefix",
       "settings.cloudBackupS3PrefixHelp": "可留空，使用 Bucket 根目录",
+      "settings.cloudBackupS3AddressingStyle": "寻址模式",
+      "settings.cloudBackupS3AddressingStyleHelp": "寻址模式说明",
+      "settings.cloudBackupS3AddressingStyleAuto": "Auto",
+      "settings.cloudBackupS3AddressingStylePath": "Path-style",
+      "settings.cloudBackupS3AddressingStyleVirtual": "Virtual-hosted",
       "settings.cloudBackupS3AccessKey": "Access Key",
       "settings.cloudBackupS3Secret": "Secret Key",
       "settings.cloudBackupPathHelp": "路径说明",
@@ -53,6 +58,7 @@ const form: CloudBackupFormState = {
   s3Region: "auto",
   s3Bucket: "renewlet",
   s3Prefix: "renewlet",
+  s3AddressingStyle: "auto",
   s3AccessKeyId: "access",
   s3SecretAccessKey: "",
   scheduleEnabled: true,
@@ -68,6 +74,7 @@ describe("cloud backup form layout", () => {
       secretPlaceholder: "留空保留已保存密钥",
       onProviderChange: vi.fn(),
       onTextChange: vi.fn(),
+      onAddressingStyleChange: vi.fn(),
     };
     const { rerender } = render(<CloudBackupConnectionForm form={form} {...props} />);
 

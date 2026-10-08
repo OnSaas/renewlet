@@ -41,6 +41,31 @@ func TestCloudBackupConfigValidationRejectsUnsafeRemotePaths(t *testing.T) {
 	}
 }
 
+func TestCloudBackupConfigValidationRejectsEndpointCredentialsAndBucketPaths(t *testing.T) {
+	withCredentials := cloudBackupS3Settings{
+		Endpoint: "https://access:secret@storage.example.com",
+		Region:   "auto",
+		Bucket:   "renewlet",
+	}
+	if err := withCredentials.NormalizeAndValidate(); err == nil {
+		t.Fatal("expected S3 endpoint credentials to be rejected")
+	}
+
+	withPath := cloudBackupS3Settings{
+		Endpoint: "https://storage.example.com",
+		Region:   "auto",
+		Bucket:   "renewlet/backups",
+	}
+	if err := withPath.NormalizeAndValidate(); err == nil {
+		t.Fatal("expected S3 bucket path to be rejected")
+	}
+
+	webdav := cloudBackupWebDAVSettings{URL: "https://alice:secret@dav.example.com", Path: "renewlet"}
+	if err := webdav.NormalizeAndValidate(); err == nil {
+		t.Fatal("expected WebDAV endpoint credentials to be rejected")
+	}
+}
+
 func TestCloudBackupS3PrefixPreservesExplicitRootAndDefaultsMissingValue(t *testing.T) {
 	var missing cloudBackupS3Settings
 	if err := json.Unmarshal([]byte(`{"endpoint":"https://storage.example.com","bucket":"renewlet","region":"auto"}`), &missing); err != nil {
@@ -311,15 +336,7 @@ func TestVerifyCloudBackupSnapshotBytesRejectsChecksumMismatch(t *testing.T) {
 func TestVerifyCloudBackupSnapshotBytesEnforcesUnifiedSnapshotLimit(t *testing.T) {
 	content := make([]byte, int(cloudBackupSnapshotMaxBytes)+1)
 	allowed := content[:159*(1<<20)/10]
-	allowedHash := sha256.Sum256(allowed)
-	allowedManifest := cloudBackupSnapshotManifest{
-		Kind:                "renewlet-cloud-backup-snapshot",
-		SchemaVersion:       cloudBackupTransportSchemaVersion,
-		SizeBytes:           int64(len(allowed)),
-		SHA256:              hex.EncodeToString(allowedHash[:]),
-		ExportKind:          "renewlet-export",
-		ExportSchemaVersion: renewletExportSchemaVersion,
-	}
+	allowedManifest := cloudBackupManifestForTest("renewlet-export-v1-allowed", allowed)
 	if err := verifyCloudBackupSnapshotBytes(allowed, allowedManifest); err != nil {
 		t.Fatalf("expected 15.9 MiB snapshot to pass, got %v", err)
 	}
@@ -390,7 +407,7 @@ func TestCloudBackupRemoteTargetForProviderDoesNotInspectOtherProvider(t *testin
 	}
 }
 
-func TestDownloadCloudBackupSnapshotFromTargetsFallsBackAndAggregatesRawFailures(t *testing.T) {
+func TestDownloadCloudBackupSnapshotFromTargetsFallsBackAndAggregatesStructuredFailures(t *testing.T) {
 	id := "renewlet-export-v1-20260609T000000Z-abcd1234"
 	content := []byte("renewlet")
 	s3 := &fakeCloudBackupRemoteClient{
@@ -398,7 +415,7 @@ func TestDownloadCloudBackupSnapshotFromTargetsFallsBackAndAggregatesRawFailures
 		downloadManifest: cloudBackupManifestForTest(id, content),
 	}
 	got, manifest, err := downloadCloudBackupSnapshotFromTargets(context.Background(), []cloudBackupTarget{
-		{Provider: cloudBackupProviderWebDAV, Client: &fakeCloudBackupRemoteClient{downloadErr: cloudBackupHTTPErrorForTest("CLOUD_BACKUP_WEBDAV_NOT_FOUND", http.StatusNotFound, "<d:error>missing</d:error>")}},
+		{Provider: cloudBackupProviderWebDAV, Client: &fakeCloudBackupRemoteClient{downloadErr: cloudBackupHTTPErrorForTest("CLOUD_BACKUP_WEBDAV_GET_FAILED", http.StatusNotFound, "<d:error>missing</d:error>")}},
 		{Provider: cloudBackupProviderS3, Client: s3},
 	}, id)
 	if err != nil {
@@ -409,18 +426,18 @@ func TestDownloadCloudBackupSnapshotFromTargetsFallsBackAndAggregatesRawFailures
 	}
 
 	_, _, err = downloadCloudBackupSnapshotFromTargets(context.Background(), []cloudBackupTarget{
-		{Provider: cloudBackupProviderWebDAV, Client: &fakeCloudBackupRemoteClient{downloadErr: cloudBackupHTTPErrorForTest("CLOUD_BACKUP_WEBDAV_NOT_FOUND", http.StatusNotFound, "<d:error>missing</d:error>")}},
+		{Provider: cloudBackupProviderWebDAV, Client: &fakeCloudBackupRemoteClient{downloadErr: cloudBackupHTTPErrorForTest("CLOUD_BACKUP_WEBDAV_GET_FAILED", http.StatusNotFound, "<d:error>missing</d:error>")}},
 		{Provider: cloudBackupProviderS3, Client: &fakeCloudBackupRemoteClient{downloadErr: cloudBackupHTTPErrorForTest("CLOUD_BACKUP_S3_GET_FAILED", http.StatusForbidden, "<Error><Code>AccessDenied</Code></Error>")}},
 	}, id)
 	remoteErr := cloudBackupRemoteErrorFrom(err)
-	if remoteErr == nil || remoteErr.details == nil || remoteErr.details.RawResponseText == nil {
-		t.Fatalf("expected raw provider attempt summary, got %#v", err)
+	if remoteErr == nil || remoteErr.details == nil || len(remoteErr.details.Attempts) != 2 {
+		t.Fatalf("expected structured provider attempts, got %#v", err)
 	}
-	if !strings.Contains(*remoteErr.details.RawResponseText, "webdav: CLOUD_BACKUP_WEBDAV_NOT_FOUND") {
-		t.Fatalf("expected WebDAV failure summary, got %#v", *remoteErr.details.RawResponseText)
+	if remoteErr.details.Attempts[0].Code != "CLOUD_BACKUP_WEBDAV_GET_FAILED" {
+		t.Fatalf("expected WebDAV failure summary, got %#v", remoteErr.details.Attempts)
 	}
-	if !strings.Contains(*remoteErr.details.RawResponseText, "s3: CLOUD_BACKUP_S3_GET_FAILED") || !strings.Contains(*remoteErr.details.RawResponseText, "AccessDenied") {
-		t.Fatalf("expected S3 failure summary, got %#v", *remoteErr.details.RawResponseText)
+	if remoteErr.details.Attempts[1].Code != "CLOUD_BACKUP_S3_GET_FAILED" || remoteErr.details.Attempts[1].Details == nil || !strings.Contains(remoteErr.details.Attempts[1].Details.ProviderMessage, "AccessDenied") {
+		t.Fatalf("expected S3 failure summary, got %#v", remoteErr.details.Attempts)
 	}
 }
 
@@ -527,10 +544,13 @@ func cloudBackupManifestForTest(id string, content []byte) cloudBackupSnapshotMa
 }
 
 func cloudBackupHTTPErrorForTest(code string, status int, body string) error {
-	return cloudBackupRemoteHTTPError(code, &http.Response{
-		StatusCode: status,
-		Status:     http.StatusText(status),
-		Header:     http.Header{"content-type": []string{"application/xml"}},
-		Body:       io.NopCloser(strings.NewReader(body)),
-	})
+	statusValue := status
+	return &cloudBackupRemoteError{
+		code: code,
+		details: cloudBackupRemoteErrorDetails("", "GET", "host=test.example.com; key=test", &cloudBackupProviderResponse{
+			Status:     &statusValue,
+			StatusText: cloudBackupStringPtr(http.StatusText(status)),
+			Body:       cloudBackupStringPtr(body),
+		}, ""),
+	}
 }
