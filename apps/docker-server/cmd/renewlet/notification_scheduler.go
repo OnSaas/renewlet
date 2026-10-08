@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 	_ "time/tzdata"
@@ -88,34 +87,6 @@ func addDateOnly(date string, days int) string {
 		return date
 	}
 	return parsed.AddDate(0, 0, days).Format("2006-01-02")
-}
-
-func isValidLocalTime(value string) bool {
-	if len(value) != 5 || value[2] != ':' {
-		return false
-	}
-	hour, errH := strconv.Atoi(value[:2])
-	minute, errM := strconv.Atoi(value[3:])
-	return errH == nil && errM == nil && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59
-}
-
-func parseLocalTime(value string) (int, int) {
-	hour, _ := strconv.Atoi(value[:2])
-	minute, _ := strconv.Atoi(value[3:])
-	return hour, minute
-}
-
-func getScheduleInstant(localDate, localTime, timezone string) (time.Time, error) {
-	loc, err := time.LoadLocation(timezone)
-	if err != nil {
-		return time.Time{}, err
-	}
-	day, err := time.Parse("2006-01-02", localDate)
-	if err != nil {
-		return time.Time{}, err
-	}
-	hour, minute := parseLocalTime(localTime)
-	return time.Date(day.Year(), day.Month(), day.Day(), hour, minute, 0, 0, loc).UTC(), nil
 }
 
 // getLocalScheduleDecision 判断当前 tick 是否命中用户本地通知窗口。
