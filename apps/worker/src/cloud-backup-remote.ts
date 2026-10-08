@@ -19,6 +19,7 @@ import {
   type CloudBackupWebDavConfig,
 } from "@renewlet/shared/schemas/cloud-backup";
 import {
+  readUpstreamResponseBody,
   redactUpstreamSecrets,
   type UpstreamFetchResponse,
   type UpstreamProviderResponse,
@@ -31,6 +32,7 @@ import { WorkerWebDAVClient, WorkerWebDAVRequestError } from "./cloud-backup-web
 const textEncoder = new TextEncoder();
 const CLOUD_BACKUP_UPSTREAM_TIMEOUT_MS = 45_000;
 const CLOUD_BACKUP_S3_LIST_RESPONSE_MAX_KEYS = 1000;
+const CLOUD_BACKUP_S3_LIST_RESPONSE_MAX_BYTES = 1024 * 1024;
 
 type CloudBackupProviderResponse = UpstreamProviderResponse;
 
@@ -217,12 +219,33 @@ class S3ObjectStore {
       region: settings.region,
       credentials: { accessKeyId: settings.accessKeyId ?? "", secretAccessKey: secret },
       forcePathStyle: settings.addressingStyle === "pathStyle",
-      // Worker 的原生边界是 fetch；显式使用 SDK 官方 handler 也让 Node 测试与线上运行面共享同一请求语义。
-      requestHandler: new FetchHttpHandler({ requestTimeout: CLOUD_BACKUP_UPSTREAM_TIMEOUT_MS }),
+      // 私有对象必须直达源站；Cloudflare 缓存可能把 ZIP 的 HEAD 改为 GET，破坏包含方法的 SigV4 签名。
+      requestHandler: new FetchHttpHandler({ cache: "no-store", requestTimeout: CLOUD_BACKUP_UPSTREAM_TIMEOUT_MS }),
       maxAttempts: 1,
       requestChecksumCalculation: RequestChecksumCalculation.WHEN_REQUIRED,
       responseChecksumValidation: ResponseChecksumValidation.WHEN_REQUIRED,
     });
+    // SDK 解析会消费正文；只给列表和失败响应做有界缓冲，保留真实诊断，成功 ZIP 下载继续流式读取。
+    this.client.middlewareStack.add((next, context) => async (args) => {
+      const result = await next(args);
+      const response = asRecord(result.response);
+      const status = numberValue(response?.["statusCode"]) ?? 0;
+      const listing = context.commandName === "ListObjectsV2Command" && status < 300;
+      if (response && (listing || status >= 300)) {
+        const limit = listing ? CLOUD_BACKUP_S3_LIST_RESPONSE_MAX_BYTES : CLOUD_BACKUP_DIAGNOSTIC_MAX_CHARS;
+        try {
+          const body = await readUpstreamResponseBody({ body: response["body"] }, limit + 1);
+          const bytes = textEncoder.encode(body.text);
+          response["body"] = bytes;
+          if (listing && (body.truncated || bytes.byteLength > limit)) {
+            throw new Error(`S3 ListObjectsV2 response exceeded the ${limit}-byte limit.`);
+          }
+        } catch (error) {
+          throw Object.assign(error instanceof Error ? error : new Error(String(error)), { $response: response });
+        }
+      }
+      return result;
+    }, { step: "deserialize", name: "renewletBoundS3Response", priority: "low" });
     if (settings.addressingStyle === "virtualHost") {
       this.client.middlewareStack.add((next) => async (args) => {
         const request = args.request as { hostname?: string } | undefined;
@@ -421,14 +444,14 @@ async function s3RemoteError(code: string, operation: string, target: string, er
   const response = await s3ProviderResponse(record?.["$response"], secrets);
   const status = numberValue(metadata?.["httpStatusCode"]) ?? response?.status ?? undefined;
   const serviceError = error instanceof S3ServiceException;
-  const providerMessage = response?.body ?? (serviceError ? truncate(redactUpstreamSecrets(error.message, secrets)) : undefined);
+  // HEAD 失败通常没有正文；SDK 合成的异常名/消息不能冒充服务端响应，也不能据此断言权限不足。
+  const providerMessage = response?.body;
   // 2xx 之后仍可能在 SDK 反序列化时失败；本地异常不能充当 provider code，也不能被响应正文覆盖。
   const clientMessage = serviceError ? undefined : truncate(redactUpstreamSecrets(
     error instanceof Error ? `${error.name}: ${error.message}` : String(error),
     secrets,
   ));
-  const providerCode = providerCodeFromBody(response?.body ?? undefined)
-    ?? (serviceError ? redactUpstreamSecrets(error.name, secrets).slice(0, 256) : undefined);
+  const providerCode = providerCodeFromBody(response?.body ?? undefined);
   const requestId = stringValue(metadata?.["requestId"])
     ?? stringValue(metadata?.["extendedRequestId"])
     ?? response?.headers?.["x-amz-request-id"]

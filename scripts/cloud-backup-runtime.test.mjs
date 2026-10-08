@@ -7,7 +7,7 @@ import test from "node:test";
 import { parse } from "jsonc-parser";
 import { unstable_dev } from "wrangler";
 
-test("S3 XML parsing uses the deployed Wrangler runtime entry", { timeout: 60_000 }, async (t) => {
+test("S3 transport uses the deployed Wrangler runtime entry", { timeout: 60_000 }, async (t) => {
   const root = fileURLToPath(new URL("..", import.meta.url));
   const config = parse(await readFile(join(root, "wrangler.jsonc"), "utf8"));
   const rootRequire = createRequire(join(root, "package.json"));
@@ -51,6 +51,7 @@ test("S3 XML parsing uses the deployed Wrangler runtime entry", { timeout: 60_00
         assert.ok(lists.every((call) => call.maxKeys === "1000" && call.prefix === (scenario === "pages" ? "backups/" : null)));
         assert.equal(result.calls.length, lists.length + 1);
         assert.ok(result.calls.every((call) => call.method === "GET" && !call.path.endsWith(".zip")));
+        assert.ok(result.calls.every((call) => call.cache === "no-store" && call.signed));
       });
     }
     for (const scenario of ["forbidden", "invalid-xml"]) {
@@ -70,6 +71,38 @@ test("S3 XML parsing uses the deployed Wrangler runtime entry", { timeout: 60_00
           assert.equal(result.details.providerCode, undefined);
           assert.match(result.details.clientMessage, /XML parse error/);
           assert.equal(result.details.providerMessage, "not xml");
+        }
+      });
+    }
+    // workerd 能验证 SDK 交给 fetch 的缓存策略，不能模拟线上 CDN 的 HEAD 改写；实际部署仍需单独确认。
+    for (const scenario of ["upload", "head-forbidden", "manifest-forbidden"]) {
+      await t.test(`keeps signed ZIP requests uncached through ${scenario}`, async () => {
+        const response = await worker.fetch(`http://localhost/?scenario=${scenario}`);
+        const result = await response.json();
+        assert.ok(result.calls.every((call) => call.cache === "no-store" && call.signed));
+        assert.equal(result.remainingObjects, 0);
+        assert.ok(result.calls[1].path.endsWith(".zip"));
+        if (scenario === "upload") {
+          assert.equal(response.status, 200, JSON.stringify(result));
+          assert.equal(result.content, "backup-content");
+          assert.deepEqual(result.calls.map((call) => call.method), ["PUT", "HEAD", "PUT", "GET", "GET", "DELETE", "DELETE"]);
+        } else {
+          assert.equal(response.status, 400);
+          assert.equal(result.details.httpStatus, 403);
+          assert.equal(result.details.clientMessage, undefined);
+          assert.equal(result.details.cleanup, undefined);
+          if (scenario === "head-forbidden") {
+            assert.equal(result.code, "CLOUD_BACKUP_S3_HEAD_FAILED");
+            assert.equal(result.details.requestId, "head-request");
+            assert.equal(result.details.providerCode, undefined);
+            assert.equal(result.details.providerMessage, undefined);
+            assert.deepEqual(result.calls.map((call) => call.method), ["PUT", "HEAD", "DELETE"]);
+          } else {
+            assert.equal(result.code, "CLOUD_BACKUP_S3_PUT_FAILED");
+            assert.equal(result.details.providerCode, "AccessDenied");
+            assert.match(result.details.providerMessage, /Manifest rejected/);
+            assert.deepEqual(result.calls.map((call) => call.method), ["PUT", "HEAD", "PUT", "DELETE", "DELETE"]);
+          }
         }
       });
     }

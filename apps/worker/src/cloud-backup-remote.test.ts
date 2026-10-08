@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { S3Client } from "@aws-sdk/client-s3";
 import { getPatcher } from "webdav/web";
+import { CLOUD_BACKUP_DIAGNOSTIC_MAX_CHARS } from "@renewlet/shared/schemas/cloud-backup";
 import { CloudBackupRemoteError, S3CloudBackupClient, WebDAVCloudBackupClient, sha256Hex } from "./cloud-backup-remote";
 
 type CloudBackupRemoteErrorMatch = Omit<Partial<CloudBackupRemoteError>, "details"> & {
@@ -22,6 +23,7 @@ function fetchCallFromArgs(input: RequestInfo | URL, init?: RequestInit) {
     href,
     url: new URL(href),
     method: init?.method ?? request?.method ?? "GET",
+    cache: init?.cache ?? request?.cache,
     headers: new Headers(init?.headers ?? request?.headers),
   };
 }
@@ -44,7 +46,8 @@ function s3ClientWithRegion(endpoint: string, bucket: string, region: string, pr
 function stubS3ListSuccess(): string[] {
   const calls: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
-    const { href, method } = fetchCallFromArgs(url, init);
+    const { href, method, cache } = fetchCallFromArgs(url, init);
+    expect(cache).toBe("no-store");
     calls.push(`${method} ${href}`);
     return new Response(`<?xml version="1.0"?><ListBucketResult></ListBucketResult>`, { status: 200 });
   }));
@@ -118,8 +121,8 @@ describe("S3CloudBackupClient endpoint addressing", () => {
     expect(calls[0]).toContain("https://renewlet.storage.example.com/");
   });
 
-  it("returns upstream XML for signature failures without leaking signed query values", async () => {
-    const body = `<?xml version='1.0' encoding='utf-8'?><Error><Code>SignatureDoesNotMatch</Code><Message>bad signature</Message></Error>`;
+  it.each(["SignatureDoesNotMatch", "Unknown"])("preserves an actual %s provider response without filtering error names", async (providerCode) => {
+    const body = `<?xml version='1.0' encoding='utf-8'?><Error><Code>${providerCode}</Code><Message>provider failure</Message></Error>`;
     vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
       const { headers } = fetchCallFromArgs(url, init);
       expect(headers.get("authorization")).toContain("AWS4-HMAC-SHA256");
@@ -141,13 +144,14 @@ describe("S3CloudBackupClient endpoint addressing", () => {
     expect(error).toMatchObject({
       code: "CLOUD_BACKUP_S3_LIST_FAILED",
       details: {
-        providerCode: "SignatureDoesNotMatch",
+        providerCode,
+        providerMessage: body,
         httpStatus: 403,
         httpStatusText: "Forbidden",
         requiredCapability: "bucket listing permission",
       },
     } satisfies CloudBackupRemoteErrorMatch);
-    expect(error?.details?.providerMessage).toBeTruthy();
+    expect(error?.details?.clientMessage).toBeUndefined();
     expect(JSON.stringify(error?.details)).not.toContain("X-Amz-Signature");
   });
 
@@ -175,6 +179,30 @@ describe("S3CloudBackupClient endpoint addressing", () => {
     expect(error?.details?.operation).toBe("ListObjectsV2");
     expect(error?.details?.clientMessage).toContain("XML parse error");
     expect(error?.details?.providerCode).toBeUndefined();
+  });
+
+  it.each([200, 403])("bounds an oversized S3 response with HTTP %s and cancels its stream", async (status) => {
+    const cancel = vi.fn();
+    const limit = status === 200 ? 1024 * 1024 : CLOUD_BACKUP_DIAGNOSTIC_MAX_CHARS;
+    const body = `<Error><Code>AccessDenied</Code><Message>secret-key ${"x".repeat(limit)}</Message></Error>`;
+    const fetch = vi.fn(async () => new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode(body)); },
+      cancel,
+    }), { status }));
+    vi.stubGlobal("fetch", fetch);
+
+    const error: unknown = await s3Client("https://storage.example.com", "renewlet").list().catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CloudBackupRemoteError);
+    if (!(error instanceof CloudBackupRemoteError)) throw new Error("Expected structured remote error");
+    expect(error.code).toBe("CLOUD_BACKUP_S3_LIST_FAILED");
+    expect(error.details?.httpStatus).toBe(status);
+    expect(error.details?.providerMessage?.length).toBeLessThanOrEqual(CLOUD_BACKUP_DIAGNOSTIC_MAX_CHARS);
+    expect(JSON.stringify(error.details)).not.toContain("secret-key");
+    if (status === 200) expect(error.details?.clientMessage).toContain("1048576-byte limit");
+    else expect(error.details?.providerCode).toBe("AccessDenied");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
   it("keeps a local SDK exception separate from a successful provider response", async () => {
@@ -252,12 +280,13 @@ describe("S3CloudBackupClient endpoint addressing", () => {
     expect(calls[1]).toContain("continuation-token=same-token");
   });
 
-  it("reports HeadObject permission failures and removes the uploaded ZIP", async () => {
+  it("preserves a bodyless HeadObject failure and cleanup without inventing provider diagnostics", async () => {
     const calls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
-      const { method } = fetchCallFromArgs(url, init);
+      const { method, cache } = fetchCallFromArgs(url, init);
+      expect(cache).toBe("no-store");
       calls.push(method);
-      if (method === "HEAD") return new Response("", { status: 403, statusText: "Forbidden" });
+      if (method === "HEAD") return new Response(null, { status: 403, statusText: "Forbidden", headers: { "x-amz-request-id": "head-request" } });
       if (method === "DELETE") return new Response("", { status: 403, statusText: "Forbidden" });
       return new Response("", { status: 200 });
     }));
@@ -287,8 +316,14 @@ describe("S3CloudBackupClient endpoint addressing", () => {
         requiredCapability: "object read permission",
         httpStatus: 403,
         httpStatusText: "Forbidden",
+        operation: "HeadObject",
+        requestId: "head-request",
+        cleanup: [expect.objectContaining({ operation: "DeleteObject", code: "CLOUD_BACKUP_S3_DELETE_FAILED" })],
       },
     } satisfies CloudBackupRemoteErrorMatch);
+    expect(error?.details?.providerCode).toBeUndefined();
+    expect(error?.details?.providerMessage).toBeUndefined();
+    expect(error?.details?.clientMessage).toBeUndefined();
     expect(calls).toEqual(["PUT", "HEAD", "DELETE"]);
   });
 
