@@ -41,6 +41,29 @@ async function expectSameDOMNode(
   expect(await before.evaluate((node, currentNode) => node === currentNode, after), label).toBe(true);
 }
 
+test("tag cursor layout uses the content box and rejects unnecessary wrapping", async ({ page }) => {
+  await page.goto("about:blank");
+  await page.setContent(`
+    <div role="dialog">
+      <div data-slot="subscription-tag-field" style="display:flex;flex-wrap:wrap;gap:8px;width:200px;box-sizing:border-box;padding:12px;border:1px solid">
+        <span id="chip" style="flex:none;width:169px;height:24px"><button aria-label="移除标签 fixture">fixture</button></span>
+        <span data-slot="subscription-tag-input-sizer" style="flex:none;width:1px;height:28px"><input aria-label="标签" style="width:1px;padding:0;border:0" /></span>
+      </div>
+      <div role="listbox">fixture</div>
+    </div>`);
+  const dialog = page.getByRole("dialog");
+  // 外框剩 18px，但右 padding/border 占 13px；真实内容区的 5px 放不下 1px 光标和 8px gap。
+  await expectEmptyTagCursorStaysInline(page, dialog);
+  await page.locator("#chip").evaluate((chip) => { chip.style.width = "160px"; });
+  await expectEmptyTagCursorStaysInline(page, dialog);
+  await page.locator("#chip").evaluate((chip) => {
+    const lineBreak = document.createElement("span");
+    lineBreak.style.flexBasis = "100%";
+    chip.after(lineBreak);
+  });
+  await expect(expectEmptyTagCursorStaysInline(page, dialog)).rejects.toThrow("empty tag cursor wrapped");
+});
+
 test("desktop advanced filters complete the right-side exit lifecycle", async ({ page }) => {
   await page.goto("/subscriptions");
   await expect(page.getByRole("heading", { name: "订阅列表" })).toBeVisible();
