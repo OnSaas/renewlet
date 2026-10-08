@@ -1,4 +1,4 @@
-import { customConfigSchema } from "@renewlet/shared/schemas/custom-config";
+import { customConfigSchema, type ApiCustomConfig } from "@renewlet/shared/schemas/custom-config";
 import {
   CLOUD_BACKUP_MAX_SNAPSHOT_BYTES,
   cloudBackupSnapshotManifestSchema,
@@ -14,7 +14,7 @@ import {
   type RenewletExportMissingAssetReason,
   type RenewletExportMissingAssetReference,
 } from "@renewlet/shared/schemas/import-export";
-import { getAsset, getCustomConfig, getSettings, listSubscriptions, toApiSubscription } from "./db";
+import { getOwnedAssetsByIds, getCustomConfig, getSettings, listSubscriptions, toApiSubscription, type OwnedAssetMetadata } from "./db";
 import { sanitizeSettingsForCloudBackup } from "./cloud-backup-sanitize";
 import { sha256Hex, snapshotId } from "./cloud-backup-remote";
 import { extensionFromMime, privateAssetIdFromLogo } from "./cloud-backup-utils";
@@ -52,7 +52,8 @@ type ExportAssetReference = {
 
 type ExportAssetCollector = {
   assets: ExportAsset[];
-  assetById: Map<string, ExportAsset>;
+  metadata: Map<string, OwnedAssetMetadata>;
+  reads: Map<string, ExportAssetReadResult>;
   missingAssets: RenewletExportMissingAsset[];
   budget?: CronBudget;
 };
@@ -78,14 +79,23 @@ export async function buildCloudBackupSnapshotPayload(env: Env, userId: string, 
 
 export async function buildCloudBackupExportZip(env: Env, userId: string, exportedAt = new Date(), budget?: CronBudget): Promise<{ content: Uint8Array; exportedAt: Date }> {
   const startedAt = performance.now();
-  const collector: ExportAssetCollector = { assets: [], assetById: new Map(), missingAssets: [], ...(budget ? { budget } : {}) };
-  const subscriptions = await listSubscriptions(env, userId);
+  const [subscriptions, settings, rawConfig, exchangeRateSnapshots] = await Promise.all([
+    listSubscriptions(env, userId), getSettings(env, userId), getCustomConfig(env, userId), listExchangeRateSnapshots(env, userId),
+  ]);
+  const config = customConfigSchema.parse(rawConfig);
+  const assetIds = [...subscriptions.map((row) => row.logo), ...config.paymentMethods.map((method) => method.icon)]
+    .map((path) => privateAssetIdFromLogo(path ?? null)).filter((id): id is string => Boolean(id));
+  // metadata 失败必须中止快照，不能把查询故障记成用户资产缺失；跨账号引用不会获得 R2 key。
+  const metadata = await getOwnedAssetsByIds(env, userId, assetIds);
+  const collector: ExportAssetCollector = {
+    assets: [], metadata: new Map(metadata.map((row) => [row.id, row])), reads: new Map(), missingAssets: [], ...(budget ? { budget } : {}),
+  };
   const exportSubscriptions = [];
   for (const row of subscriptions) {
     const subscription = { ...toApiSubscription(row) };
     const assetId = privateAssetIdFromLogo(subscription.logo ?? null);
     if (assetId && subscription.logo) {
-      const assetPath = await resolveExportAsset(env, userId, collector, {
+      const assetPath = await resolveExportAsset(env, collector, {
         assetId,
         path: subscription.logo,
         reference: "subscription.logo",
@@ -96,7 +106,7 @@ export async function buildCloudBackupExportZip(env: Env, userId: string, export
     }
     exportSubscriptions.push(subscription);
   }
-  const customConfig = await buildExportCustomConfig(env, userId, collector);
+  const customConfig = await buildExportCustomConfig(env, config, collector);
   // 云备份使用业务恢复 allowlist 组包；settings 必须经过 shared v1 投影，避免 Worker 与浏览器互导漂移。
   // sessions/MFA/passkey/tickets 和 R2 系统密钥对象都不进入 ZIP。
   const payload = renewletExportV1Schema.parse({
@@ -105,9 +115,9 @@ export async function buildCloudBackupExportZip(env: Env, userId: string, export
     exportedAt: exportedAt.toISOString(),
     data: {
       subscriptions: exportSubscriptions,
-      settings: toRenewletExportSettingsV1(sanitizeSettingsForCloudBackup(await getSettings(env, userId))),
+      settings: toRenewletExportSettingsV1(sanitizeSettingsForCloudBackup(settings)),
       customConfig,
-      exchangeRateSnapshots: await listExchangeRateSnapshots(env, userId),
+      exchangeRateSnapshots,
       ...(collector.assets.length > 0
         ? { assets: collector.assets.map(({ r2Key: _r2Key, ...asset }) => asset) }
         : {}),
@@ -155,51 +165,45 @@ export async function verifySnapshotBytes(content: Uint8Array, manifest: CloudBa
   return (await sha256Hex(content)) === manifest.sha256.toLowerCase();
 }
 
-async function buildExportCustomConfig(env: Env, userId: string, collector: ExportAssetCollector) {
-  const config = customConfigSchema.parse(await getCustomConfig(env, userId));
-  return {
-    ...config,
-    paymentMethods: await Promise.all(config.paymentMethods.map(async (paymentMethod) => {
-      const assetId = privateAssetIdFromLogo(paymentMethod.icon ?? null);
-      if (!assetId || !paymentMethod.icon) return paymentMethod;
-      const assetPath = await resolveExportAsset(env, userId, collector, {
-        assetId,
-        path: paymentMethod.icon,
-        reference: "customConfig.paymentMethods.icon",
-        referenceId: paymentMethod.id,
-      });
-      if (assetPath) return { ...paymentMethod, icon: assetPath };
-      const { icon: _icon, ...rest } = paymentMethod;
-      return rest;
-    })),
-  };
-}
-
-async function resolveExportAsset(env: Env, userId: string, collector: ExportAssetCollector, reference: ExportAssetReference): Promise<string | null> {
-  const existing = collector.assetById.get(reference.assetId);
-  if (existing) return existing.path;
-  // 每个私有对象先head校验、再get读取；额度不足中止整个快照，不能降级成missingAssets。
-  collector.budget?.consumeStorage(2);
-  const result = await readExportAsset(env, userId, reference.assetId);
-  if (!result.ok) {
-    collector.missingAssets.push({
-      assetId: reference.assetId,
-      path: reference.path,
-      reference: reference.reference,
-      referenceId: reference.referenceId,
-      reason: result.reason,
+async function buildExportCustomConfig(env: Env, config: ApiCustomConfig, collector: ExportAssetCollector) {
+  const paymentMethods = [];
+  // 同一资产可被多个支付方式引用；顺序解析与共享结果缓存保证每个对象只校验和入包一次。
+  for (const paymentMethod of config.paymentMethods) {
+    const assetId = privateAssetIdFromLogo(paymentMethod.icon ?? null);
+    if (!assetId || !paymentMethod.icon) {
+      paymentMethods.push(paymentMethod);
+      continue;
+    }
+    const assetPath = await resolveExportAsset(env, collector, {
+      assetId, path: paymentMethod.icon, reference: "customConfig.paymentMethods.icon", referenceId: paymentMethod.id,
     });
-    return null;
+    if (assetPath) paymentMethods.push({ ...paymentMethod, icon: assetPath });
+    else {
+      const { icon: _icon, ...rest } = paymentMethod;
+      paymentMethods.push(rest);
+    }
   }
-  collector.assetById.set(reference.assetId, result.asset);
-  collector.assets.push(result.asset);
-  return result.asset.path;
+  return { ...config, paymentMethods };
 }
 
-async function readExportAsset(env: Env, userId: string, assetId: string): Promise<ExportAssetReadResult> {
-  // D1失败必须中止组包；查询失败不代表用户资产缺失，不能把不完整快照伪装成可恢复备份。
-  const row = await getAsset(env, userId, assetId);
-  if (!row) return { ok: false, reason: "not_found" };
+async function resolveExportAsset(env: Env, collector: ExportAssetCollector, reference: ExportAssetReference): Promise<string | null> {
+  let result = collector.reads.get(reference.assetId);
+  if (!result) {
+    const row = collector.metadata.get(reference.assetId);
+    if (row) {
+      // 每个私有对象先head校验、再get读取；额度不足中止整个快照，不能降级成missingAssets。
+      collector.budget?.consumeStorage(2);
+      result = await readExportAsset(env, row);
+    } else result = { ok: false, reason: "not_found" };
+    collector.reads.set(reference.assetId, result);
+    if (result.ok) collector.assets.push(result.asset);
+  }
+  if (result.ok) return result.asset.path;
+  collector.missingAssets.push({ ...reference, reason: result.reason });
+  return null;
+}
+
+async function readExportAsset(env: Env, row: OwnedAssetMetadata): Promise<ExportAssetReadResult> {
   try {
     // D1 asset metadata 是 owner 和 R2 key 的事实来源；R2 对象缺失只让引用进入 manifest 审计，不阻断整份快照。
     const object = await env.ASSETS_BUCKET.head(row.r2_key);
@@ -211,8 +215,8 @@ async function readExportAsset(env: Env, userId: string, assetId: string): Promi
     return {
       ok: true,
       asset: {
-        id: assetId,
-        path: `assets/${assetId}${extensionFromMime(mimeType, row.original_name ?? "")}`,
+        id: row.id,
+        path: `assets/${row.id}${extensionFromMime(mimeType, row.original_name ?? "")}`,
         ...(row.original_name ? { originalName: row.original_name } : {}),
         mimeType,
         sizeBytes: object.size,
