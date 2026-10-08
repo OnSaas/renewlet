@@ -21,6 +21,7 @@ import { extensionFromMime, privateAssetIdFromLogo } from "./cloud-backup-utils"
 import { listExchangeRateSnapshots } from "./exchange-rate-snapshots";
 import { createStoredZipFromSources, type StoredZipSource } from "./zip-store";
 import type { Env } from "./types";
+import type { CronBudget } from "./cron-budget";
 
 const textEncoder = new TextEncoder();
 // 导出资产必须保持上传同一 2MiB 上限；整包 16MiB 约束不能让旧大对象绕过恢复上传校验。
@@ -53,12 +54,13 @@ type ExportAssetCollector = {
   assets: ExportAsset[];
   assetById: Map<string, ExportAsset>;
   missingAssets: RenewletExportMissingAsset[];
+  budget?: CronBudget;
 };
 
-export async function buildCloudBackupSnapshotPayload(env: Env, userId: string): Promise<CloudBackupSnapshotPayload> {
-  const { content, exportedAt } = await buildCloudBackupExportZip(env, userId);
+export async function buildCloudBackupSnapshotPayload(env: Env, userId: string, scheduled?: { id: string; exportedAt: Date; budget: CronBudget }): Promise<CloudBackupSnapshotPayload> {
+  const { content, exportedAt } = await buildCloudBackupExportZip(env, userId, scheduled?.exportedAt, scheduled?.budget);
   if (content.length > CLOUD_BACKUP_MAX_SNAPSHOT_BYTES) throw new Error("CLOUD_BACKUP_SNAPSHOT_TOO_LARGE");
-  const id = snapshotId(exportedAt);
+  const id = scheduled?.id ?? snapshotId(exportedAt);
   const filename = `${id}.zip`;
   const manifest = cloudBackupSnapshotManifestSchema.parse({
     kind: "renewlet-cloud-backup-snapshot",
@@ -74,10 +76,9 @@ export async function buildCloudBackupSnapshotPayload(env: Env, userId: string):
   return { content, id, filename, manifest };
 }
 
-export async function buildCloudBackupExportZip(env: Env, userId: string): Promise<{ content: Uint8Array; exportedAt: Date }> {
+export async function buildCloudBackupExportZip(env: Env, userId: string, exportedAt = new Date(), budget?: CronBudget): Promise<{ content: Uint8Array; exportedAt: Date }> {
   const startedAt = performance.now();
-  const exportedAt = new Date();
-  const collector: ExportAssetCollector = { assets: [], assetById: new Map(), missingAssets: [] };
+  const collector: ExportAssetCollector = { assets: [], assetById: new Map(), missingAssets: [], ...(budget ? { budget } : {}) };
   const subscriptions = await listSubscriptions(env, userId);
   const exportSubscriptions = [];
   for (const row of subscriptions) {
@@ -177,6 +178,8 @@ async function buildExportCustomConfig(env: Env, userId: string, collector: Expo
 async function resolveExportAsset(env: Env, userId: string, collector: ExportAssetCollector, reference: ExportAssetReference): Promise<string | null> {
   const existing = collector.assetById.get(reference.assetId);
   if (existing) return existing.path;
+  // 每个私有对象先head校验、再get读取；额度不足中止整个快照，不能降级成missingAssets。
+  collector.budget?.consumeStorage(2);
   const result = await readExportAsset(env, userId, reference.assetId);
   if (!result.ok) {
     collector.missingAssets.push({
@@ -194,10 +197,11 @@ async function resolveExportAsset(env: Env, userId: string, collector: ExportAss
 }
 
 async function readExportAsset(env: Env, userId: string, assetId: string): Promise<ExportAssetReadResult> {
+  // D1失败必须中止组包；查询失败不代表用户资产缺失，不能把不完整快照伪装成可恢复备份。
+  const row = await getAsset(env, userId, assetId);
+  if (!row) return { ok: false, reason: "not_found" };
   try {
     // D1 asset metadata 是 owner 和 R2 key 的事实来源；R2 对象缺失只让引用进入 manifest 审计，不阻断整份快照。
-    const row = await getAsset(env, userId, assetId);
-    if (!row) return { ok: false, reason: "not_found" };
     const object = await env.ASSETS_BUCKET.head(row.r2_key);
     if (!object) return { ok: false, reason: "file_missing" };
     if (row.size_bytes !== null && row.size_bytes > MAX_EXPORT_ASSET_BYTES) return { ok: false, reason: "too_large" };

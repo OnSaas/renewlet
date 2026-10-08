@@ -54,8 +54,14 @@ export type CloudBackupRemoteClient = {
   delete(id: string): Promise<void>;
 };
 
+export interface CloudBackupPagedRemoteClient extends CloudBackupRemoteClient {
+  prepareDirectory(cursor: string | null, limit: number): Promise<string | null>;
+  upload(filename: string, content: Uint8Array, manifest: CloudBackupSnapshotManifest, directoryPrepared?: boolean): Promise<void>;
+  listPage(cursor: string | null, limit: number): Promise<{ manifests: CloudBackupSnapshotManifest[]; cursor: string | null }>;
+}
+
 /** WebDAV 协议库负责认证、XML 和请求；这一层只把业务对象名映射为远端路径并维护快照状态。 */
-export class WebDAVCloudBackupClient implements CloudBackupRemoteClient {
+export class WebDAVCloudBackupClient implements CloudBackupPagedRemoteClient {
   private readonly client: WorkerWebDAVClient;
   private readonly diagnosticSecrets: readonly string[];
 
@@ -113,8 +119,31 @@ export class WebDAVCloudBackupClient implements CloudBackupRemoteClient {
     return manifests;
   }
 
-  async upload(filename: string, content: Uint8Array, manifest: CloudBackupSnapshotManifest): Promise<void> {
-    await this.ensureDirectory();
+  async listPage(cursor: string | null, limit: number): Promise<{ manifests: CloudBackupSnapshotManifest[]; cursor: string | null }> {
+    // WebDAV没有目录续传令牌；按不变文件名切片，只读取本页manifest，不能每tick把历史正文全拉回来。
+    const directory = this.remotePath("");
+    const files = (await this.withError("CLOUD_BACKUP_WEBDAV_PROPFIND_FAILED", "PROPFIND", directory, () => this.client.list(directory)))
+      .filter((name) => name.endsWith(".manifest.json") && (cursor === null || name > cursor)).sort();
+    const page = files.slice(0, limit);
+    const manifests: CloudBackupSnapshotManifest[] = [];
+    for (const name of page) manifests.push(await this.readManifest(name));
+    return { manifests, cursor: files.length > limit ? page.at(-1) ?? null : null };
+  }
+
+  async prepareDirectory(cursor: string | null, limit: number): Promise<string | null> {
+    const segments = this.remotePath("").split("/").filter(Boolean);
+    const start = cursor ? cursor.split("/").filter(Boolean).length : 0;
+    if (cursor && segments.slice(0, start).join("/") !== cursor) throw new Error("CLOUD_BACKUP_CURSOR_INVALID");
+    const end = Math.min(segments.length, start + limit);
+    for (let index = start; index < end; index++) {
+      const path = segments.slice(0, index + 1).join("/");
+      await this.withError("CLOUD_BACKUP_WEBDAV_MKCOL_FAILED", "MKCOL", path, () => this.client.ensureDirectory(path, false));
+    }
+    return end < segments.length ? segments.slice(0, end).join("/") : null;
+  }
+
+  async upload(filename: string, content: Uint8Array, manifest: CloudBackupSnapshotManifest, directoryPrepared = false): Promise<void> {
+    if (!directoryPrepared) await this.ensureDirectory();
     await this.put(filename, content, "application/zip");
     try {
       const size = await this.withError("CLOUD_BACKUP_WEBDAV_PROPFIND_FAILED", "PROPFIND", this.remotePath(filename), () => this.client.stat(this.remotePath(filename)));
@@ -314,6 +343,17 @@ class S3ObjectStore {
     }
   }
 
+  async listObjectPage(prefix: string, cursor: string | null, limit: number): Promise<{ keys: string[]; cursor: string | null }> {
+    const output = await this.send("CLOUD_BACKUP_S3_LIST_FAILED", "ListObjectsV2", prefix, () => this.client.send(new ListObjectsV2Command({
+      Bucket: this.settings.bucket, MaxKeys: limit, EncodingType: "url",
+      ...(prefix ? { Prefix: prefix } : {}), ...(cursor ? { ContinuationToken: cursor } : {}),
+    })));
+    if (output.NextContinuationToken && output.NextContinuationToken === cursor) {
+      throw localRemoteError("CLOUD_BACKUP_S3_LIST_FAILED", "s3", "ListObjectsV2", this.target(prefix), "Repeated continuation token");
+    }
+    return { keys: (output.Contents ?? []).flatMap((item) => item.Key ? [item.Key] : []), cursor: output.NextContinuationToken ?? null };
+  }
+
   private async send<T>(code: string, operation: string, key: string, action: () => Promise<T>): Promise<T> {
     try {
       return await action();
@@ -328,12 +368,14 @@ class S3ObjectStore {
   }
 }
 
-export class S3CloudBackupClient implements CloudBackupRemoteClient {
+export class S3CloudBackupClient implements CloudBackupPagedRemoteClient {
   private readonly store: S3ObjectStore;
 
   constructor(private readonly settings: CloudBackupS3Config, secret: string) {
     this.store = new S3ObjectStore(settings, secret);
   }
+
+  async prepareDirectory(_cursor: string | null, _limit: number): Promise<null> { return null; }
 
   async test(): Promise<void> {
     const key = this.key(`.renewlet-probe-${randomHex(4)}.txt`);
@@ -369,17 +411,19 @@ export class S3CloudBackupClient implements CloudBackupRemoteClient {
     const manifests: CloudBackupSnapshotManifest[] = [];
     for (const key of await this.store.listObjects(this.key(""))) {
       if (!key.endsWith(".manifest.json")) continue;
-      let manifest: CloudBackupSnapshotManifest;
-      try {
-        manifest = cloudBackupSnapshotManifestSchema.parse(JSON.parse(textDecoder(await this.store.getObject(key))));
-      } catch (error) {
-        if (error instanceof CloudBackupRemoteError) throw error;
-        throw localRemoteError("CLOUD_BACKUP_MANIFEST_INVALID", "s3", "manifest", this.target(key), error instanceof Error ? error.message : String(error));
-      }
-      if (!manifest.id) throw localRemoteError("CLOUD_BACKUP_MANIFEST_INVALID", "s3", "manifest", this.target(key), "manifest id is empty");
-      manifests.push(manifest);
+      manifests.push(await this.readManifest(key));
     }
     return manifests;
+  }
+
+  async listPage(cursor: string | null, limit: number): Promise<{ manifests: CloudBackupSnapshotManifest[]; cursor: string | null }> {
+    const page = await this.store.listObjectPage(this.key(""), cursor, limit);
+    const manifests: CloudBackupSnapshotManifest[] = [];
+    for (const key of page.keys) {
+      if (!key.endsWith(".manifest.json")) continue;
+      manifests.push(await this.readManifest(key));
+    }
+    return { manifests, cursor: page.cursor };
   }
 
   async upload(filename: string, content: Uint8Array, manifest: CloudBackupSnapshotManifest): Promise<void> {
@@ -398,20 +442,22 @@ export class S3CloudBackupClient implements CloudBackupRemoteClient {
   }
 
   async download(id: string): Promise<{ content: Uint8Array; manifest: CloudBackupSnapshotManifest }> {
-    const manifestKey = this.key(manifestName(id));
-    let manifest: CloudBackupSnapshotManifest;
-    try {
-      manifest = cloudBackupSnapshotManifestSchema.parse(JSON.parse(textDecoder(await this.store.getObject(manifestKey))));
-    } catch (error) {
-      if (error instanceof CloudBackupRemoteError) throw error;
-      throw localRemoteError("CLOUD_BACKUP_MANIFEST_INVALID", "s3", "manifest", this.target(manifestKey), error instanceof Error ? error.message : String(error));
-    }
+    const manifest = await this.readManifest(this.key(manifestName(id)));
     return { content: await this.store.getObject(this.key(manifest.filename)), manifest };
   }
 
   async delete(id: string): Promise<void> {
     await this.store.deleteObject(this.key(`${id}.zip`));
     await this.store.deleteObject(this.key(manifestName(id)));
+  }
+
+  private async readManifest(key: string): Promise<CloudBackupSnapshotManifest> {
+    try {
+      return cloudBackupSnapshotManifestSchema.parse(JSON.parse(textDecoder(await this.store.getObject(key))));
+    } catch (error) {
+      if (error instanceof CloudBackupRemoteError) throw error;
+      throw localRemoteError("CLOUD_BACKUP_MANIFEST_INVALID", "s3", "manifest", this.target(key), error instanceof Error ? error.message : String(error));
+    }
   }
 
   private async cleanup(keys: readonly string[]): Promise<CleanupError[]> {

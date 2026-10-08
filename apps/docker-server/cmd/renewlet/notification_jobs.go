@@ -82,6 +82,31 @@ func markNotificationJobSending(app core.App, record *core.Record, attempts int)
 	return claimed, err
 }
 
+func failExhaustedNotificationJob(app core.App, record *core.Record) (bool, error) {
+	settled := false
+	// 撤销耗尽次数的过期sending身份，保留渠道成功快照；迟到结果不得覆盖终止状态。
+	err := app.RunInTransaction(func(txApp core.App) error {
+		current, err := txApp.FindRecordById("notification_jobs", record.Id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("read exhausted notification: %w", err)
+		}
+		if !notificationJobClaimMatches(current, record) {
+			return nil
+		}
+		current.Set("status", notificationStatusFailed)
+		current.Set("lastError", "max_retries_reached")
+		if err := txApp.Save(current); err != nil {
+			return fmt.Errorf("settle exhausted notification: %w", err)
+		}
+		settled = true
+		return nil
+	})
+	return settled, err
+}
+
 func notificationJobClaimMatches(current, claimed *core.Record) bool {
 	// PocketBase落库精度为毫秒；刚Save的内存时间仍可能带纳秒，身份比较必须使用同一持久化表示。
 	return current.Id == claimed.Id && current.GetString("user") == claimed.GetString("user") &&

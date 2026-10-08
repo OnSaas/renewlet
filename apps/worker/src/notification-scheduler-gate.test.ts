@@ -1,8 +1,7 @@
 import { createDefaultAppSettings } from "@renewlet/shared/settings-defaults";
 import type { ApiAppSettings } from "@renewlet/shared/schemas/settings";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runScheduledNotifications } from "./notifications";
-import { listNotificationDueUsers } from "./subscription-scheduler-state";
+import { runScheduledForUser } from "./notifications";
 import type { Env } from "./types";
 import { notificationSenders } from "./notification-channel-send";
 import { subscriptionRow } from "./subscription-d1-test-support";
@@ -106,50 +105,11 @@ describe("Cloudflare notification scheduler gate", () => {
       throw new Error(`unexpected ${method} query: ${sql}`);
     });
     const error = vi.spyOn(console, "error");
-    await runScheduledNotifications(env);
+    await runScheduledForUser(env, "usr_due");
     expect(error).not.toHaveBeenCalled();
     expect(sender).toHaveBeenCalledTimes(phase === "finalize" ? 1 : 0);
     expect(finalizations).toBe(phase === "claim" ? 0 : 1);
     expect(dueWrites).toBe(0);
-  });
-
-  it("pages past retained due users with an immutable account cursor", async () => {
-    const queries: FakeD1Query[] = [];
-    const env = fakeEnv((query) => {
-      queries.push(query);
-      if (query.method === "all" && query.sql.includes("FROM subscription_scheduler_state AS scheduler")) {
-        return d1All([{ user_id: "usr_later" }]);
-      }
-      throw new Error(`unexpected ${query.method} query: ${query.sql}`);
-    });
-
-    const users = await listNotificationDueUsers(env, new Date("2026-01-09T08:00:00.000Z"), 1, "usr_retained");
-
-    expect(users).toEqual([{ user_id: "usr_later" }]);
-    expect(queries[0]?.sql).toContain("users.id > ?");
-    expect(queries[0]?.params).toEqual(["2026-01-09T08:00:00Z", "2026-01-09T08:00:00Z", "usr_retained", 1]);
-  });
-
-  it("skips non-due scheduled ticks without subscription candidate scans when repeat gate is empty", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-01-09T07:00:00.000Z"));
-    const subscriptionQueries: string[] = [];
-    const env = fakeEnv(({ sql, method }) => {
-      if (method === "all" && sql.includes("FROM subscription_scheduler_state AS scheduler")) return d1All([]);
-      if (method === "first" && sql.includes("SELECT settings_json FROM settings")) {
-        return { settings_json: JSON.stringify(settings()) };
-      }
-      if (method === "first" && sql.includes("FROM subscription_scheduler_state")) return schedulerState(0);
-      if (method === "all" && sql.includes("FROM subscriptions")) {
-        subscriptionQueries.push(sql);
-        return d1All([]);
-      }
-      throw new Error(`unexpected ${method} query: ${sql}`);
-    });
-
-    await expect(runScheduledNotifications(env)).resolves.toBeUndefined();
-
-    expect(subscriptionQueries).toHaveLength(0);
   });
 
   it("uses repeat candidates without full subscription scans when repeat gate is present", async () => {
@@ -171,7 +131,7 @@ describe("Cloudflare notification scheduler gate", () => {
       throw new Error(`unexpected ${method} query: ${sql}`);
     });
 
-    await expect(runScheduledNotifications(env)).resolves.toBeUndefined();
+    await expect(runScheduledForUser(env, "usr_due")).resolves.toEqual(expect.objectContaining({ outcome: expect.any(String) }));
 
     expect(subscriptionQueries).toHaveLength(1);
     expect(subscriptionQueries[0]).toContain("repeat_reminder_enabled = 1");
@@ -219,7 +179,7 @@ describe("Cloudflare notification scheduler gate", () => {
       throw new Error(`unexpected ${method} query: ${sql}`);
     });
 
-    await expect(runScheduledNotifications(env)).resolves.toBeUndefined();
+    await expect(runScheduledForUser(env, "usr_due")).resolves.toEqual(expect.objectContaining({ outcome: expect.any(String) }));
 
     expect(mirrorRefreshCount).toBe(1);
     expect(schedulerRefreshCount).toBe(1);

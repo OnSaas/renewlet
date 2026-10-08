@@ -188,8 +188,7 @@ func buildScheduleDecision(now time.Time, localDate string, localTime string, ti
 	}
 }
 
-// getNextLocalScheduleOccurrence 返回下一次本地通知时间。
-func getNextLocalScheduleOccurrence(now time.Time, timezone string, localTime string) localScheduleOccurrence {
+func getNextLocalScheduleOccurrence(now time.Time, timezone string, localTime string, includeCurrent bool) localScheduleOccurrence {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
 		loc = time.UTC
@@ -202,7 +201,7 @@ func getNextLocalScheduleOccurrence(now time.Time, timezone string, localTime st
 	today := localNow.Format("2006-01-02")
 	todayInstant, _ := getScheduleInstant(today, localTime, timezone)
 	date := today
-	if todayInstant.Before(now.UTC()) {
+	if todayInstant.Before(now.UTC()) || (!includeCurrent && todayInstant.Equal(now.UTC())) {
 		date = localNow.AddDate(0, 0, 1).Format("2006-01-02")
 	}
 	instant, _ := getScheduleInstant(date, localTime, timezone)
@@ -218,7 +217,7 @@ func getNextLocalScheduleOccurrence(now time.Time, timezone string, localTime st
 // PERF： 当前按未来 N 天逐日扫描订阅；订阅量明显增长后可改为按 nextBillingDate/trialEndDate 建索引查询。
 func buildNotificationOverview(now time.Time, settings appSettings, subscriptions []notificationSubscription, days int) notificationOverview {
 	days = maxInt(days, 1)
-	dailyNextCheck := getNextLocalScheduleOccurrence(now, settings.Timezone, settings.NotificationTimeLocal)
+	dailyNextCheck := getNextLocalScheduleOccurrence(now, settings.Timezone, settings.NotificationTimeLocal, true)
 	nextCheck := dailyNextCheck
 	if repeatNext, ok := getNextRepeatScheduleOccurrence(now, settings, subscriptions); ok {
 		if repeatInstant, err := time.Parse(time.RFC3339, repeatNext.ScheduledInstantUTC); err == nil {
@@ -411,8 +410,17 @@ func processNotificationCronUser(app core.App, options notificationCronOptions, 
 		}
 		return notificationCronUserResult{UserID: userID, Action: "skipped", Reason: "retries_disabled"}, nil
 	}
-	if !options.Force && existingJob != nil && existingJob.GetString("status") == notificationStatusFailed && attempts >= options.MaxRetries {
-		// 超过重试预算后不再扰动外部渠道，同时推进 due-index，防止同一 failed 窗口长期占住 cron 热路径。
+	if !options.Force && existingJob != nil && attempts >= options.MaxRetries {
+		// 失败和过期sending共享次数上限；先撤销旧发送者身份，再允许推进due-index。
+		if existingJob.GetString("status") == notificationStatusSending && !options.DryRun {
+			settled, err := failExhaustedNotificationJob(app, existingJob)
+			if err != nil {
+				return notificationCronUserResult{}, err
+			}
+			if !settled {
+				return notificationCronUserResult{UserID: userID, Action: "skipped", Reason: "claim_lost"}, nil
+			}
+		}
 		if err := refreshNotificationSettledDerivedState(app, userID, settings, schedule.localScheduleOccurrence, options); err != nil {
 			return notificationCronUserResult{}, err
 		}

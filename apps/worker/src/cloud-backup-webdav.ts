@@ -42,8 +42,8 @@ export class WorkerWebDAVClient {
     });
   }
 
-  async ensureDirectory(path: string): Promise<void> {
-    await this.#run("MKCOL", path, (signal) => this.#client.createDirectory(path, { recursive: true, signal }));
+  async ensureDirectory(path: string, recursive = true): Promise<void> {
+    await this.#run("MKCOL", path, (signal) => this.#client.createDirectory(path, { recursive, signal }));
   }
 
   async list(path: string): Promise<string[]> {

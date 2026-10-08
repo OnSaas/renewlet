@@ -164,7 +164,7 @@ func advanceSubscriptionSchedulerDueState(
 		return subscriptionSchedulerState{}, err
 	}
 	for _, candidate := range repeatCandidates {
-		if err := replaceNotificationSubscriptionRepeatSchedule(app, userID, candidate, settings, now); err != nil {
+		if err := replaceNotificationSubscriptionRepeatSchedule(app, userID, candidate, settings, now, skipCurrentNotificationWindow); err != nil {
 			return subscriptionSchedulerState{}, err
 		}
 	}
@@ -366,22 +366,23 @@ func nextAutoRenewCheckAfterLocalDate(localDate string, timezone string) string 
 }
 
 func nextDailyNotificationDueAt(now time.Time, timezone string, localTime string, skipCurrentWindow bool) string {
+	// 完成后严格越过窗口；不能依赖执行延迟让包含当前时刻的预览函数偶然推进。
 	if skipCurrentWindow {
-		return getNextLocalScheduleOccurrence(now, timezone, localTime).ScheduledInstantUTC
+		return getNextLocalScheduleOccurrence(now, timezone, localTime, false).ScheduledInstantUTC
 	}
 	current := getLocalScheduleDecision(now, timezone, localTime, maxInt(envInt("NOTIFICATION_CRON_WINDOW_MINUTES", 2), 0), false)
 	if current.Due {
 		return current.ScheduledInstantUTC
 	}
-	return getNextLocalScheduleOccurrence(now, timezone, localTime).ScheduledInstantUTC
+	return getNextLocalScheduleOccurrence(now, timezone, localTime, true).ScheduledInstantUTC
 }
 
-func nextRepeatNotificationDueAt(now time.Time, settings appSettings, subscriptions []notificationSubscription) string {
+func nextRepeatNotificationDueAt(now time.Time, settings appSettings, subscriptions []notificationSubscription, skipCurrentWindow bool) string {
 	if len(subscriptions) == 0 {
 		return ""
 	}
 	current := getRepeatScheduleDecision(now, settings, subscriptions, maxInt(envInt("NOTIFICATION_CRON_WINDOW_MINUTES", 2), 0))
-	if current.Due {
+	if current.Due && !skipCurrentWindow {
 		return current.ScheduledInstantUTC
 	}
 	if next, ok := getNextRepeatScheduleOccurrence(now, settings, subscriptions); ok {

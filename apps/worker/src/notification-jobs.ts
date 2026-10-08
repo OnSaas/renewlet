@@ -90,6 +90,14 @@ export async function markNotificationJobSending(env: Env, row: NotificationJobR
   return { ...row, status: "sending", attempts, last_error: null, updated_at: timestamp };
 }
 
+export async function failExhaustedNotificationJob(env: Env, row: NotificationJobRow): Promise<boolean> {
+  // 发送者已超时且耗尽次数时，保留上次完整快照并撤销身份；旧发送者迟到的结果不能复活该任务。
+  const result = await env.DB.prepare(`UPDATE notification_jobs SET status = 'failed', last_error = 'max_retries_reached', updated_at = ?
+    WHERE user_id = ? AND id = ? AND status = ? AND attempts = ? AND updated_at = ?`)
+    .bind(nowIso(), row.user_id, row.id, row.status, row.attempts, row.updated_at).run();
+  return result.meta.changes === 1;
+}
+
 export async function finalizeNotificationJob(
   env: Env,
   row: NotificationJobRow | null,
@@ -99,6 +107,7 @@ export async function finalizeNotificationJob(
   attempts: number,
   error: string | null,
   result: unknown,
+  preparedMessageParts?: string[],
 ): Promise<boolean> {
   let target = row;
   if (!target) {
@@ -110,7 +119,7 @@ export async function finalizeNotificationJob(
   const timestamp = nowIso();
   const persistedResult = stripNotificationFailureDetails(result);
   if (!target || target.user_id !== userId) throw new Error("Notification job owner mismatch");
-  const snapshot = splitNotificationJobMessage(persistedResult);
+  const snapshot = splitNotificationJobMessage(persistedResult, preparedMessageParts);
   // 最终态和每条消息写入都核对同一接管身份；旧执行者不能覆盖新一轮成功渠道或正文。
   const finalize = env.DB.prepare(`
     UPDATE notification_jobs SET status = ?, attempts = ?, last_error = ?, result_json = ?, updated_at = ?

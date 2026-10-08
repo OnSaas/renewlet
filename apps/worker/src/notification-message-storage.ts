@@ -4,15 +4,24 @@ import type { Env, NotificationJobRow } from "./types";
 
 const messageChunkCharacters = 8192;
 
-export function splitNotificationJobMessage(result: unknown): { metadata: string; parts: string[] } {
+export function splitNotificationJobMessage(result: unknown, preparedParts?: string[]): { metadata: string; parts: string[] } {
   const { message, ...metadata } = cronJobResultResponseSchema.parse(result);
+  const parts = preparedParts ?? notificationMessageParts(message);
+  return { metadata: JSON.stringify({ ...metadata, messageChunkCount: parts.length }), parts };
+}
+
+export function notificationMessageParts(message: unknown): string[] {
   // 与 Go/SQLite substr 统一按 Unicode 码点计数；快照总大小不再决定任务 JSON 能否提交。
   const characters = Array.from(JSON.stringify(message));
   const parts: string[] = [];
   for (let start = 0; start < characters.length; start += messageChunkCharacters) {
     parts.push(characters.slice(start, start + messageChunkCharacters).join(""));
   }
-  return { metadata: JSON.stringify({ ...metadata, messageChunkCount: parts.length }), parts };
+  return parts;
+}
+
+export function notificationMessageWriteCount(parts: readonly string[]): number {
+  return 2 + Math.ceil(parts.length / 16);
 }
 
 export function notificationMessageStatements(env: Env, claim: NotificationJobRow, parts: string[]): D1PreparedStatement[] {
