@@ -30,3 +30,5 @@ minimumReleaseAgeExclude:
   # 仅目标 Wrangler 和其官方 Miniflare 依赖未满 24 小时；workerd/类型仍走默认冷却期，不放行整个命名空间。
   - wrangler@4.142.0
   - miniflare@5.20260926.0-alpha
+  # 工程优化已审计并指定Vite版本；仅放行该版本的发布冷却期，不扩大后续升级范围。
+  - vite@8.3.4
