@@ -13,6 +13,9 @@ if (previousDist && performanceMode) throw new Error("Deployment upgrade journey
 if (profilingMode && !performanceMode) throw new Error("RENEWLET_E2E_PROFILE requires the isolated performance fixture");
 // 根包由 Playwright 按 CommonJS 加载；指纹根目录跟随配置文件，不依赖调用者 cwd。
 const performanceEnvironment = performanceMode ? capturePerformanceEnvironment(__dirname) : undefined;
+const productionClientBuild = profilingMode
+  ? "pnpm --filter @renewlet/client exec vite build --sourcemap"
+  : performanceMode ? "pnpm exec tsx scripts/build-performance-client.ts" : "pnpm --filter @renewlet/client build";
 
 // Playwright 会为 reporter 设置 FORCE_COLOR；继承 NO_COLOR 会让 Node 在每个 webServer 子进程重复打印冲突告警。
 delete env.NO_COLOR;
@@ -95,7 +98,7 @@ export default defineConfig({
     {
       // 性能模式重建生产产物；普通 E2E 仍重建 optimizer，不复用开发机残留缓存。
       command: performanceMode || previousDist
-        ? `${profilingMode ? "pnpm --filter @renewlet/client exec vite build --sourcemap" : "pnpm --filter @renewlet/client build"} && pnpm --dir apps/web exec vite preview --host 127.0.0.1 --port ${e2eClientPort} --strictPort`
+        ? `${productionClientBuild} && pnpm --dir apps/web exec vite preview --host 127.0.0.1 --port ${e2eClientPort} --strictPort`
         : `pnpm --dir apps/web exec vite --force --host 127.0.0.1 --port ${e2eClientPort} --strictPort`,
       env: {
         ...proxyEnv,
@@ -118,7 +121,7 @@ export default defineConfig({
     },
     ...(performanceMode ? [{
       name: "performance-probe",
-      testMatch: "**/performance-probe.spec.ts",
+      testMatch: ["**/performance-probe.spec.ts", ...(profilingMode ? [] : ["**/performance-vitals-probe.spec.ts"])],
       use: { ...devices["Desktop Chrome"] },
     }, {
       name: "performance-seed",
@@ -132,7 +135,7 @@ export default defineConfig({
       name: performanceMode ? "performance-desktop" : "desktop",
       dependencies: [performanceMode ? "performance-seed" : "setup"],
       repeatEach: performanceMode && !profilingMode ? performanceSampleCount : 1,
-      testMatch: previousDist ? ["**/version-upgrade.spec.ts"] : performanceMode ? ["**/performance.spec.ts"] : [
+      testMatch: previousDist ? ["**/version-upgrade.spec.ts"] : performanceMode ? ["**/performance.spec.ts", ...(profilingMode ? [] : ["**/performance-vitals.spec.ts"])] : [
         "**/calendar-feed-management.spec.ts",
         "**/subscriptions.spec.ts",
         "**/settings.spec.ts",
@@ -151,7 +154,7 @@ export default defineConfig({
       name: performanceMode ? "performance-mobile" : "mobile",
       dependencies: [performanceMode ? "performance-seed" : "setup"],
       repeatEach: performanceMode && !profilingMode ? performanceSampleCount : 1,
-      testMatch: previousDist ? ["**/version-upgrade.spec.ts"] : performanceMode ? ["**/performance.spec.ts"] : ["**/mobile-*.spec.ts", "**/lunar-calendar.spec.ts", "**/route-progress.spec.ts", "**/report-exchange-rates.spec.ts"],
+      testMatch: previousDist ? ["**/version-upgrade.spec.ts"] : performanceMode ? ["**/performance.spec.ts", ...(profilingMode ? [] : ["**/performance-vitals.spec.ts"])] : ["**/mobile-*.spec.ts", "**/lunar-calendar.spec.ts", "**/route-progress.spec.ts", "**/report-exchange-rates.spec.ts"],
       use: {
         ...devices["Pixel 5"],
         storageState: adminStorageState,

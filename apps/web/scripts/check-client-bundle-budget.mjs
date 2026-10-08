@@ -5,7 +5,7 @@
  * chunk 名只用于报告；依赖禁入读取 Vite 生成的 module graph，避免自动分包改名绕过守卫。
  */
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -142,6 +142,7 @@ const privateShellKey = "src/components/private-app-shell.tsx";
 if (!manifest[privateShellKey]) throw new Error("Client bundle manifest has no private application shell entry");
 const privateShellClosure = collectStaticClosure(privateShellKey);
 
+const startupReports = [];
 for (const locale of locales) {
   const localeKey = catalogEntryKey(locale);
   if (!manifest[localeKey]) throw new Error(`Client bundle manifest has no ${locale} catalog entry`);
@@ -150,6 +151,7 @@ for (const locale of locales) {
   console.log(`${locale} startup files: ${[...startupClosure.files].sort().join(", ")}`);
   assertStartupDependencies(locale, startupClosure);
   assertBudget(`${locale} startup closure`, startupSizes, budgets.startup);
+  startupReports.push({ locale, files: [...startupClosure.files].sort(), ...startupSizes });
 }
 
 const routeClosures = manifestEntries
@@ -167,3 +169,9 @@ for (const route of routeClosures) assertLazyDialogShellDependencies(route.key, 
 const largestRoute = routeClosures[0];
 console.log(`largest route files (${largestRoute.key}): ${[...largestRoute.files].sort().join(", ")}`);
 assertBudget(`largest complete route closure (${largestRoute.key})`, largestRoute, budgets.route);
+// 报告复用守卫已经核算的闭包与压缩字节；采集器不再解析日志或维护第二套包体算法。
+writeFileSync(join(distRoot, ".vite/bundle-budget.json"), JSON.stringify({
+  budgets,
+  startup: startupReports,
+  routes: routeClosures.map(({ files, ...route }) => ({ ...route, files: [...files].sort() })),
+}, null, 2) + "\n");

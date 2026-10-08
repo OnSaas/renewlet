@@ -102,6 +102,7 @@
     "jsonc-parser": "3.3.1",
     "tsx": "4.23.9",
     "typescript": "6.0.3",
+    "web-vitals": "6.2.3",
     "wrangler": "4.142.0",
     "zod": "4.4.3"
   }

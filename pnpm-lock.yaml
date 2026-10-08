@@ -40,6 +40,9 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+      web-vitals:
+        specifier: 6.2.3
+        version: 6.2.3
       wrangler:
         specifier: 4.142.0
         version: 4.142.0(@cloudflare/workers-types@5.20260926.1)(@types/node@24.13.3)
@@ -4382,6 +4385,9 @@ packages:
     resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
     engines: {node: '>= 8'}
 
+  web-vitals@6.2.3:
+    resolution: {integrity: sha512-Dmy+vdO1UPMqXiAtZSNayhl4f794Bxfd94W4HIj2HlYtczEQfEOon969memlcpcHrTuOKLa5baFjX7WbgmOq+A==}
+
   webdav@5.11.0:
     resolution: {integrity: sha512-DbUS8rHvWse55EiHM0q5q1z3eVRCLWW7Va7mUqA2/JJdQHIew4Op2HTglHkBJDOAVrQeQf0I+REUJkIrYqtL+w==}
     engines: {node: '>=14'}
@@ -8182,6 +8188,8 @@ snapshots:
       xml-name-validator: 5.0.0
 
   web-streams-polyfill@3.3.3: {}
+
+  web-vitals@6.2.3: {}
 
   webdav@5.11.0:
     dependencies:
