@@ -4,6 +4,10 @@
   "main": "apps/worker/src/index.ts",
   "compatibility_date": "2026-06-24",
   "compatibility_flags": ["nodejs_compat"],
+  "alias": {
+    // Worker 没有 DOMParser；固定 AWS 官方 Node 入口，避免 browser 字段把 XML 解析切到 DOM 实现。
+    "@aws-sdk/xml-builder": "@aws-sdk/xml-builder/dist-cjs/index.js"
+  },
   "observability": {
     // Worker 日志/trace 是线上排障入口；业务错误仍由结构化 API error body 返回给当前操作者。
     "enabled": true,
