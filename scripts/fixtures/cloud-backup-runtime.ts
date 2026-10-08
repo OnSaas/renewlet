@@ -1,4 +1,4 @@
-import type { CloudBackupSnapshotManifest } from "../../packages/shared/src/schemas/cloud-backup";
+import type { CloudBackupSnapshotManifest } from "@renewlet/shared/schemas/cloud-backup";
 import { CloudBackupRemoteError, S3CloudBackupClient } from "../../apps/worker/src/cloud-backup-remote";
 
 // 由 Wrangler 打包后在独立 workerd 中执行；只替换远端响应，SDK 入口、签名和 XML 解析仍走实际构建路径。

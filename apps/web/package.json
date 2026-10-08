@@ -16,7 +16,7 @@
     "test:perf": "vitest run .performance.test.tsx",
     "test:run": "vitest run --exclude '**/*.performance.test.tsx'",
     "typecheck": "tsc --noEmit --project tsconfig.app.json",
-    "typecheck:all": "tsc --noEmit --project tsconfig.json --incremental false"
+    "typecheck:all": "tsc --noEmit --project tsconfig.json"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

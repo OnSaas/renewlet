@@ -1,7 +1,7 @@
-import { subscriptionResponseSchema, subscriptionsIndexResponseSchema } from "../packages/shared/src/schemas/subscriptions";
+import { subscriptionResponseSchema, subscriptionsIndexResponseSchema } from "@renewlet/shared/schemas/subscriptions";
 // 桌面订阅 E2E 覆盖创建、筛选、编辑、Logo sheet 和持久化回读，是订阅主流程的跨组件回归基线。
 import type { ElementHandle, Locator } from "@playwright/test";
-import subscriptionCollectionContractFixtures from "../packages/shared/src/contract-fixtures/subscription-collection-contract-fixtures.json";
+import { subscriptionCollectionContractFixture as subscriptionCollectionContractFixtures } from "@renewlet/shared/contract-fixtures";
 import { expect, test } from "./support/test";
 import {
   createSubscription,

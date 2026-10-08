@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { IMPORT_APPLY_SUBSCRIPTION_LIMIT, importApplyRequestSchema } from "../packages/shared/src/schemas/import-export";
+import { IMPORT_APPLY_SUBSCRIPTION_LIMIT, importApplyRequestSchema } from "@renewlet/shared/schemas/import-export";
 import {
   comparePerformanceReports, performanceFixture, performanceInteractions, performancePages,
   performanceReportSchema, performanceSampleCount, sha256, summarize, summarizeLabVitals, summarizeReport,

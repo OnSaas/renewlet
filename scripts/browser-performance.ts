@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { arch, cpus, hostname, platform, release } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { buildSubscriptionPerformanceScenario } from "../packages/shared/src/contract-fixtures";
+import { buildSubscriptionPerformanceScenario } from "@renewlet/shared/contract-fixtures";
 import { performanceExchangeRateCache } from "../e2e/support/exchange-rate-fixture";
 
 export const performanceSampleCount = 10;

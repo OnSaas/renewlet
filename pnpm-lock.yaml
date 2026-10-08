@@ -28,6 +28,9 @@ importers:
       '@redocly/cli':
         specifier: 2.45.0
         version: 2.45.0
+      '@renewlet/shared':
+        specifier: workspace:*
+        version: link:packages/shared
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
@@ -380,6 +383,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.8.0(jiti@2.7.0)(supports-color@10.2.2))
+      '@playwright/test':
+        specifier: ^1.62.1
+        version: 1.62.1
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.9))
@@ -419,9 +425,6 @@ importers:
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
-      playwright:
-        specifier: ^1.62.1
-        version: 1.62.1
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3

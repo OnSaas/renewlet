@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { LOCALE_PREFERENCES } from "../packages/shared/src/i18n-config";
+import { LOCALE_PREFERENCES } from "@renewlet/shared/i18n-config";
 import {
   captureBookmark,
   deploymentRecoveryCommand,
