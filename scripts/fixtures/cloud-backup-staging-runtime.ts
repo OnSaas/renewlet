@@ -51,6 +51,12 @@ export default {
       download: async () => { throw new Error("Unexpected remote download"); },
       prepareDirectory: async () => null,
       upload: async (_filename, content) => { await env.ASSETS_BUCKET.put("fixture-upload", content as Uint8Array<ArrayBuffer>); },
+      writeSnapshot: async (_filename, content) => { await env.ASSETS_BUCKET.put("fixture-upload", content as Uint8Array<ArrayBuffer>); },
+      verifySnapshot: async () => undefined,
+      writeManifest: async () => undefined,
+      listManifestPage: async () => ({ keys: [], cursor: null }),
+      readManifest: async () => { throw new Error("Unexpected manifest read"); },
+      deleteSnapshotFile: async () => { throw new Error("Unexpected deletion"); },
       listPage: async () => ({ manifests: [], cursor: null }),
       delete: async () => undefined,
     };

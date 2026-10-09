@@ -13,7 +13,7 @@ export class CronBudgetExceeded extends Error {
 }
 
 export class CronBudget {
-  readonly used = { sql: 0, externalReserved: 0, storageReserved: 0 };
+  readonly used = { sql: 0, externalReserved: 0, externalRequests: 0, storageReserved: 0 };
   readonly #originals = new WeakMap<D1PreparedStatement, D1PreparedStatement>();
 
   requireSql(count: number): void {
@@ -26,8 +26,13 @@ export class CronBudget {
   }
 
   consumeExternal(count: number): void {
-    if (this.used.externalReserved + count > CRON_EXTERNAL_REQUEST_LIMIT) throw new CronBudgetExceeded("external");
+    if (this.used.externalReserved + this.used.externalRequests + count > CRON_EXTERNAL_REQUEST_LIMIT) throw new CronBudgetExceeded("external");
     this.used.externalReserved += count;
+  }
+
+  consumeExternalRequest(): void {
+    if (this.used.externalReserved + this.used.externalRequests >= CRON_EXTERNAL_REQUEST_LIMIT) throw new CronBudgetExceeded("external");
+    this.used.externalRequests += 1;
   }
 
   consumeStorage(count: number): void {

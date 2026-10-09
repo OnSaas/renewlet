@@ -35,8 +35,10 @@ async function fixture(assetCount: number, subscriptions = assetCount) {
     JSON.stringify({ s3: { endpoint: "https://s3.example.test", bucket: "backups", region: "auto", prefix: "", accessKeyId: "fixture", addressingStyle: "pathStyle" } }),
     JSON.stringify({ s3SecretAccessKey: "secret-fixture" }), scheduledAt.toISOString(), scheduledAt.toISOString());
   vi.spyOn(S3CloudBackupClient.prototype, "prepareDirectory").mockResolvedValue(null);
-  vi.spyOn(S3CloudBackupClient.prototype, "listPage").mockResolvedValue({ manifests: [], cursor: null });
-  const upload = vi.spyOn(S3CloudBackupClient.prototype, "upload").mockResolvedValue(undefined);
+  vi.spyOn(S3CloudBackupClient.prototype, "listManifestPage").mockResolvedValue({ keys: [], cursor: null });
+  vi.spyOn(S3CloudBackupClient.prototype, "verifySnapshot").mockResolvedValue(undefined);
+  vi.spyOn(S3CloudBackupClient.prototype, "writeManifest").mockResolvedValue(undefined);
+  const upload = vi.spyOn(S3CloudBackupClient.prototype, "writeSnapshot").mockResolvedValue(undefined);
   const row = () => base.db.prepare("SELECT cron_cursor_json, last_status, last_error FROM cloud_backup_targets WHERE user_id = ? AND provider = 's3'").get(userId);
   const budgets: CronBudget[] = [];
   const run = async () => {
@@ -99,7 +101,7 @@ describe("durable backup asset preparation", () => {
       state.db.prepare("INSERT INTO custom_configs (user_id, config_json, created_at, updated_at) VALUES (?, ?, '', '')")
         .run(state.userId, JSON.stringify({ categories: [], statuses: [], currencies: [], paymentMethods }));
       const expected = await buildCloudBackupExportZip(state.env, state.userId, scheduledAt);
-      for (let tick = 0; tick < 6; tick++) await state.run();
+      for (let tick = 0; tick < 8; tick++) await state.run();
       expect(state.row()?.["last_status"]).toBe("success");
       const bytes = state.upload.mock.calls[0]?.[1];
       expect(bytes).toEqual(expected.content);

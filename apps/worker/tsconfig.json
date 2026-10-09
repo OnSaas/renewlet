@@ -23,6 +23,7 @@
     "tsBuildInfoFile": "./node_modules/.cache/typescript/worker.tsbuildinfo"
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "test-fixtures/**/*.ts"
   ]
 }

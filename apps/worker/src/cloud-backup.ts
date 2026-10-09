@@ -1,3 +1,4 @@
+import { persistedCloudBackupErrorMessage, stableCloudBackupErrorCode } from "./cloud-backup-errors";
 import {
   CLOUD_BACKUP_DEFAULT_RETENTION,
   CLOUD_BACKUP_DEFAULT_SCHEDULE_TIME,
@@ -264,7 +265,7 @@ export async function runScheduledCloudBackupForUser(
   const lockedUntil = new Date(now.getTime() + CLOUD_BACKUP_LOCK_MS).toISOString();
   try {
     const outcome = await runCloudBackupStep({
-      env, userId, provider, client: remoteClientForTarget(target, DEFAULT_SERVER_I18N_LOCALE),
+      env, userId, provider, client: remoteClientForTarget(target, DEFAULT_SERVER_I18N_LOCALE, budget),
       cursor: readCloudBackupCursor(stored.cron_cursor_json), retention: target.policy.retention, now, budget,
     });
     const complete = outcome.kind === "complete";
@@ -277,7 +278,7 @@ export async function runScheduledCloudBackupForUser(
           last_status = ?, last_error = ?, updated_at = ?
       WHERE user_id = ? AND provider = ? AND locked_until = ? AND cron_cursor_json = ? AND cron_claim_token = ?`)
       .bind(complete ? "{}" : JSON.stringify(outcome.cursor), backupAt, nextRun,
-        complete ? "success" : target.lastStatus, complete ? null : target.lastError, nowIso(),
+        complete ? "success" : outcome.failure ? "failed" : target.lastStatus, complete ? null : outcome.failure ?? target.lastError, nowIso(),
         userId, provider, lockedUntil, stored.cron_cursor_json, claimToken).run();
     return result.meta.changes === 1;
   } catch (error) {
@@ -318,7 +319,7 @@ function remoteClientForProvider(config: ResolvedCloudBackupConfig, provider: Cl
   return remoteClientForTarget(target, locale);
 }
 
-function remoteClientForTarget(target: ResolvedCloudBackupTarget, locale: AppLocale): CloudBackupPagedRemoteClient {
+function remoteClientForTarget(target: ResolvedCloudBackupTarget, locale: AppLocale, budget?: CronBudget): CloudBackupPagedRemoteClient {
   if (target.provider === "webdav") {
     if (!target.webdav) throw new HttpError(400, serverText(locale, "cloudBackup.configIncomplete"), "CLOUD_BACKUP_WEBDAV_REQUIRED");
     if (!target.credential.webdavPassword?.trim()) throw new HttpError(400, serverText(locale, "cloudBackup.configIncomplete"), "CLOUD_BACKUP_WEBDAV_CREDENTIAL_REQUIRED");
@@ -328,7 +329,7 @@ function remoteClientForTarget(target: ResolvedCloudBackupTarget, locale: AppLoc
   if (!target.s3.accessKeyId?.trim() || !target.credential.s3SecretAccessKey?.trim()) {
     throw new HttpError(400, serverText(locale, "cloudBackup.configIncomplete"), "CLOUD_BACKUP_S3_CREDENTIAL_REQUIRED");
   }
-  return new S3CloudBackupClient(target.s3, target.credential.s3SecretAccessKey);
+  return new S3CloudBackupClient(target.s3, target.credential.s3SecretAccessKey, budget);
 }
 
 function cloudBackupTargetsForConfig(config: ResolvedCloudBackupConfig): CloudBackupTarget[] {
@@ -622,15 +623,6 @@ function cloudBackupOperationError(locale: AppLocale, messageKey: ServerTextKey,
   return new HttpError(400, serverText(locale, messageKey), code, cloudBackupLocalErrorDetails(error));
 }
 
-function persistedCloudBackupErrorMessage(error: unknown): string {
-  if (error instanceof CloudBackupRemoteError) {
-    return error.code;
-  }
-  const candidate = stableCloudBackupErrorCode(errorMessage(error));
-  if (candidate) return candidate;
-  return "local_sdk_error";
-}
-
 function cloudBackupLocalErrorDetails(error: unknown): CloudBackupErrorDetails {
   return {
     operation: "local",
@@ -641,11 +633,6 @@ function cloudBackupLocalErrorDetails(error: unknown): CloudBackupErrorDetails {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function stableCloudBackupErrorCode(value: string): string | null {
-  const candidate = value.trim();
-  return /^CLOUD_BACKUP_[A-Z0-9_]+$/.test(candidate) ? candidate : null;
 }
 
 function credentialSetForTarget(target: ResolvedCloudBackupTarget | undefined): boolean {

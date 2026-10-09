@@ -72,7 +72,7 @@ describe("durable Cron account pipeline", () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     try {
       await runCronTick(env, new Date("2026-09-08T07:00:00Z"));
-      expect(info).toHaveBeenCalledWith("cron_resources", { event: "cron_resources", phase: "idle", sql: 3, externalReserved: 0, storageReserved: 0 });
+      expect(info).toHaveBeenCalledWith("cron_resources", { event: "cron_resources", phase: "idle", sql: 3, externalReserved: 0, externalRequests: 0, storageReserved: 0 });
       expect(db.prepare("SELECT COUNT(*) AS n FROM cron_progress").get()?.["n"]).toBe(0);
     } finally { db.close(); }
   });
