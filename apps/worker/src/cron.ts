@@ -4,6 +4,7 @@ import { CronBudget, CRON_SUBSCRIPTION_PAGE_SIZE } from "./cron-budget";
 import { claimCronAccount, cronCheckpoint, cronClaimGuard, enqueueDueCronAccounts, releaseCronClaim, type CronProgress } from "./cron-progress";
 import { runScheduledForUser } from "./notifications";
 import { runScheduledCloudBackupForUser } from "./cloud-backup";
+import { collectCloudBackupStaging } from "./cloud-backup-staging";
 import { planAutoRenewalPage } from "./subscription-renewal";
 import { getSubscriptionSchedulerState } from "./subscription-scheduler-state";
 import { addDays, dateOnlyInZone, scheduleOccurrence } from "./notification-schedule";
@@ -16,6 +17,12 @@ export async function runCronTick(env: Env, now = new Date()): Promise<void> {
   const businessEnv = { ...env, DB: budget.database(env.DB, 3) };
   let claim: CronProgress | null = null;
   try {
+    try {
+      await collectCloudBackupStaging(progressEnv, budget, now);
+    } catch (error) {
+      // 回收故障保留登记等待下一tick；不能阻断账号续订/提醒，也不能把R2错误正文写进日志。
+      console.error("cloud_backup_staging_cleanup_failed", { event: "cloud_backup_staging_cleanup_failed", error: { name: error instanceof Error ? error.name : "Error" } });
+    }
     await enqueueDueCronAccounts(progressEnv, now);
     claim = await claimCronAccount(progressEnv, now);
     if (!claim) return;

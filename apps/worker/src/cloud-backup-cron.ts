@@ -1,6 +1,8 @@
 import { z } from "zod";
-import { CLOUD_BACKUP_MAX_RETENTION } from "@renewlet/shared/schemas/cloud-backup";
-import { buildCloudBackupSnapshotPayload } from "./cloud-backup-export";
+import { CLOUD_BACKUP_MAX_RETENTION, CLOUD_BACKUP_MAX_SNAPSHOT_BYTES, type CloudBackupProvider } from "@renewlet/shared/schemas/cloud-backup";
+import { cloudBackupPayloadFromZip } from "./cloud-backup-export";
+import { prepareCloudBackupAssets } from "./cloud-backup-assets";
+import { cloudBackupStagingKeySchema, readCloudBackupStaging } from "./cloud-backup-staging";
 import { snapshotId, type CloudBackupPagedRemoteClient } from "./cloud-backup-remote";
 import type { CronBudget } from "./cron-budget";
 import type { Env } from "./types";
@@ -10,7 +12,8 @@ const common = { id: snapshotKey.shape.id, createdAt: snapshotKey.shape.createdA
 const retained = z.array(snapshotKey).max(CLOUD_BACKUP_MAX_RETENTION);
 const backupCursorSchema = z.discriminatedUnion("stage", [
   z.object({ ...common, stage: z.literal("directory"), after: z.string().nullable() }).strict(),
-  z.object({ ...common, stage: z.literal("upload") }).strict(),
+  z.object({ ...common, stage: z.literal("prepare"), stagingKey: cloudBackupStagingKeySchema.nullable() }).strict(),
+  z.object({ ...common, stage: z.literal("upload"), stagingKey: cloudBackupStagingKeySchema }).strict(),
   z.object({ ...common, stage: z.literal("scan"), after: z.string().nullable(), retained }).strict(),
   z.object({ ...common, stage: z.literal("prune"), after: z.string().nullable(), retained }).strict(),
 ]);
@@ -30,6 +33,7 @@ export function readCloudBackupCursor(raw: string): CloudBackupCursor | null {
 export async function runCloudBackupStep(input: {
   env: Env;
   userId: string;
+  provider: CloudBackupProvider;
   client: CloudBackupPagedRemoteClient;
   cursor: CloudBackupCursor | null;
   retention: number;
@@ -46,11 +50,18 @@ export async function runCloudBackupStep(input: {
     budget.consumeExternal(BACKUP_PAGE_SIZE * WEBDAV_AUTH_REQUESTS);
     const after = await client.prepareDirectory(cursor.after, BACKUP_PAGE_SIZE);
     return { kind: "continue", cursor: after === null
-      ? { id: cursor.id, createdAt: cursor.createdAt, stage: "upload" }
+      ? { id: cursor.id, createdAt: cursor.createdAt, stage: "prepare", stagingKey: null }
       : { ...cursor, after } };
   }
+  const owner = { userId: input.userId, provider: input.provider, id: cursor.id };
+  if (cursor.stage === "prepare") {
+    const prepared = await prepareCloudBackupAssets({ env: input.env, owner, exportedAt: new Date(cursor.createdAt), stagingKey: cursor.stagingKey, budget });
+    return { kind: "continue", cursor: { id: cursor.id, createdAt: cursor.createdAt, stage: prepared.complete ? "upload" : "prepare", stagingKey: prepared.stagingKey } };
+  }
   if (cursor.stage === "upload") {
-    const payload = await buildCloudBackupSnapshotPayload(input.env, input.userId, { id: cursor.id, exportedAt: new Date(cursor.createdAt), budget });
+    budget.consumeStorage(1);
+    const content = await readCloudBackupStaging(input.env, owner, cursor.stagingKey, "zip", CLOUD_BACKUP_MAX_SNAPSHOT_BYTES);
+    const payload = await cloudBackupPayloadFromZip(content, cursor.id, new Date(cursor.createdAt));
     budget.requireSql(3);
     // 三次正常上传请求加两次失败清理；目录已由上一阶段逐段建立。
     budget.consumeExternal(5 * WEBDAV_AUTH_REQUESTS);

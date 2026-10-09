@@ -35,6 +35,10 @@ export class CronBudget {
     this.used.storageReserved += count;
   }
 
+  get remainingStorage(): number {
+    return CRON_STORAGE_REQUEST_LIMIT - CRON_SQL_LIMIT - this.used.storageReserved;
+  }
+
   database(database: D1Database, reserved = 0): D1Database {
     const wrap = (statement: D1PreparedStatement): D1PreparedStatement => {
       const proxy = new Proxy(statement, {

@@ -67,13 +67,28 @@ describe("durable Cron account pipeline", () => {
     } finally { db.close(); }
   }, 120_000);
 
-  it("spends only enqueue and claim queries when no account is due", async () => {
+  it("spends only cleanup, enqueue and claim queries when no account is due", async () => {
     const { db, env } = createCronFixture(1);
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     try {
       await runCronTick(env, new Date("2026-09-08T07:00:00Z"));
-      expect(info).toHaveBeenCalledWith("cron_resources", { event: "cron_resources", phase: "idle", sql: 2, externalReserved: 0, storageReserved: 0 });
+      expect(info).toHaveBeenCalledWith("cron_resources", { event: "cron_resources", phase: "idle", sql: 3, externalReserved: 0, storageReserved: 0 });
       expect(db.prepare("SELECT COUNT(*) AS n FROM cron_progress").get()?.["n"]).toBe(0);
+    } finally { db.close(); }
+  });
+
+  it("continues account work when staged object cleanup fails without logging provider details", async () => {
+    const { db, env } = createCronFixture(1);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      db.prepare("INSERT INTO cloud_backup_staging (r2_key, created_at) VALUES (?, '')").run(`system/cloud-backup-staging/${crypto.randomUUID()}`);
+      env.ASSETS_BUCKET = { delete: vi.fn().mockRejectedValue(new Error("Bearer fixture-secret")) } as unknown as R2Bucket;
+      await runCronTick(env, scheduledAt);
+      expect(db.prepare("SELECT phase FROM cron_progress").get()?.["phase"]).toBe("notification");
+      expect(error).toHaveBeenCalledWith("cloud_backup_staging_cleanup_failed", { event: "cloud_backup_staging_cleanup_failed", error: { name: "Error" } });
+      expect(JSON.stringify(error.mock.calls)).not.toContain("fixture-secret");
+      expect(db.prepare("SELECT count(*) AS count FROM cloud_backup_staging").get()?.["count"]).toBe(1);
     } finally { db.close(); }
   });
 

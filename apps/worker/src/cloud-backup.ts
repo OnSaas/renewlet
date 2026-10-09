@@ -264,7 +264,7 @@ export async function runScheduledCloudBackupForUser(
   const lockedUntil = new Date(now.getTime() + CLOUD_BACKUP_LOCK_MS).toISOString();
   try {
     const outcome = await runCloudBackupStep({
-      env, userId, client: remoteClientForTarget(target, DEFAULT_SERVER_I18N_LOCALE),
+      env, userId, provider, client: remoteClientForTarget(target, DEFAULT_SERVER_I18N_LOCALE),
       cursor: readCloudBackupCursor(stored.cron_cursor_json), retention: target.policy.retention, now, budget,
     });
     const complete = outcome.kind === "complete";

@@ -23,7 +23,7 @@ const ZIP_END_BYTES = 22;
 
 /**
  * store-only ZIP 先按 metadata 算出精确长度，再把每个 source 原位写进唯一输出 buffer。
- * load 必须一次只返回一个 entry；调用方不能把全部资产内容预先聚合到数组中。
+ * load 一次只返回一个 entry；直接导出顺序读取R2，Cron续接可传入既有有界检查点的视图。
  * 这里故意不压缩：可精确预判 16 MiB 峰值，也避免 Worker isolate 为压缩器再保留整份输入状态。
  */
 export async function createStoredZipFromSources(

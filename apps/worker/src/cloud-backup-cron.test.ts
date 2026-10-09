@@ -5,6 +5,7 @@ import { CronBudget } from "./cron-budget";
 import { readCloudBackupCursor } from "./cloud-backup-cron";
 import { runScheduledCloudBackupForUser } from "./cloud-backup";
 import { CloudBackupRemoteError, S3CloudBackupClient, WebDAVCloudBackupClient } from "./cloud-backup-remote";
+import { createCloudBackupBucket } from "./cloud-backup-staging-test-support";
 
 vi.mock("./smtp", () => ({ notificationSmtpConfig: vi.fn(), sendSmtpEmail: vi.fn() }));
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
@@ -14,6 +15,7 @@ function fixture() {
   vi.setSystemTime(scheduledAt);
   vi.spyOn(console, "info").mockImplementation(() => undefined);
   const base = createCronFixture(1);
+  base.env.ASSETS_BUCKET = createCloudBackupBucket().bucket;
   const userId = base.ids[0] ?? "";
   for (const provider of ["webdav", "s3"] as const) {
     const config = provider === "webdav" ? { webdav: { url: "https://dav.example.test/", username: "fixture", path: "backups" } }
@@ -86,7 +88,7 @@ describe("durable cloud backup stages", () => {
     const state = fixture();
     const client = remote();
     try {
-      await state.run(); await state.run(); await state.run();
+      await state.run(); await state.run(); await state.run(); await state.run();
       const before = state.row()?.["cron_cursor_json"];
       client.upload.mockImplementationOnce(async (_filename, _bytes, value) => { client.objects.set(value.id, value); throw new Error("lost response Bearer secret"); });
       await state.run();
@@ -116,7 +118,7 @@ describe("durable cloud backup stages", () => {
       await state.run();
       client.directory.mockRejectedValue(new CloudBackupRemoteError("CLOUD_BACKUP_WEBDAV_MKCOL_FAILED"));
       await state.run();
-      for (let tick = 0; tick < 5; tick++) await state.run("s3");
+      for (let tick = 0; tick < 6; tick++) await state.run("s3");
       expect(s3Upload).toHaveBeenCalledTimes(1);
       expect(state.row("s3")?.["last_status"]).toBe("success");
       expect(state.row()?.["last_status"]).toBe("failed");
