@@ -10,9 +10,18 @@ import { CronBudget } from "./cron-budget";
 import { collectCloudBackupStaging, CLOUD_BACKUP_STAGING_GRACE_MS, readCloudBackupStaging } from "./cloud-backup-staging";
 import { readStoredZipText } from "./zip-store-test-support";
 import { prepareCloudBackupAssets } from "./cloud-backup-assets";
+import { Buffer } from "node:buffer";
 
 vi.mock("./smtp", () => ({ notificationSmtpConfig: vi.fn(), sendSmtpEmail: vi.fn() }));
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+
+function expectExactBytes(actual: Uint8Array | undefined, expected: Uint8Array) {
+  if (!actual) throw new Error("Missing uploaded ZIP bytes");
+  expect(actual.byteLength).toBe(expected.byteLength);
+  if (actual.byteLength !== expected.byteLength) return;
+  // 大型快照仍需逐字节相等；Node 原生比较避免 Vitest 递归枚举百万个 Uint8Array 元素而耗尽 CI 单测时限。
+  expect(Buffer.compare(Buffer.from(actual), Buffer.from(expected))).toBe(0);
+}
 
 async function fixture(assetCount: number, subscriptions = assetCount) {
   vi.useFakeTimers();
@@ -62,7 +71,7 @@ describe("durable backup asset preparation", () => {
       for (let tick = 0; tick < 30 && state.row()?.["last_status"] !== "success"; tick++) await state.run();
       expect(state.row()).toMatchObject({ cron_cursor_json: "{}", last_status: "success" });
       expect(state.upload).toHaveBeenCalledTimes(1);
-      expect(state.upload.mock.calls[0]?.[1]).toEqual(expected.content);
+      expectExactBytes(state.upload.mock.calls[0]?.[1], expected.content);
       expect(state.storage.head).toHaveBeenCalledTimes(count);
       expect(state.storage.get.mock.calls.filter(([key]) => key.startsWith("private/"))).toHaveLength(count);
       expect(Math.max(...state.budgets.map((budget) => budget.used.storageReserved))).toBeLessThanOrEqual(102);
@@ -104,7 +113,7 @@ describe("durable backup asset preparation", () => {
       for (let tick = 0; tick < 8; tick++) await state.run();
       expect(state.row()?.["last_status"]).toBe("success");
       const bytes = state.upload.mock.calls[0]?.[1];
-      expect(bytes).toEqual(expected.content);
+      expectExactBytes(bytes, expected.content);
       const manifest = JSON.parse(readStoredZipText(expected.content, "manifest.json"));
       expect(manifest.missingAssets.map((asset: { assetId: string; reason: string }) => [asset.assetId, asset.reason])).toEqual([["foreign", "not_found"], ["missing", "not_found"]]);
       expect(state.storage.head.mock.calls.flat()).not.toContain("secret/foreign");
@@ -133,8 +142,8 @@ describe("durable backup asset preparation", () => {
       expect(state.row()?.["cron_cursor_json"]).toBe(ready);
       await state.run();
       expect(state.upload).toHaveBeenCalledTimes(2);
-      expect(state.upload.mock.calls[0]?.[1]).toEqual(expected.content);
-      expect(state.upload.mock.calls[1]?.[1]).toEqual(expected.content);
+      expectExactBytes(state.upload.mock.calls[0]?.[1], expected.content);
+      expectExactBytes(state.upload.mock.calls[1]?.[1], expected.content);
     } finally { state.db.close(); }
   });
 

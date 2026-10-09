@@ -1,6 +1,6 @@
 module github.com/zhiyingzzhou/renewlet/apps/docker-server
 
-go 1.27.1
+go 1.27.2
 
 require (
 	github.com/arran4/golang-ical v0.3.5
@@ -13,7 +13,7 @@ require (
 	github.com/pquerna/otp v1.5.0
 	github.com/studio-b12/gowebdav v0.13.0
 	github.com/zendev-sh/goai v0.10.5
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/sys v0.48.0
 	golang.org/x/text v0.42.0
