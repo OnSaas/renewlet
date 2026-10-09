@@ -291,7 +291,7 @@ describe("Cloudflare notifications", () => {
         items: [],
       },
       channels: { attempted: [], succeeded: [], failed: [] },
-    }) as { schedule: Record<string, unknown> };
+    });
 
     expect(result.schedule).toEqual({
       scheduledLocalDate: "2026-01-09",
@@ -458,7 +458,7 @@ describe("Cloudflare notifications", () => {
     expect(finalizeParams?.[0]).toBe("skipped");
   });
 
-  it("marks partial channel failures as failed cron jobs", async () => {
+  it("checkpoints successful channels before attempting the remaining channel", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-09T08:00:00.000Z"));
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: 0, message: "ok" }), {
@@ -488,10 +488,11 @@ describe("Cloudflare notifications", () => {
     await expect(runScheduledForUser(env, "usr_due")).resolves.toEqual(expect.objectContaining({ outcome: expect.any(String) }));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(finalizeParams?.[0]).toBe("failed");
+    expect(finalizeParams?.[0]).toBe("pending");
     const result = JSON.parse(String(finalizeParams?.[3])) as { channels: { succeeded: string[]; failed: Array<{ channel: string }> } };
     expect(result.channels.succeeded).toEqual(["serverchan"]);
-    expect(result.channels.failed.map((failure) => failure.channel)).toEqual(["telegram"]);
+    expect(result.channels.failed).toEqual([]);
+    expect(JSON.parse(String(finalizeParams?.[3]))).toHaveProperty("deliveryPending", ["telegram"]);
   });
 
   it.each(["failed", "sending"] as const)("preserves successful channels when retrying %s cron jobs", async (status) => {

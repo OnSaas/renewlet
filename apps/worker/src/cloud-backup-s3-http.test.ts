@@ -62,7 +62,7 @@ describe("S3 Cron transport budget", () => {
   it.each(["file:///etc/passwd", "https://name:password@fixture.test/next"])("rejects an unsafe redirect target without sending it", async (location) => {
     const send = vi.fn(async () => new Response(null, { status: 307, headers: { location } }));
     vi.stubGlobal("fetch", send);
-    await expect(new CronS3HttpHandler(new CronBudget(), 0).handle(request())).rejects.toThrow("Invalid S3 redirect URL");
+    await expect(new CronS3HttpHandler(new CronBudget(), 0).handle(request())).rejects.toThrow("Invalid upstream redirect URL");
     expect(send).toHaveBeenCalledOnce();
   });
 
@@ -70,7 +70,7 @@ describe("S3 Cron transport budget", () => {
     const send = vi.fn(async () => new Response(null, { status: 307, headers: { location: "/next" } }));
     vi.stubGlobal("fetch", send);
     await expect(new CronS3HttpHandler(new CronBudget(), 0).handle(new HttpRequest({ ...request(), method: "PUT", body: new ReadableStream() })))
-      .rejects.toThrow("Cannot redirect a streaming S3 body");
+      .rejects.toThrow("Cannot redirect a streaming upstream body");
     expect(send).toHaveBeenCalledOnce();
   });
 });

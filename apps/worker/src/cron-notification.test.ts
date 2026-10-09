@@ -56,7 +56,7 @@ describe("notification continuation boundaries", () => {
     } finally { db.close(); }
   });
 
-  it.each([41, 42])("reserves final persistence before sending with %i SQL calls already spent", async (spent) => {
+  it.each([40, 41])("reserves final persistence before sending with %i SQL calls already spent", async (spent) => {
     vi.useFakeTimers(); vi.setSystemTime(scheduledAt);
     const sender = vi.spyOn(notificationSenders, "webhook").mockResolvedValue(undefined);
     const { db, env, ids } = createCronFixture(1);
@@ -69,7 +69,7 @@ describe("notification continuation boundaries", () => {
       const run = (budget: CronBudget) => runScheduledForUser({ ...env, DB: budget.database(env.DB, 3) }, userId, scheduledAt, { settings: enabled, leaseNow: scheduledAt, budget });
       const budget = new CronBudget(); budget.consumeSql(spent);
       await expect(run(budget)).rejects.toThrow("CRON_SQL_BUDGET_EXCEEDED");
-      if (spent === 41) {
+      if (spent === 40) {
         expect(sender).toHaveBeenCalledTimes(1);
         expect(db.prepare("SELECT status FROM notification_jobs").get()?.["status"]).toBe("sent");
       } else {

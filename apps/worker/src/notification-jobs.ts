@@ -80,7 +80,8 @@ export async function createNotificationJob(
 }
 
 export async function markNotificationJobSending(env: Env, row: NotificationJobRow, attempts: number): Promise<NotificationJobRow | null> {
-  const timestamp = nowIso();
+  // 同一毫秒也必须产生新身份，防止pending→sending→pending后旧发送者命中相同CAS。
+  const timestamp = new Date(Math.max(Date.now(), Date.parse(row.updated_at) + 1)).toISOString();
   // failed/stale sending 必须仍匹配读取时的身份；丢失抢占权的执行者不能调用外部渠道。
   const result = await env.DB.prepare(`
     UPDATE notification_jobs SET status = 'sending', attempts = ?, last_error = NULL, updated_at = ?
@@ -257,10 +258,10 @@ export function createCronJobResult(input: {
   locale: AppLocale;
   message: NotificationEmailMessage;
   channels: JobChannels;
-}): unknown {
+}) {
   // 历史 result 只保存可解释的 cron 快照，不写 provider token、完整外部响应或 manual source。
   return {
-    source: "cron",
+    source: "cron" as const,
     reason: input.reason,
     force: input.force,
     windowMinutes: input.windowMinutes,

@@ -80,7 +80,7 @@ afterEach(() => {
 });
 
 describe("Cloudflare notification scheduler gate", () => {
-  it.each(["claim", "finalize", "skip"])("keeps the due state after losing the %s race", async (phase) => {
+  it.each(["claim", "snapshot", "finalize", "skip"])("keeps the due state after losing the %s race", async (phase) => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-09T08:00:00.000Z"));
     const sender = vi.spyOn(notificationSenders, "webhook").mockResolvedValue(undefined);
@@ -99,7 +99,7 @@ describe("Cloudflare notification scheduler gate", () => {
       };
       if (method === "run" && sql.includes("SET status = 'sending'")) return d1Run(phase === "claim" ? 0 : 1);
       if (method === "run" && sql.includes("notification_job_messages")) return d1Run(0);
-      if (method === "run" && sql.includes("UPDATE notification_jobs")) { finalizations++; return d1Run(0); }
+      if (method === "run" && sql.includes("UPDATE notification_jobs")) { finalizations++; return d1Run(phase === "finalize" && finalizations === 1 ? 1 : 0); }
       if (method === "run" && sql.includes("subscription_scheduler_state")) { dueWrites++; return d1Run(1); }
       if (method === "first" && sql.includes("SUM(CASE WHEN auto_renew")) return { auto_renew_count: 0, repeat_reminder_count: 0 };
       throw new Error(`unexpected ${method} query: ${sql}`);
@@ -108,7 +108,7 @@ describe("Cloudflare notification scheduler gate", () => {
     await runScheduledForUser(env, "usr_due");
     expect(error).not.toHaveBeenCalled();
     expect(sender).toHaveBeenCalledTimes(phase === "finalize" ? 1 : 0);
-    expect(finalizations).toBe(phase === "claim" ? 0 : 1);
+    expect(finalizations).toBe(phase === "claim" ? 0 : phase === "finalize" ? 2 : 1);
     expect(dueWrites).toBe(0);
   });
 

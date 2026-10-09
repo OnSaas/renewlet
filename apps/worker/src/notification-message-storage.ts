@@ -41,7 +41,9 @@ export function restoreNotificationJobMessage(metadata: string, parts: string[])
   let fields: unknown;
   try { fields = JSON.parse(metadata); } catch { return "{}"; }
   if (!fields || typeof fields !== "object" || Array.isArray(fields) || !("messageChunkCount" in fields)) return "{}";
-  const { messageChunkCount, ...result } = fields;
+  const { messageChunkCount, ...metadataFields } = fields;
+  // 渠道续接仅供Worker调度器使用，历史API继续满足两端相同的严格公开schema。
+  const { deliveryPending: _pending, ...result } = metadataFields as Record<string, unknown>;
   // 分段数属于完整性校验，不是兼容版本；缺段不能伪装成“这次没有通知内容”。
   if (!Number.isInteger(messageChunkCount) || messageChunkCount !== parts.length || parts.length === 0) {
     throw new Error("Notification message snapshot is incomplete");

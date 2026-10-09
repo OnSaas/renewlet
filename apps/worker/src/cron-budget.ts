@@ -1,6 +1,6 @@
 // Free配额按invocation累计；batch中的每条SQL仍占一次，不能按往返次数计费。
 export const CRON_SQL_LIMIT = 50;
-const CRON_EXTERNAL_REQUEST_LIMIT = 50;
+export const CRON_EXTERNAL_REQUEST_LIMIT = 50;
 const CRON_STORAGE_REQUEST_LIMIT = 1000;
 export const CRON_SUBSCRIPTION_PAGE_SIZE = 50;
 export const CRON_CLAIM_DURATION_MS = 15 * 60_000;
@@ -25,8 +25,12 @@ export class CronBudget {
     this.used.sql += count;
   }
 
-  consumeExternal(count: number): void {
+  requireExternal(count: number): void {
     if (this.used.externalReserved + this.used.externalRequests + count > CRON_EXTERNAL_REQUEST_LIMIT) throw new CronBudgetExceeded("external");
+  }
+
+  consumeExternal(count: number): void {
+    this.requireExternal(count);
     this.used.externalReserved += count;
   }
 

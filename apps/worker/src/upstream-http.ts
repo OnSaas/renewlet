@@ -13,11 +13,15 @@ import {
   upstreamProviderResponseFromFetchResponse,
 } from "./upstream-response";
 
+import { CronBudgetExceeded, type CronBudget } from "./cron-budget";
+import { UPSTREAM_MAX_REDIRECTS, UPSTREAM_REDIRECT_STATUSES, upstreamRedirect } from "./upstream-redirect";
+
 export const DEFAULT_UPSTREAM_HTTP_TIMEOUT_MS = 10_000;
 const REQUEST_BODY_SUMMARY_MAX_CHARS = 4096;
 
 type UpstreamRequestOptions = {
   provider: string;
+  budget?: CronBudget;
   timeoutMs?: number;
   secrets?: readonly string[];
 };
@@ -58,20 +62,49 @@ export async function sendUpstreamRequest(
   options: UpstreamRequestOptions,
 ): Promise<Response> {
   const timeoutMs = normalizedTimeoutMs(options.timeoutMs);
-  const abort = createUpstreamAbort(init.signal, timeoutMs);
+  const abort = createUpstreamAbort(init.signal ?? (url instanceof Request ? url.signal : undefined), timeoutMs);
   try {
+    if (options.budget) return await sendBudgetedRequest(url, init, abort.signal, options.budget);
     // Worker fetch 没有 Go http.Client.Timeout；所有调用点必须复用这个显式超时边界。
     return await fetch(url, {
       ...init,
       ...(abort.signal ? { signal: abort.signal } : {}),
     });
   } catch (error) {
+    if (error instanceof CronBudgetExceeded) throw error;
     throw new UpstreamRequestError(
       upstreamTransportDiagnosticMessage(url, init, options, error, timeoutMs, abort.didTimeout()),
       abort.didTimeout(),
     );
   } finally {
     abort.cleanup();
+  }
+}
+
+async function sendBudgetedRequest(input: UpstreamRequestInput, init: RequestInit, signal: AbortSignal | undefined, budget: CronBudget): Promise<Response> {
+  const initial = new Request(input, init);
+  let url = new URL(initial.url);
+  let method = initial.method;
+  let body = init.body ?? initial.body;
+  // 让Fetch本身归一化自动Content-Type和替换headers，不能把原请求的鉴权头错误合并到新headers。
+  const headers = new Headers(initial.headers);
+  const mode = initial.redirect;
+  for (let redirects = 0; ; redirects++) {
+    signal?.throwIfAborted();
+    budget.consumeExternalRequest();
+    const response = await fetch(url, { ...init, method, headers, body: body ?? null, ...(signal ? { signal } : {}), redirect: "manual" });
+    const location = response.headers.get("location");
+    if (!UPSTREAM_REDIRECT_STATUSES.has(response.status) || mode === "manual") return response;
+    if (mode !== "error" && location === null) return response;
+    if (response.body) await response.body.cancel();
+    if (mode === "error") throw new TypeError("Upstream redirect disallowed");
+    if (redirects === UPSTREAM_MAX_REDIRECTS) throw new TypeError("Too many upstream redirects");
+    const next = upstreamRedirect(url, location ?? "", response.status, method, body instanceof ReadableStream);
+    // 当前workerd跨源剥离Authorization、保留Cookie及Content-*；计数不能扩大原有凭据转发范围。
+    if (next.url.origin !== url.origin) headers.delete("authorization");
+    url = next.url;
+    method = next.method;
+    if (next.dropBody) body = null;
   }
 }
 
