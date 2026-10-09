@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { S3CloudBackupClient, WebDAVCloudBackupClient } from "./cloud-backup-remote";
-import { fetchCallFromArgs, installWebDAVFetchPatcher } from "./cloud-backup-test-fixtures";
+import { fetchCallFromArgs } from "./cloud-backup-test-fixtures";
 
-installWebDAVFetchPatcher();
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 const snapshot = (id: string) => ({ kind: "renewlet-cloud-backup-snapshot", schemaVersion: 1, id, filename: `${id}.zip`, createdAt: "2026-09-08T08:00:00.000Z", sizeBytes: 100, sha256: "a".repeat(64), exportKind: "renewlet-export", exportSchemaVersion: 1 });
 

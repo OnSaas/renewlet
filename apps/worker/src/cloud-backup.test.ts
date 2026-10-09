@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   emptyWebDAVMultiStatus,
   fetchCallFromArgs,
-  installWebDAVFetchPatcher,
   stubRemoteSuccessFetch,
 } from "./cloud-backup-test-fixtures";
 import {
@@ -30,7 +29,6 @@ type CloudBackupRemoteErrorMatch = Omit<Partial<CloudBackupRemoteError>, "detail
 
 const authUser = userRow();
 
-installWebDAVFetchPatcher();
 
 const authMocks = vi.hoisted(() => ({
   requireAuth: vi.fn(),

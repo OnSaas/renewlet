@@ -49,6 +49,7 @@ import type { CloudBackupTargetRow, Env, UserRow } from "./types";
 import type { ApiAppSettings } from "@renewlet/shared/schemas/settings";
 import { CronBudgetExceeded, type CronBudget } from "./cron-budget";
 import { readCloudBackupCursor, runCloudBackupStep } from "./cloud-backup-cron";
+import { WebDAVOperationLimitExceeded } from "./cloud-backup-webdav";
 
 const CLOUD_BACKUP_COLUMNS = [
   "user_id",
@@ -284,10 +285,14 @@ export async function runScheduledCloudBackupForUser(
   } catch (error) {
     // 游标保留在失败之前的阶段；已上传的固定ID不会因为保留策略失败而重新生成另一份快照。
     const message = error instanceof CronBudgetExceeded ? error.message : persistedCloudBackupErrorMessage(error);
+    // 单操作已用满完整外发额度时关闭当前目标的定时开关；保留断点，修正配置后由用户重新开启。
+    const pause = error instanceof WebDAVOperationLimitExceeded;
     const result = await checkpointDB.prepare(`UPDATE cloud_backup_targets
-      SET locked_until = NULL, cron_claim_token = NULL, last_status = 'failed', last_error = ?, updated_at = ?
+      SET locked_until = NULL, cron_claim_token = NULL, last_status = 'failed', last_error = ?, updated_at = ?,
+          schedule_enabled = CASE WHEN ? THEN 0 ELSE schedule_enabled END,
+          next_run_at_utc = CASE WHEN ? THEN NULL ELSE next_run_at_utc END
       WHERE user_id = ? AND provider = ? AND locked_until = ? AND cron_cursor_json = ? AND cron_claim_token = ?`)
-      .bind(message, nowIso(), userId, provider, lockedUntil, stored.cron_cursor_json, claimToken).run();
+      .bind(message, nowIso(), boolToInt(pause), boolToInt(pause), userId, provider, lockedUntil, stored.cron_cursor_json, claimToken).run();
     return result.meta.changes === 1;
   }
 }
@@ -323,7 +328,7 @@ function remoteClientForTarget(target: ResolvedCloudBackupTarget, locale: AppLoc
   if (target.provider === "webdav") {
     if (!target.webdav) throw new HttpError(400, serverText(locale, "cloudBackup.configIncomplete"), "CLOUD_BACKUP_WEBDAV_REQUIRED");
     if (!target.credential.webdavPassword?.trim()) throw new HttpError(400, serverText(locale, "cloudBackup.configIncomplete"), "CLOUD_BACKUP_WEBDAV_CREDENTIAL_REQUIRED");
-    return new WebDAVCloudBackupClient(target.webdav, target.credential.webdavPassword);
+    return new WebDAVCloudBackupClient(target.webdav, target.credential.webdavPassword, budget);
   }
   if (!target.s3) throw new HttpError(400, serverText(locale, "cloudBackup.configIncomplete"), "CLOUD_BACKUP_S3_REQUIRED");
   if (!target.s3.accessKeyId?.trim() || !target.credential.s3SecretAccessKey?.trim()) {

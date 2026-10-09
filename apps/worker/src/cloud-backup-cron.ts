@@ -9,7 +9,6 @@ import { CronBudgetExceeded, type CronBudget } from "./cron-budget";
 import type { Env } from "./types";
 
 const BACKUP_PAGE_SIZE = 4;
-const WEBDAV_AUTH_REQUESTS = 3;
 const snapshotKey = z.object({ id: z.string().regex(/^[A-Za-z0-9_-]+$/), createdAt: z.iso.datetime() }).strict();
 const common = { id: snapshotKey.shape.id, createdAt: snapshotKey.shape.createdAt };
 const retained = z.array(snapshotKey).max(CLOUD_BACKUP_MAX_RETENTION);
@@ -51,8 +50,7 @@ export async function runCloudBackupStep(input: {
     const prepared = await prepareCloudBackupAssets({ env: input.env, owner, exportedAt: new Date(cursor.createdAt), stagingKey: cursor.stagingKey, budget });
     return { kind: "continue", cursor: { ...identity, stage: prepared.complete ? "upload" : "prepare", stagingKey: prepared.stagingKey } };
   }
-  // 一片只做一个远端操作；S3在实例传输层逐跳计数。WebDAV仍为认证请求预留，不能冒充已覆盖重定向。
-  if (input.provider === "webdav") budget.consumeExternal(WEBDAV_AUTH_REQUESTS);
+  // 一片只做一个远端操作；认证握手与重定向都在传输层按实际请求计入同一预算。
   if (cursor.stage === "directory") {
     const after = await client.prepareDirectory(cursor.after, 1);
     return { kind: "continue", cursor: after === null ? { ...identity, stage: "prepare", stagingKey: null } : { ...cursor, after } };

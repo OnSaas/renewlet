@@ -64,10 +64,11 @@ export class WebDAVCloudBackupClient implements CloudBackupPagedRemoteClient {
   private readonly client: WorkerWebDAVClient;
   private readonly diagnosticSecrets: readonly string[];
 
-  constructor(private readonly settings: CloudBackupWebDavConfig, private readonly password: string) {
+  constructor(private readonly settings: CloudBackupWebDavConfig, private readonly password: string, budget?: CronBudget) {
     this.diagnosticSecrets = [settings.username ?? "", password];
     this.client = new WorkerWebDAVClient({
       baseURL: settings.url,
+      budget,
       username: settings.username ?? "",
       password,
       timeoutMs: CLOUD_BACKUP_UPSTREAM_TIMEOUT_MS,
@@ -236,6 +237,7 @@ export class WebDAVCloudBackupClient implements CloudBackupPagedRemoteClient {
     try {
       return await action();
     } catch (error) {
+      if (error instanceof CronBudgetExceeded) throw error;
       throw await webDavRemoteError(code, operation, this.remoteTarget(path), error, this.diagnosticSecrets);
     }
   }

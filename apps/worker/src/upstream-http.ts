@@ -64,12 +64,11 @@ export async function sendUpstreamRequest(
   const timeoutMs = normalizedTimeoutMs(options.timeoutMs);
   const abort = createUpstreamAbort(init.signal ?? (url instanceof Request ? url.signal : undefined), timeoutMs);
   try {
-    if (options.budget) return await sendBudgetedRequest(url, init, abort.signal, options.budget);
     // Worker fetch 没有 Go http.Client.Timeout；所有调用点必须复用这个显式超时边界。
-    return await fetch(url, {
+    return await fetchUpstream(url, {
       ...init,
       ...(abort.signal ? { signal: abort.signal } : {}),
-    });
+    }, options.budget);
   } catch (error) {
     if (error instanceof CronBudgetExceeded) throw error;
     throw new UpstreamRequestError(
@@ -81,8 +80,14 @@ export async function sendUpstreamRequest(
   }
 }
 
-async function sendBudgetedRequest(input: UpstreamRequestInput, init: RequestInit, signal: AbortSignal | undefined, budget: CronBudget): Promise<Response> {
+// 协议SDK复用相同外发出口，但自行拥有整次认证操作的超时和错误语义，不能逐次握手重置。
+export function fetchUpstream(input: RequestInfo | URL, init: RequestInit, budget?: CronBudget): Promise<Response> {
+  return budget ? fetchWithBudget(input, init, budget) : fetch(input, init);
+}
+
+async function fetchWithBudget(input: RequestInfo | URL, init: RequestInit, budget: CronBudget): Promise<Response> {
   const initial = new Request(input, init);
+  const signal = init.signal ?? initial.signal;
   let url = new URL(initial.url);
   let method = initial.method;
   let body = init.body ?? initial.body;
